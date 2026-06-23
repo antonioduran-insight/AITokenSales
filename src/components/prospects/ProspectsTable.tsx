@@ -71,6 +71,7 @@ export function ProspectsTable() {
   const [reassigning, setReassigning] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // Drawer
   const [drawerProspect, setDrawerProspect] = useState<Prospect | null>(null)
@@ -166,6 +167,7 @@ export function ProspectsTable() {
   async function handleBulkDelete() {
     if (selected.size === 0) return
     setDeleting(true)
+    setDeleteError(null)
     try {
       const ids = Array.from(selected)
       const res = await fetch('/api/prospects', {
@@ -175,12 +177,14 @@ export function ProspectsTable() {
       })
       if (!res.ok) {
         const json = await res.json()
-        console.error('Delete failed:', json.error)
+        setDeleteError(json.error ?? 'Error desconocido')
         return
       }
       setSelected(new Set())
       setConfirmDelete(false)
       fetchProspects()
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'Error de red')
     } finally {
       setDeleting(false)
     }
@@ -450,7 +454,7 @@ export function ProspectsTable() {
       {/* Delete confirm modal */}
       {confirmDelete && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
-          onClick={e => { if (e.target === e.currentTarget) setConfirmDelete(false) }}>
+          onClick={e => { if (e.target === e.currentTarget) { setConfirmDelete(false); setDeleteError(null) } }}>
           <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 28, width: 380, maxWidth: '90vw' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
               <div style={{ width: 36, height: 36, borderRadius: '50%', backgroundColor: '#EF444420', border: '1px solid #EF444440', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -461,8 +465,13 @@ export function ProspectsTable() {
             <p style={{ fontSize: 13, color: '#8B8BA0', lineHeight: 1.6, marginBottom: 20 }}>
               ¿Eliminás permanentemente <strong style={{ color: '#F0F0F5' }}>{selected.size} lead{selected.size > 1 ? 's' : ''}</strong>? Esta acción no se puede deshacer.
             </p>
+            {deleteError && (
+              <div style={{ padding: '10px 14px', backgroundColor: '#EF444415', border: '1px solid #EF444440', borderRadius: 8, marginBottom: 16, fontSize: 12, color: '#EF4444' }}>
+                {deleteError}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 10 }}>
-              <Button onClick={() => setConfirmDelete(false)} style={{ flex: 1, backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>
+              <Button onClick={() => { setConfirmDelete(false); setDeleteError(null) }} style={{ flex: 1, backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>
                 {t('common.cancel')}
               </Button>
               <Button

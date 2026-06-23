@@ -31,6 +31,9 @@ export async function DELETE(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
+  // Clear FK references in audit_log before deleting
+  await adminClient.from('audit_log').update({ prospect_id: null }).in('prospect_id', ids)
+
   const { error } = await adminClient.from('prospects').delete().in('id', ids)
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
