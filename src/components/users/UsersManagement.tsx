@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
 import { Button } from '@/components/ui/button'
 import { AreaBadge } from '@/components/ui/AreaBadge'
-import { Plus, UserX, UserCheck, RefreshCw, Eye, EyeOff, Trash2 } from 'lucide-react'
+import { Plus, UserX, UserCheck, RefreshCw, Eye, EyeOff, Trash2, UserMinus } from 'lucide-react'
 import { format } from 'date-fns'
 import type { User, Area } from '@/lib/types'
 
@@ -49,6 +49,9 @@ export function UsersManagement() {
   const [deleteUser, setDeleteUser] = useState<UserWithArea | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+
+  // Unassign leads
+  const [unassigning, setUnassigning] = useState<string | null>(null) // holds SDR id being unassigned
 
   useEffect(() => {
     createClient().from('areas').select('*').eq('is_active', true).order('name').then(({ data }) => {
@@ -129,6 +132,16 @@ export function UsersManagement() {
       fetchUsers()
     } finally {
       setDeactivating(false)
+    }
+  }
+
+  async function handleUnassign(u: UserWithArea) {
+    setUnassigning(u.id)
+    try {
+      await createClient().from('prospects').update({ assigned_to: null }).eq('assigned_to', u.id)
+      await logAuditEvent({ event_type: 'prospect_reassigned', metadata: { from: u.full_name, to: 'unassigned', action: 'bulk_unassign' } })
+    } finally {
+      setUnassigning(null)
     }
   }
 
@@ -234,6 +247,14 @@ export function UsersManagement() {
                         }}
                       >
                         {u.is_active ? <><UserX size={12} /> {t('deactivate')}</> : <><UserCheck size={12} /> {t('reactivate')}</>}
+                      </button>
+                      <button
+                        onClick={() => handleUnassign(u)}
+                        disabled={unassigning === u.id}
+                        title="Desasignar todos los leads"
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 5, fontSize: 11, cursor: 'pointer', border: '1px solid #F59E0B40', backgroundColor: '#F59E0B10', color: '#F59E0B', opacity: unassigning === u.id ? 0.5 : 1 }}
+                      >
+                        <UserMinus size={12} /> {unassigning === u.id ? '...' : 'Unassign'}
                       </button>
                       <button
                         onClick={() => { setDeleteError(''); setDeleteUser(u) }}

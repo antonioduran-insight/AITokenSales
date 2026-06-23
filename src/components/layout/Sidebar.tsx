@@ -26,7 +26,7 @@ export function Sidebar({ user }: Props) {
   const navItems = [
     { href: '/kanban', label: t('kanban'), icon: LayoutGrid, always: true },
     { href: '/prospects', label: t('prospects'), icon: Users2, always: true },
-    { href: '/admin/import', label: t('import'), icon: UploadCloud, adminOnly: true },
+    { href: '/import', label: t('import'), icon: UploadCloud, always: true },
     { href: '/audit', label: t('audit'), icon: ClipboardList, adminOnly: true },
     { href: '/stats', label: t('stats'), icon: BarChart3, adminOnly: true },
     { href: '/admin/users', label: t('users'), icon: Users, adminOnly: true },

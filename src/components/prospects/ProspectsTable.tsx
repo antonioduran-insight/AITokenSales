@@ -8,7 +8,7 @@ import { useUser } from '@/contexts/UserContext'
 import { ProspectDrawer } from './ProspectDrawer'
 import { TemperatureBadge } from '@/components/ui/TemperatureBadge'
 import { AreaBadge } from '@/components/ui/AreaBadge'
-import { Search, ChevronLeft, ChevronRight, Users, RefreshCw, X } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, Users, RefreshCw, X, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, Area, User, LeadTemperature } from '@/lib/types'
@@ -68,6 +68,8 @@ export function ProspectsTable() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [reassignTo, setReassignTo] = useState('')
   const [reassigning, setReassigning] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   // Drawer
   const [drawerProspect, setDrawerProspect] = useState<Prospect | null>(null)
@@ -160,6 +162,20 @@ export function ProspectsTable() {
     }
   }
 
+  async function handleBulkDelete() {
+    if (selected.size === 0) return
+    setDeleting(true)
+    try {
+      const ids = Array.from(selected)
+      await createClient().from('prospects').delete().in('id', ids)
+      setSelected(new Set())
+      setConfirmDelete(false)
+      fetchProspects()
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   function clearFilters() {
     setSearch('')
     setFilterArea('')
@@ -244,6 +260,13 @@ export function ProspectsTable() {
             >
               {reassigning ? t('common.reassigning') : t('common.reassign')}
             </Button>
+            <div style={{ width: 1, height: 20, backgroundColor: '#2A2A3A' }} />
+            <button
+              onClick={() => setConfirmDelete(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 5, border: '1px solid #EF444440', backgroundColor: '#EF444410', color: '#EF4444', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+            >
+              <Trash2 size={12} /> Eliminar ({selected.size})
+            </button>
             <button onClick={() => setSelected(new Set())} style={{ padding: '4px 8px', borderRadius: 4, border: 'none', backgroundColor: 'transparent', color: '#52526A', cursor: 'pointer', fontSize: 12 }}>
               {t('common.cancel')}
             </button>
@@ -404,6 +427,36 @@ export function ProspectsTable() {
             setDrawerProspect(updated)
           }}
         />
+      )}
+
+      {/* Delete confirm modal */}
+      {confirmDelete && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
+          onClick={e => { if (e.target === e.currentTarget) setConfirmDelete(false) }}>
+          <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 28, width: 380, maxWidth: '90vw' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', backgroundColor: '#EF444420', border: '1px solid #EF444440', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Trash2 size={16} color="#EF4444" />
+              </div>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: '#EF4444' }}>Eliminar leads</h2>
+            </div>
+            <p style={{ fontSize: 13, color: '#8B8BA0', lineHeight: 1.6, marginBottom: 20 }}>
+              ¿Eliminás permanentemente <strong style={{ color: '#F0F0F5' }}>{selected.size} lead{selected.size > 1 ? 's' : ''}</strong>? Esta acción no se puede deshacer.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Button onClick={() => setConfirmDelete(false)} style={{ flex: 1, backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                onClick={handleBulkDelete}
+                disabled={deleting}
+                style={{ flex: 1, backgroundColor: '#EF4444', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+              >
+                <Trash2 size={13} /> {deleting ? 'Eliminando...' : `Eliminar ${selected.size}`}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

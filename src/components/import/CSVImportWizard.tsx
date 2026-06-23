@@ -86,13 +86,13 @@ const S: Record<string, React.CSSProperties> = {
 }
 
 export function CSVImportWizard() {
-  const { user } = useUser()
+  const { user, isAdmin } = useUser()
   const t = useTranslations('import')
   const tc = useTranslations('common')
 
   const [step, setStep] = useState<Step>(1)
 
-  // Step 2: area selection
+  // Step 2: area selection (admin only — SDRs use their own area automatically)
   const [selectedArea, setSelectedArea] = useState<AreaName | null>(null)
   const [selectedAreaId, setSelectedAreaId] = useState<string>('')
 
@@ -112,7 +112,7 @@ export function CSVImportWizard() {
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Fetch area id when area is selected
+  // Fetch area id when area is selected (admin flow)
   async function handleAreaSelect(areaName: AreaName) {
     setSelectedArea(areaName)
     const { data } = await createClient().from('areas').select('id').eq('name', areaName).single()
@@ -123,14 +123,27 @@ export function CSVImportWizard() {
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (result) => {
+      complete: async (result) => {
         const headers = result.meta.fields ?? []
         setCsvHeaders(headers)
         setCsvData(result.data)
         const autoMap: Record<string, ProspectFieldKey | ''> = {}
         headers.forEach(h => { autoMap[h] = autoDetect(h) })
         setMapping(autoMap)
-        setStep(2)
+
+        if (!isAdmin && user?.area_id) {
+          // SDR: resolve their area name for display, then skip to step 3
+          const { data: areaData } = await createClient()
+            .from('areas')
+            .select('name')
+            .eq('id', user.area_id)
+            .single()
+          setSelectedAreaId(user.area_id)
+          if (areaData) setSelectedArea(areaData.name as AreaName)
+          setStep(3)
+        } else {
+          setStep(2)
+        }
       },
     })
   }
@@ -265,8 +278,11 @@ export function CSVImportWizard() {
 
   function resetWizard() {
     setStep(1)
-    setSelectedArea(null)
-    setSelectedAreaId('')
+    // Keep SDR area pre-loaded — it never changes
+    if (isAdmin) {
+      setSelectedArea(null)
+      setSelectedAreaId('')
+    }
     setCsvHeaders([])
     setCsvData([])
     setMapping({})
@@ -279,7 +295,21 @@ export function CSVImportWizard() {
   const errorCount = rows.filter(r => r.status === 'error').length
   const willImport = rows.filter(r => !r.skip && r.status !== 'error').length
 
-  const STEP_LABELS = [t('step1'), 'Área', t('step2'), t('step3'), t('step4')]
+  // SDRs skip step 2 (area), so remap display steps
+  const adminSteps = [
+    { s: 1 as Step, label: t('step1') },
+    { s: 2 as Step, label: 'Área' },
+    { s: 3 as Step, label: t('step2') },
+    { s: 4 as Step, label: t('step3') },
+    { s: 5 as Step, label: t('step4') },
+  ]
+  const sdrSteps = [
+    { s: 1 as Step, label: t('step1') },
+    { s: 3 as Step, label: t('step2') },
+    { s: 4 as Step, label: t('step3') },
+    { s: 5 as Step, label: t('step4') },
+  ]
+  const displaySteps = isAdmin ? adminSteps : sdrSteps
 
   return (
     <div style={S.page}>
@@ -289,7 +319,7 @@ export function CSVImportWizard() {
 
       {/* Step indicator */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 28 }}>
-        {([1, 2, 3, 4, 5] as Step[]).map((s, i) => {
+        {displaySteps.map(({ s, label }, i) => {
           const done = step > s
           const active = step === s
           return (
@@ -305,10 +335,10 @@ export function CSVImportWizard() {
                   {done ? '✓' : s}
                 </div>
                 <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: active ? '#F0F0F5' : '#52526A' }}>
-                  {STEP_LABELS[i]}
+                  {label}
                 </span>
               </div>
-              {i < 4 && <div style={{ width: 32, height: 1, backgroundColor: '#2A2A3A', margin: '0 10px' }} />}
+              {i < displaySteps.length - 1 && <div style={{ width: 32, height: 1, backgroundColor: '#2A2A3A', margin: '0 10px' }} />}
             </div>
           )
         })}
@@ -462,7 +492,7 @@ export function CSVImportWizard() {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
-            <Button onClick={() => setStep(2)} style={{ backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>
+            <Button onClick={() => setStep(isAdmin ? 2 : 1)} style={{ backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>
               <ChevronLeft size={14} /> {tc('back')}
             </Button>
             <Button
