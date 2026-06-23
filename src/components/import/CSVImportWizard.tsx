@@ -268,6 +268,7 @@ export function CSVImportWizard() {
         area_id: selectedAreaId,
         source: 'csv_import' as const,
         created_by: user?.id ?? null,
+        assigned_to: user?.id ?? null,
         flag_tomorrow: false,
       }
     })
