@@ -107,7 +107,7 @@ export function CSVImportWizard() {
 
   // Step 5: import
   const [importing, setImporting] = useState(false)
-  const [results, setResults] = useState<{ imported: number; skipped: number; forced: number; errors: number; totalRows: number } | null>(null)
+  const [results, setResults] = useState<{ imported: number; skipped: number; forced: number; errors: number; totalRows: number; skippedConstraint: number } | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
 
   const [dragOver, setDragOver] = useState(false)
@@ -241,7 +241,7 @@ export function CSVImportWizard() {
 
   async function runImportWithRows(targetRows: ParsedRow[]) {
     setImporting(true)
-    let imported = 0, skipped = 0, forced = 0
+    let imported = 0, skipped = 0, forced = 0, skippedConstraint = 0
 
     const toInsert = targetRows.filter(r => r.status !== 'error' && !r.skip)
     const errorRows = targetRows.filter(r => r.status === 'error')
@@ -285,6 +285,7 @@ export function CSVImportWizard() {
         const data = await res.json()
         if (res.ok) {
           imported = data.imported ?? 0
+          skippedConstraint = data.skippedConstraint ?? 0
           if (data.errors?.length) setImportError(data.errors.join(', '))
         } else {
           setImportError(data.error ?? `HTTP ${res.status}`)
@@ -301,7 +302,7 @@ export function CSVImportWizard() {
       metadata: { imported, skipped, forced, errors: errorRows.length, total: targetRows.length, area: selectedArea },
     })
 
-    setResults({ imported, skipped, forced, errors: errorRows.length, totalRows: targetRows.length })
+    setResults({ imported, skipped, forced, errors: errorRows.length, totalRows: targetRows.length, skippedConstraint })
     setImporting(false)
     setStep(5)
   }
@@ -676,6 +677,12 @@ export function CSVImportWizard() {
               <div style={{ fontSize: 34, fontWeight: 700, color: '#F59E0B' }}>{results.skipped}</div>
               <div style={{ fontSize: 12, color: '#8B8BA0' }}>Duplicados omitidos</div>
             </div>
+            {results.skippedConstraint > 0 && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 34, fontWeight: 700, color: '#52526A' }}>{results.skippedConstraint}</div>
+                <div style={{ fontSize: 12, color: '#8B8BA0' }}>Ya existían (global)</div>
+              </div>
+            )}
             {results.errors > 0 && (
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 34, fontWeight: 700, color: '#EF4444' }}>{results.errors}</div>

@@ -79,21 +79,36 @@ export async function PUT(req: NextRequest) {
   )
 
   let imported = 0
+  let skippedConstraint = 0
   const errors: string[] = []
 
   for (let i = 0; i < records.length; i += 100) {
     const batch = records.slice(i, i + 100)
     const { error, data } = await admin.from('prospects').insert(batch).select('id')
     if (error) {
-      errors.push(error.message)
+      if (error.code === '23505') {
+        // Unique constraint violation in batch — retry one by one to skip only conflicts
+        for (const record of batch) {
+          const { error: e, data: d } = await admin.from('prospects').insert(record).select('id')
+          if (!e) {
+            imported += d?.length ?? 0
+          } else if (e.code === '23505') {
+            skippedConstraint++
+          } else {
+            errors.push(e.message)
+          }
+        }
+      } else {
+        errors.push(error.message)
+      }
     } else {
       imported += data?.length ?? 0
     }
   }
 
-  if (errors.length > 0 && imported === 0) {
+  if (errors.length > 0 && imported === 0 && skippedConstraint === 0) {
     return NextResponse.json({ error: errors[0] }, { status: 400 })
   }
 
-  return NextResponse.json({ ok: true, imported, errors })
+  return NextResponse.json({ ok: true, imported, skippedConstraint, errors })
 }
