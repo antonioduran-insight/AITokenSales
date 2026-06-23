@@ -1,26 +1,137 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* AITokenSales — Dark Professional Theme */
+:root {
+  --crm-background:     #0A0A0F;
+  --crm-surface:        #13131A;
+  --crm-surface-raised: #1C1C27;
+  --crm-border:         #2A2A3A;
+  --crm-accent:         #6C63FF;
+  --crm-accent-hover:   #5A52E0;
+  --crm-success:        #22C55E;
+  --crm-warning:        #F59E0B;
+  --crm-danger:         #EF4444;
+  --crm-text-primary:   #F0F0F5;
+  --crm-text-secondary: #8B8BA0;
+  --crm-text-muted:     #52526A;
+
+  /* Override shadcn defaults to dark theme */
+  --background: #0A0A0F;
+  --foreground: #F0F0F5;
+  --card: #13131A;
+  --card-foreground: #F0F0F5;
+  --popover: #1C1C27;
+  --popover-foreground: #F0F0F5;
+  --primary: #6C63FF;
+  --primary-foreground: #F0F0F5;
+  --secondary: #1C1C27;
+  --secondary-foreground: #F0F0F5;
+  --muted: #1C1C27;
+  --muted-foreground: #8B8BA0;
+  --accent: #6C63FF;
+  --accent-foreground: #F0F0F5;
+  --destructive: #EF4444;
+  --border: #2A2A3A;
+  --input: #2A2A3A;
+  --ring: #6C63FF;
+  --radius: 0.5rem;
+  --sidebar: #13131A;
+  --sidebar-foreground: #F0F0F5;
+  --sidebar-primary: #6C63FF;
+  --sidebar-primary-foreground: #F0F0F5;
+  --sidebar-accent: #1C1C27;
+  --sidebar-accent-foreground: #F0F0F5;
+  --sidebar-border: #2A2A3A;
+  --sidebar-ring: #6C63FF;
+  --chart-1: #6C63FF;
+  --chart-2: #22C55E;
+  --chart-3: #F59E0B;
+  --chart-4: #EF4444;
+  --chart-5: #60A5FA;
+}
+
+/* Area badge colors */
+.area-badge-taiwan {
+  background-color: #1E3A5F;
+  color: #60A5FA;
+}
+.area-badge-latam {
+  background-color: #1A3A2A;
+  color: #4ADE80;
+}
+.area-badge-vietnam {
+  background-color: #3A1A1A;
+  color: #F87171;
+}
+.area-badge-europe {
+  background-color: #2A2A1A;
+  color: #FCD34D;
+  opacity: 0.6;
+}
+
+/* JetBrains Mono for ICP Score and timestamps */
+.font-mono-data {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  body {
+    @apply bg-background text-foreground;
+    background-color: #0A0A0F;
+    color: #F0F0F5;
+  }
+  html {
+    @apply font-sans;
+  }
 }

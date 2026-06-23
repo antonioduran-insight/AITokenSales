@@ -1,0 +1,621 @@
+'use client'
+
+import { useState, useRef } from 'react'
+import { useTranslations } from 'next-intl'
+import { createClient } from '@/lib/supabase/client'
+import { logAuditEvent } from '@/lib/utils/audit'
+import { useUser } from '@/contexts/UserContext'
+import { Button } from '@/components/ui/button'
+import { UploadCloud, CheckCircle, ChevronRight, ChevronLeft, SkipForward, AlertTriangle } from 'lucide-react'
+import Papa from 'papaparse'
+import type { AreaName } from '@/lib/types'
+import { SEARCH_COMBOS, LEAD_TEMPERATURES } from '@/lib/types'
+
+const PROSPECT_FIELDS = [
+  { key: 'name', label: 'Full Name', required: true },
+  { key: 'linkedin_url', label: 'LinkedIn URL', required: false },
+  { key: 'email', label: 'Email', required: false },
+  { key: 'company', label: 'Company', required: false },
+  { key: 'title', label: 'Job Title', required: false },
+  { key: 'industry', label: 'Industry', required: false },
+  { key: 'company_size', label: 'Company Size', required: false },
+  { key: 'icp_score', label: 'ICP Score', required: false },
+  { key: 'lead_temperature', label: 'Temperature (Cold/Warm/Hot)', required: false },
+  { key: 'search_combo', label: 'Search Combo (A-F)', required: false },
+  { key: 'scrape_date', label: 'Scrape Date', required: false },
+  { key: 'market', label: 'Market / Country', required: false },
+  { key: 'custom1', label: 'Custom 1 (msg1)', required: false },
+  { key: 'custom2', label: 'Custom 2 (msg2)', required: false },
+  { key: 'custom3', label: 'Custom 3 (msg3)', required: false },
+] as const
+
+type ProspectFieldKey = typeof PROSPECT_FIELDS[number]['key']
+
+function autoDetect(col: string): ProspectFieldKey | '' {
+  const c = col.toLowerCase().replace(/[\s_-]/g, '')
+  if (['name', 'fullname', 'leadname', 'contactname'].includes(c)) return 'name'
+  if (['linkedin', 'linkedinurl', 'profileurl', 'linkedinprofile'].includes(c)) return 'linkedin_url'
+  if (['email', 'emailaddress', 'mail'].includes(c)) return 'email'
+  if (['company', 'companyname', 'organization', 'org'].includes(c)) return 'company'
+  if (['title', 'jobtitle', 'position', 'role', 'jobrole'].includes(c)) return 'title'
+  if (['industry', 'sector', 'vertical'].includes(c)) return 'industry'
+  if (['companysize', 'size', 'employees', 'headcount'].includes(c)) return 'company_size'
+  if (['icpscore', 'score', 'icp'].includes(c)) return 'icp_score'
+  if (['temperature', 'leadtemperature', 'temp', 'leadtemp'].includes(c)) return 'lead_temperature'
+  if (['searchcombo', 'combo', 'comboused'].includes(c)) return 'search_combo'
+  if (['scrapedate', 'date', 'scrapeddate', 'scrapedat'].includes(c)) return 'scrape_date'
+  if (['custom1', 'mensaje1', 'message1', 'msg1'].includes(c)) return 'custom1'
+  if (['custom2', 'mensaje2', 'message2', 'msg2'].includes(c)) return 'custom2'
+  if (['custom3', 'mensaje3', 'message3', 'msg3'].includes(c)) return 'custom3'
+  if (['market', 'country', 'region', 'location', 'geography', 'geo'].includes(c)) return 'market'
+  return ''
+}
+
+interface ParsedRow {
+  raw: Record<string, string>
+  mapped: Record<string, string>
+  status: 'new' | 'duplicate' | 'error'
+  duplicateType?: 'email' | 'linkedin' | 'both'
+  duplicateName?: string
+  error?: string
+  skip: boolean
+}
+
+type Step = 1 | 2 | 3 | 4 | 5
+
+const AREA_OPTIONS: { name: AreaName; label: string; disabled?: boolean; disabledReason?: string }[] = [
+  { name: 'taiwan', label: 'Taiwan / SEA' },
+  { name: 'latam', label: 'LATAM' },
+  { name: 'vietnam', label: 'Vietnam' },
+  { name: 'europe', label: 'Europe', disabled: true, disabledReason: 'Area not yet active' },
+]
+
+const AREA_COLORS: Record<AreaName, string> = {
+  taiwan: '#6C63FF',
+  latam: '#22C55E',
+  vietnam: '#F59E0B',
+  europe: '#3B82F6',
+}
+
+const S: Record<string, React.CSSProperties> = {
+  page: { padding: '24px 28px', color: '#F0F0F5', maxWidth: 920, margin: '0 auto' },
+  card: { backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 28 },
+  label: { fontSize: 12, color: '#8B8BA0', display: 'block', marginBottom: 6 },
+  select: { backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 6, color: '#F0F0F5', padding: '7px 10px', fontSize: 13, width: '100%' },
+  divider: { borderTop: '1px solid #2A2A3A', margin: '20px 0' },
+}
+
+export function CSVImportWizard() {
+  const { user } = useUser()
+  const t = useTranslations('import')
+  const tc = useTranslations('common')
+
+  const [step, setStep] = useState<Step>(1)
+
+  // Step 2: area selection
+  const [selectedArea, setSelectedArea] = useState<AreaName | null>(null)
+  const [selectedAreaId, setSelectedAreaId] = useState<string>('')
+
+  // Step 3: column mapping
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([])
+  const [csvData, setCsvData] = useState<Record<string, string>[]>([])
+  const [mapping, setMapping] = useState<Record<string, ProspectFieldKey | ''>>({})
+
+  // Step 4: dedup
+  const [rows, setRows] = useState<ParsedRow[]>([])
+  const [checking, setChecking] = useState(false)
+
+  // Step 5: import
+  const [importing, setImporting] = useState(false)
+  const [results, setResults] = useState<{ imported: number; skipped: number; forced: number } | null>(null)
+
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Fetch area id when area is selected
+  async function handleAreaSelect(areaName: AreaName) {
+    setSelectedArea(areaName)
+    const { data } = await createClient().from('areas').select('id').eq('name', areaName).single()
+    if (data) setSelectedAreaId(data.id)
+  }
+
+  function parseCSV(file: File) {
+    Papa.parse<Record<string, string>>(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (result) => {
+        const headers = result.meta.fields ?? []
+        setCsvHeaders(headers)
+        setCsvData(result.data)
+        const autoMap: Record<string, ProspectFieldKey | ''> = {}
+        headers.forEach(h => { autoMap[h] = autoDetect(h) })
+        setMapping(autoMap)
+        setStep(2)
+      },
+    })
+  }
+
+  function handleFile(file: File) {
+    if (!file.name.endsWith('.csv')) return
+    if (file.size > 5 * 1024 * 1024) return
+    parseCSV(file)
+  }
+
+  async function proceedToReview() {
+    setChecking(true)
+
+    const supabase = createClient()
+    const { data: existing } = await supabase.from('prospects').select('id, name, email, linkedin_url')
+
+    const emailMap = new Map<string, string>()
+    const linkedinMap = new Map<string, string>()
+    existing?.forEach(p => {
+      if (p.email) emailMap.set(p.email.toLowerCase(), p.name)
+      if (p.linkedin_url) linkedinMap.set(p.linkedin_url.toLowerCase(), p.name)
+    })
+
+    const parsed: ParsedRow[] = csvData.map(raw => {
+      const mapped: Record<string, string> = {}
+      Object.entries(mapping).forEach(([csvCol, field]) => {
+        if (field && raw[csvCol] !== undefined) mapped[field] = raw[csvCol]
+      })
+
+      if (!mapped.name?.trim()) {
+        return { raw, mapped, status: 'error', error: 'Missing name', skip: true }
+      }
+
+      const email = mapped.email?.toLowerCase()
+      const linkedin = mapped.linkedin_url?.toLowerCase()
+      const emailMatch = email ? emailMap.get(email) : null
+      const linkedinMatch = linkedin ? linkedinMap.get(linkedin) : null
+
+      let status: ParsedRow['status'] = 'new'
+      let duplicateType: ParsedRow['duplicateType']
+      let duplicateName: string | undefined
+
+      if (emailMatch && linkedinMatch) {
+        status = 'duplicate'; duplicateType = 'both'; duplicateName = emailMatch
+      } else if (emailMatch) {
+        status = 'duplicate'; duplicateType = 'email'; duplicateName = emailMatch
+      } else if (linkedinMatch) {
+        status = 'duplicate'; duplicateType = 'linkedin'; duplicateName = linkedinMatch
+      }
+
+      return { raw, mapped, status, duplicateType, duplicateName, skip: status === 'duplicate' }
+    })
+
+    setRows(parsed)
+    setChecking(false)
+
+    const hasDuplicates = parsed.some(r => r.status === 'duplicate')
+    if (!hasDuplicates) {
+      await runImportWithRows(parsed)
+    } else {
+      setStep(4)
+    }
+  }
+
+  function toggleSkip(index: number) {
+    setRows(prev => prev.map((r, i) => i === index ? { ...r, skip: !r.skip } : r))
+  }
+
+  function skipAllDuplicates() {
+    setRows(prev => prev.map(r => r.status === 'duplicate' ? { ...r, skip: true } : r))
+  }
+
+  function forceAllDuplicates() {
+    setRows(prev => prev.map(r => r.status === 'duplicate' ? { ...r, skip: false } : r))
+  }
+
+  async function runImportWithRows(targetRows: ParsedRow[]) {
+    setImporting(true)
+    const supabase = createClient()
+    let imported = 0, skipped = 0, forced = 0
+
+    const toInsert = targetRows.filter(r => r.status !== 'error' && !r.skip)
+    skipped = targetRows.filter(r => r.skip).length
+
+    const records = toInsert.map(r => {
+      if (r.status === 'duplicate') forced++
+      const m = r.mapped
+      return {
+        name: m.name?.trim(),
+        linkedin_url: m.linkedin_url?.trim() || null,
+        email: m.email?.trim() || null,
+        company: m.company?.trim() || null,
+        title: m.title?.trim() || null,
+        industry: m.industry?.trim() || null,
+        company_size: m.company_size?.trim() || null,
+        icp_score: m.icp_score ? parseFloat(m.icp_score) : null,
+        lead_temperature: LEAD_TEMPERATURES.includes(m.lead_temperature as typeof LEAD_TEMPERATURES[number]) ? m.lead_temperature : null,
+        search_combo: SEARCH_COMBOS.includes(m.search_combo as typeof SEARCH_COMBOS[number]) ? m.search_combo : null,
+        scrape_date: m.scrape_date?.trim() || null,
+        custom1: m.custom1?.trim() || null,
+        custom2: m.custom2?.trim() || null,
+        custom3: m.custom3?.trim() || null,
+        market: m.market?.trim() || null,
+        outreach_status: 'new' as const,
+        area_id: selectedAreaId,
+        source: 'csv_import' as const,
+        created_by: user?.id ?? null,
+        flag_tomorrow: false,
+      }
+    })
+
+    for (let i = 0; i < records.length; i += 100) {
+      const batch = records.slice(i, i + 100)
+      const { error } = await supabase.from('prospects').insert(batch)
+      if (!error) imported += batch.length
+      else skipped += batch.length
+    }
+
+    await logAuditEvent({
+      event_type: 'csv_import',
+      metadata: { imported, skipped, forced, total: targetRows.length, area: selectedArea },
+    })
+
+    setResults({ imported, skipped, forced })
+    setImporting(false)
+    setStep(5)
+  }
+
+  function runImport() {
+    return runImportWithRows(rows)
+  }
+
+  function resetWizard() {
+    setStep(1)
+    setSelectedArea(null)
+    setSelectedAreaId('')
+    setCsvHeaders([])
+    setCsvData([])
+    setMapping({})
+    setRows([])
+    setResults(null)
+  }
+
+  const newCount = rows.filter(r => r.status === 'new').length
+  const dupCount = rows.filter(r => r.status === 'duplicate').length
+  const errorCount = rows.filter(r => r.status === 'error').length
+  const willImport = rows.filter(r => !r.skip && r.status !== 'error').length
+
+  const STEP_LABELS = [t('step1'), 'Área', t('step2'), t('step3'), t('step4')]
+
+  return (
+    <div style={S.page}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700 }}>{t('title')}</h1>
+      </div>
+
+      {/* Step indicator */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 28 }}>
+        {([1, 2, 3, 4, 5] as Step[]).map((s, i) => {
+          const done = step > s
+          const active = step === s
+          return (
+            <div key={s} style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 12, fontWeight: 700,
+                  backgroundColor: done ? '#22C55E' : active ? '#6C63FF' : '#2A2A3A',
+                  color: done || active ? '#FFF' : '#52526A',
+                  transition: 'all 0.2s',
+                }}>
+                  {done ? '✓' : s}
+                </div>
+                <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: active ? '#F0F0F5' : '#52526A' }}>
+                  {STEP_LABELS[i]}
+                </span>
+              </div>
+              {i < 4 && <div style={{ width: 32, height: 1, backgroundColor: '#2A2A3A', margin: '0 10px' }} />}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* STEP 1: Upload */}
+      {step === 1 && (
+        <div
+          style={{
+            ...S.card,
+            border: `2px dashed ${dragOver ? '#6C63FF' : '#2A2A3A'}`,
+            backgroundColor: dragOver ? '#6C63FF08' : '#13131A',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            minHeight: 240, cursor: 'pointer', transition: 'all 0.2s',
+          }}
+          onClick={() => fileInputRef.current?.click()}
+          onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
+        >
+          <UploadCloud size={44} color={dragOver ? '#6C63FF' : '#52526A'} />
+          <p style={{ marginTop: 14, fontSize: 16, color: '#F0F0F5', fontWeight: 500 }}>{t('dropzone')}</p>
+          <p style={{ fontSize: 12, color: '#52526A', marginTop: 6 }}>{t('csvOnly')} · {t('maxSize')}</p>
+          <input ref={fileInputRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+        </div>
+      )}
+
+      {/* STEP 2: Area selection */}
+      {step === 2 && (
+        <div style={S.card}>
+          <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>¿A qué área pertenecen estos prospectos?</h2>
+          <p style={{ fontSize: 13, color: '#52526A', marginBottom: 28 }}>
+            El área elegida se aplicará a todas las {csvData.length} filas del CSV.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 32 }}>
+            {AREA_OPTIONS.map(opt => {
+              const isSelected = selectedArea === opt.name
+              const color = AREA_COLORS[opt.name]
+              return (
+                <div key={opt.name} title={opt.disabled ? opt.disabledReason : undefined}>
+                  <button
+                    disabled={opt.disabled}
+                    onClick={() => handleAreaSelect(opt.name)}
+                    style={{
+                      width: '100%', padding: '20px 16px', borderRadius: 10, cursor: opt.disabled ? 'not-allowed' : 'pointer',
+                      border: `2px solid ${isSelected ? color : '#2A2A3A'}`,
+                      backgroundColor: isSelected ? color + '18' : opt.disabled ? '#0A0A0F' : '#1C1C27',
+                      color: opt.disabled ? '#3A3A4A' : isSelected ? color : '#8B8BA0',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                      transition: 'all 0.15s', opacity: opt.disabled ? 0.4 : 1,
+                    }}
+                  >
+                    <div style={{
+                      width: 18, height: 18, borderRadius: '50%', border: `2px solid ${isSelected ? color : '#3A3A4A'}`,
+                      backgroundColor: isSelected ? color : 'transparent', transition: 'all 0.15s',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {isSelected && <div style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: '#FFF' }} />}
+                    </div>
+                    <span style={{ fontSize: 15, fontWeight: isSelected ? 700 : 500 }}>{opt.label}</span>
+                    {opt.disabled && <span style={{ fontSize: 10, color: '#3A3A4A' }}>{opt.disabledReason}</span>}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Button onClick={() => setStep(1)} style={{ backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>
+              <ChevronLeft size={14} /> {tc('back')}
+            </Button>
+            <Button
+              onClick={() => setStep(3)}
+              disabled={!selectedArea || !selectedAreaId}
+              style={{ backgroundColor: selectedArea ? '#6C63FF' : '#2A2A3A', color: '#FFF' }}
+            >
+              {tc('next_step')} <ChevronRight size={14} />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 3: Column mapping */}
+      {step === 3 && (
+        <div style={S.card}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+            <div>
+              <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{t('columnMapping')}</h2>
+              <p style={{ fontSize: 12, color: '#52526A' }}>
+                {csvData.length} filas · {csvHeaders.length} columnas · Área:{' '}
+                <span style={{ color: AREA_COLORS[selectedArea!], fontWeight: 600 }}>
+                  {AREA_OPTIONS.find(a => a.name === selectedArea)?.label}
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 }}>
+            {csvHeaders.map(col => (
+              <div key={col} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ flex: 1, padding: '7px 10px', backgroundColor: '#0A0A0F', border: '1px solid #2A2A3A', borderRadius: 6, fontSize: 13, color: '#8B8BA0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {col}
+                </div>
+                <span style={{ color: '#52526A', fontSize: 12 }}>→</span>
+                <select
+                  value={mapping[col] ?? ''}
+                  onChange={e => setMapping(prev => ({ ...prev, [col]: e.target.value as ProspectFieldKey | '' }))}
+                  style={{ ...S.select, flex: 1 }}
+                >
+                  <option value="">— skip —</option>
+                  {PROSPECT_FIELDS.map(f => (
+                    <option key={f.key} value={f.key}>
+                      {f.label}{f.required ? ' *' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+
+          {/* Preview */}
+          <div style={S.divider} />
+          <h3 style={{ fontSize: 13, fontWeight: 600, color: '#8B8BA0', marginBottom: 12 }}>{t('preview')}</h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr>
+                  {csvHeaders.slice(0, 6).map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '6px 8px', borderBottom: '1px solid #2A2A3A' }}>
+                      {mapping[h]
+                        ? <span style={{ color: '#8B8BA0' }}>{mapping[h]}</span>
+                        : <span style={{ color: '#3A3A4A', textDecoration: 'line-through' }}>{h}</span>
+                      }
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {csvData.slice(0, 5).map((row, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #1C1C27' }}>
+                    {csvHeaders.slice(0, 6).map(h => (
+                      <td key={h} style={{ padding: '6px 8px', color: mapping[h] ? '#F0F0F5' : '#3A3A4A', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {row[h] || '—'}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
+            <Button onClick={() => setStep(2)} style={{ backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>
+              <ChevronLeft size={14} /> {tc('back')}
+            </Button>
+            <Button
+              onClick={proceedToReview}
+              disabled={checking || !Object.values(mapping).includes('name')}
+              style={{ backgroundColor: '#6C63FF', color: '#FFF' }}
+            >
+              {checking ? t('checking') : t('proceedToReview')} <ChevronRight size={14} />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 4: Review duplicates only */}
+      {step === 4 && (
+        <div style={S.card}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+            <AlertTriangle size={18} color="#F59E0B" />
+            <div>
+              <h2 style={{ fontSize: 16, fontWeight: 600 }}>{t('duplicateCheck')}</h2>
+              <p style={{ fontSize: 12, color: '#52526A', marginTop: 2 }}>
+                {dupCount} {t('duplicates')} · {newCount} {t('new')} {t('willImport').toLowerCase()}
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+            <div style={{ padding: '8px 16px', backgroundColor: '#22C55E15', border: '1px solid #22C55E30', borderRadius: 8 }}>
+              <span style={{ fontSize: 22, fontWeight: 700, color: '#22C55E' }}>{newCount}</span>
+              <span style={{ fontSize: 12, color: '#8B8BA0', display: 'block' }}>{t('new')} ✓</span>
+            </div>
+            <div style={{ padding: '8px 16px', backgroundColor: '#F59E0B15', border: '1px solid #F59E0B40', borderRadius: 8 }}>
+              <span style={{ fontSize: 22, fontWeight: 700, color: '#F59E0B' }}>{dupCount}</span>
+              <span style={{ fontSize: 12, color: '#8B8BA0', display: 'block' }}>{t('duplicates')}</span>
+            </div>
+            {errorCount > 0 && (
+              <div style={{ padding: '8px 16px', backgroundColor: '#EF444415', border: '1px solid #EF444430', borderRadius: 8 }}>
+                <span style={{ fontSize: 22, fontWeight: 700, color: '#EF4444' }}>{errorCount}</span>
+                <span style={{ fontSize: 12, color: '#8B8BA0', display: 'block' }}>{t('errors')}</span>
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            <button onClick={skipAllDuplicates} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #2A2A3A', backgroundColor: 'transparent', color: '#8B8BA0', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <SkipForward size={11} /> {t('skipAll')}
+            </button>
+            <button onClick={forceAllDuplicates} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #F59E0B40', backgroundColor: '#F59E0B10', color: '#F59E0B', fontSize: 12, cursor: 'pointer' }}>
+              {t('forceImport')}
+            </button>
+          </div>
+
+          <div style={{ maxHeight: 400, overflowY: 'auto', border: '1px solid #2A2A3A', borderRadius: 8 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead style={{ position: 'sticky', top: 0, backgroundColor: '#1C1C27' }}>
+                <tr>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', color: '#52526A', fontWeight: 500, fontSize: 11 }}>Registro CSV</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', color: '#52526A', fontWeight: 500, fontSize: 11 }}>Match</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', color: '#52526A', fontWeight: 500, fontSize: 11 }}>Ya existe como</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'center', color: '#52526A', fontWeight: 500, fontSize: 11 }}>Decisión</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, i) => {
+                  if (row.status !== 'duplicate') return null
+                  const willForce = !row.skip
+                  return (
+                    <tr key={i} style={{ borderTop: '1px solid #1C1C27', opacity: row.skip ? 0.5 : 1, backgroundColor: willForce ? '#F59E0B08' : 'transparent' }}>
+                      <td style={{ padding: '10px 12px' }}>
+                        <div style={{ fontWeight: 600, color: row.skip ? '#52526A' : '#F0F0F5' }}>{row.mapped.name || '—'}</div>
+                        <div style={{ fontSize: 11, color: '#3A3A4A', marginTop: 2 }}>{row.mapped.company || ''}</div>
+                      </td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <span style={{ display: 'inline-block', padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700, backgroundColor: '#F59E0B25', color: '#F59E0B', textTransform: 'uppercase' }}>
+                          {row.duplicateType}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 12px', color: '#8B8BA0', fontSize: 12 }}>
+                        {row.duplicateName || '—'}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                        {row.skip ? (
+                          <button
+                            onClick={() => toggleSkip(i)}
+                            style={{ padding: '4px 14px', borderRadius: 5, border: '1px solid #F59E0B40', cursor: 'pointer', fontSize: 11, fontWeight: 600, backgroundColor: '#F59E0B10', color: '#F59E0B' }}
+                          >
+                            {t('forceImport')}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => toggleSkip(i)}
+                            style={{ padding: '4px 14px', borderRadius: 5, border: '1px solid #EF444440', cursor: 'pointer', fontSize: 11, fontWeight: 600, backgroundColor: '#EF444410', color: '#EF4444' }}
+                          >
+                            {t('skip')}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <p style={{ fontSize: 11, color: '#52526A', marginTop: 10 }}>
+            {rows.filter(r => r.status === 'duplicate' && r.skip).length} {t('skipped').toLowerCase()} · {rows.filter(r => r.status === 'duplicate' && !r.skip).length} se importarán igual
+          </p>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
+            <Button onClick={() => setStep(3)} style={{ backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>
+              <ChevronLeft size={14} /> {tc('back')}
+            </Button>
+            <Button onClick={runImport} disabled={importing || willImport === 0} style={{ backgroundColor: '#6C63FF', color: '#FFF' }}>
+              {importing ? t('importing') : `${t('startImport')} (${willImport})`}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 5: Results */}
+      {step === 5 && results && (
+        <div style={{ ...S.card, textAlign: 'center' }}>
+          <CheckCircle size={52} color="#22C55E" style={{ margin: '0 auto 16px' }} />
+          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>{t('importComplete')}</h2>
+
+          {selectedArea && (
+            <div style={{ display: 'inline-block', marginBottom: 20, padding: '4px 14px', borderRadius: 20, backgroundColor: AREA_COLORS[selectedArea] + '20', color: AREA_COLORS[selectedArea], fontSize: 13, fontWeight: 600, border: `1px solid ${AREA_COLORS[selectedArea]}40` }}>
+              {AREA_OPTIONS.find(a => a.name === selectedArea)?.label}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 24, margin: '24px 0' }}>
+            <div>
+              <div style={{ fontSize: 34, fontWeight: 700, color: '#22C55E' }}>{results.imported}</div>
+              <div style={{ fontSize: 12, color: '#8B8BA0' }}>{t('imported')}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 34, fontWeight: 700, color: '#52526A' }}>{results.skipped}</div>
+              <div style={{ fontSize: 12, color: '#8B8BA0' }}>{t('skipped')}</div>
+            </div>
+            {results.forced > 0 && (
+              <div>
+                <div style={{ fontSize: 34, fontWeight: 700, color: '#F59E0B' }}>{results.forced}</div>
+                <div style={{ fontSize: 12, color: '#8B8BA0' }}>{t('forced')}</div>
+              </div>
+            )}
+          </div>
+
+          <Button onClick={resetWizard} style={{ backgroundColor: '#6C63FF', color: '#FFF' }}>
+            {t('importAnother')}
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}

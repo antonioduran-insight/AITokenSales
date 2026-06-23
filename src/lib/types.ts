@@ -1,0 +1,128 @@
+export type OutreachStatus =
+  | 'new'
+  | 'connection_sent'
+  | 'connected'
+  | 'replied'
+  | 'demo_scheduled'
+  | 'closed'
+  | 'nurture'
+
+export type LeadTemperature = 'Cold' | 'Warm' | 'Hot'
+
+export type SearchCombo = 'A' | 'B' | 'C' | 'D' | 'E' | 'F'
+
+export type UserRole = 'admin' | 'sdr'
+
+export type AreaName = 'taiwan' | 'latam' | 'vietnam' | 'europe'
+
+export type AuditEventType =
+  | 'prospect_created'
+  | 'status_changed'
+  | 'prospect_reassigned'
+  | 'note_added'
+  | 'duplicate_attempt'
+  | 'sdr_created'
+  | 'sdr_deactivated'
+  | 'csv_import'
+
+export interface Area {
+  id: string
+  name: AreaName
+  label_zh: string
+  label_en: string
+  label_vi: string
+  label_es: string
+  is_active: boolean
+  created_at: string
+}
+
+export interface User {
+  id: string
+  full_name: string
+  email: string
+  role: UserRole
+  area_id: string | null
+  is_active: boolean
+  created_at: string
+  // Joined
+  area?: Area
+}
+
+export interface Prospect {
+  id: string
+  // Scraping / pipeline fields
+  name: string
+  linkedin_url: string | null
+  email: string | null
+  company: string | null
+  title: string | null
+  industry: string | null
+  company_size: string | null
+  icp_score: number | null
+  lead_temperature: LeadTemperature | null
+  search_combo: SearchCombo | null
+  scrape_date: string | null
+  custom1: string | null
+  custom2: string | null
+  custom3: string | null
+  // CRM fields
+  outreach_status: OutreachStatus
+  market: string | null
+  area_id: string
+  assigned_to: string | null
+  flag_tomorrow: boolean
+  source: 'manual' | 'csv_import'
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  // Joined
+  area?: Area
+  assigned_user?: User
+}
+
+export interface Note {
+  id: string
+  prospect_id: string
+  author_id: string
+  content: string
+  created_at: string
+  author?: User
+}
+
+export interface AuditLog {
+  id: string
+  actor_id: string
+  actor_name: string
+  event_type: AuditEventType
+  prospect_id: string | null
+  prospect_name: string | null
+  metadata: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface CSVImportSession {
+  id: string
+  imported_by: string | null
+  total_rows: number
+  imported: number
+  skipped: number
+  forced_duplicates: number
+  area_id: string | null
+  created_at: string
+}
+
+export type Locale = 'zh' | 'en' | 'vi' | 'es'
+
+export const OUTREACH_STATUSES: OutreachStatus[] = [
+  'new',
+  'connection_sent',
+  'connected',
+  'replied',
+  'demo_scheduled',
+  'closed',
+  'nurture',
+]
+
+export const LEAD_TEMPERATURES: LeadTemperature[] = ['Cold', 'Warm', 'Hot']
+export const SEARCH_COMBOS: SearchCombo[] = ['A', 'B', 'C', 'D', 'E', 'F']
+export const AREA_NAMES: AreaName[] = ['taiwan', 'latam', 'vietnam', 'europe']
