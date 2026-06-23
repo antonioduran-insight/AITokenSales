@@ -107,7 +107,7 @@ export function CSVImportWizard() {
 
   // Step 5: import
   const [importing, setImporting] = useState(false)
-  const [results, setResults] = useState<{ imported: number; skipped: number; forced: number } | null>(null)
+  const [results, setResults] = useState<{ imported: number; skipped: number; forced: number; errors: number; totalRows: number } | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
 
   const [dragOver, setDragOver] = useState(false)
@@ -244,7 +244,8 @@ export function CSVImportWizard() {
     let imported = 0, skipped = 0, forced = 0
 
     const toInsert = targetRows.filter(r => r.status !== 'error' && !r.skip)
-    skipped = targetRows.filter(r => r.skip).length
+    const errorRows = targetRows.filter(r => r.status === 'error')
+    skipped = targetRows.filter(r => r.skip && r.status !== 'error').length
 
     const records = toInsert.map(r => {
       if (r.status === 'duplicate') forced++
@@ -297,10 +298,10 @@ export function CSVImportWizard() {
 
     await logAuditEvent({
       event_type: 'csv_import',
-      metadata: { imported, skipped, forced, total: targetRows.length, area: selectedArea },
+      metadata: { imported, skipped, forced, errors: errorRows.length, total: targetRows.length, area: selectedArea },
     })
 
-    setResults({ imported, skipped, forced })
+    setResults({ imported, skipped, forced, errors: errorRows.length, totalRows: targetRows.length })
     setImporting(false)
     setStep(5)
   }
@@ -664,19 +665,27 @@ export function CSVImportWizard() {
             </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 24, margin: '24px 0' }}>
-            <div>
+          <div style={{ fontSize: 12, color: '#52526A', marginBottom: 8 }}>{results.totalRows} filas en el CSV</div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 20, margin: '20px 0', flexWrap: 'wrap' }}>
+            <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 34, fontWeight: 700, color: '#22C55E' }}>{results.imported}</div>
               <div style={{ fontSize: 12, color: '#8B8BA0' }}>{t('imported')}</div>
             </div>
-            <div>
-              <div style={{ fontSize: 34, fontWeight: 700, color: '#52526A' }}>{results.skipped}</div>
-              <div style={{ fontSize: 12, color: '#8B8BA0' }}>{t('skipped')}</div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 34, fontWeight: 700, color: '#F59E0B' }}>{results.skipped}</div>
+              <div style={{ fontSize: 12, color: '#8B8BA0' }}>Duplicados omitidos</div>
             </div>
+            {results.errors > 0 && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 34, fontWeight: 700, color: '#EF4444' }}>{results.errors}</div>
+                <div style={{ fontSize: 12, color: '#8B8BA0' }}>Sin nombre (error)</div>
+              </div>
+            )}
             {results.forced > 0 && (
-              <div>
-                <div style={{ fontSize: 34, fontWeight: 700, color: '#F59E0B' }}>{results.forced}</div>
-                <div style={{ fontSize: 12, color: '#8B8BA0' }}>{t('forced')}</div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 34, fontWeight: 700, color: '#6C63FF' }}>{results.forced}</div>
+                <div style={{ fontSize: 12, color: '#8B8BA0' }}>Duplicados forzados</div>
               </div>
             )}
           </div>
