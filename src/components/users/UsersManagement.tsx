@@ -51,7 +51,9 @@ export function UsersManagement() {
   const [deleteError, setDeleteError] = useState('')
 
   // Unassign leads
-  const [unassigning, setUnassigning] = useState<string | null>(null) // holds SDR id being unassigned
+  const [unassignUser, setUnassignUser] = useState<UserWithArea | null>(null)
+  const [unassigning, setUnassigning] = useState(false)
+  const [unassignSuccess, setUnassignSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     createClient().from('areas').select('*').eq('is_active', true).order('name').then(({ data }) => {
@@ -135,13 +137,26 @@ export function UsersManagement() {
     }
   }
 
-  async function handleUnassign(u: UserWithArea) {
-    setUnassigning(u.id)
+  async function confirmUnassign() {
+    if (!unassignUser) return
+    setUnassigning(true)
     try {
-      await createClient().from('prospects').update({ assigned_to: null }).eq('assigned_to', u.id)
-      await logAuditEvent({ event_type: 'prospect_reassigned', metadata: { from: u.full_name, to: 'unassigned', action: 'bulk_unassign' } })
+      const res = await fetch('/api/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: unassignUser.id, action: 'unassign' }),
+      })
+      const json = await res.json()
+      if (!res.ok) return
+      await logAuditEvent({
+        event_type: 'prospect_reassigned',
+        metadata: { from: unassignUser.full_name, to: 'unassigned', action: 'bulk_unassign', count: json.count },
+      })
+      setUnassignSuccess(`${json.count ?? 0} leads desasignados de ${unassignUser.full_name}`)
+      setUnassignUser(null)
+      setTimeout(() => setUnassignSuccess(null), 4000)
     } finally {
-      setUnassigning(null)
+      setUnassigning(false)
     }
   }
 
@@ -249,16 +264,15 @@ export function UsersManagement() {
                         {u.is_active ? <><UserX size={12} /> {t('deactivate')}</> : <><UserCheck size={12} /> {t('reactivate')}</>}
                       </button>
                       <button
-                        onClick={() => handleUnassign(u)}
-                        disabled={unassigning === u.id}
+                        onClick={() => setUnassignUser(u)}
                         title="Desasignar todos los leads"
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 5, fontSize: 11, cursor: 'pointer', border: '1px solid #F59E0B40', backgroundColor: '#F59E0B10', color: '#F59E0B', opacity: unassigning === u.id ? 0.5 : 1 }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 5, fontSize: 11, cursor: 'pointer', border: '1px solid #F59E0B40', backgroundColor: '#F59E0B10', color: '#F59E0B' }}
                       >
-                        <UserMinus size={12} /> {unassigning === u.id ? '...' : 'Unassign'}
+                        <UserMinus size={12} /> Unassign
                       </button>
                       <button
                         onClick={() => { setDeleteError(''); setDeleteUser(u) }}
-                        title={t('delete')}
+                        title="Eliminar SDR"
                         style={{ display: 'flex', alignItems: 'center', padding: '4px 8px', borderRadius: 5, fontSize: 12, cursor: 'pointer', border: '1px solid #7F1D1D60', backgroundColor: '#7F1D1D20', color: '#EF4444' }}
                       >
                         <Trash2 size={12} />
@@ -335,6 +349,42 @@ export function UsersManagement() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Unassign confirm modal */}
+      {unassignUser && (
+        <div style={S.modal} onClick={e => { if (e.target === e.currentTarget) setUnassignUser(null) }}>
+          <div style={{ ...S.modalCard, maxWidth: 380 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', backgroundColor: '#F59E0B20', border: '1px solid #F59E0B40', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <UserMinus size={16} color="#F59E0B" />
+              </div>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: '#F59E0B' }}>Desasignar leads</h2>
+            </div>
+            <p style={{ fontSize: 13, color: '#8B8BA0', lineHeight: 1.6, marginBottom: 20 }}>
+              Todos los leads asignados a <strong style={{ color: '#F0F0F5' }}>{unassignUser.full_name}</strong> quedarán <strong style={{ color: '#F0F0F5' }}>sin asignar</strong>. Los leads no se eliminan.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Button onClick={() => setUnassignUser(null)} style={{ flex: 1, backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>
+                {t('cancel')}
+              </Button>
+              <Button
+                onClick={confirmUnassign}
+                disabled={unassigning}
+                style={{ flex: 1, backgroundColor: '#F59E0B', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 700 }}
+              >
+                <UserMinus size={13} /> {unassigning ? 'Desasignando...' : 'Desasignar'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Unassign success toast */}
+      {unassignSuccess && (
+        <div style={{ position: 'fixed', bottom: 24, right: 24, backgroundColor: '#1C2A1C', border: '1px solid #22C55E40', borderRadius: 8, padding: '12px 18px', color: '#22C55E', fontSize: 13, fontWeight: 500, zIndex: 100, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>✓</span> {unassignSuccess}
         </div>
       )}
 

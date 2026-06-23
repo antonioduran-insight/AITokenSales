@@ -167,7 +167,16 @@ export function ProspectsTable() {
     setDeleting(true)
     try {
       const ids = Array.from(selected)
-      await createClient().from('prospects').delete().in('id', ids)
+      const res = await fetch('/api/prospects', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      })
+      if (!res.ok) {
+        const json = await res.json()
+        console.error('Delete failed:', json.error)
+        return
+      }
       setSelected(new Set())
       setConfirmDelete(false)
       fetchProspects()
