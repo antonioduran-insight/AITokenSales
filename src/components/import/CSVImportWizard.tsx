@@ -157,15 +157,33 @@ export function CSVImportWizard() {
   async function proceedToReview() {
     setChecking(true)
 
-    const supabase = createClient()
-    const { data: existing } = await supabase.from('prospects').select('id, name, email, linkedin_url')
-
-    const emailMap = new Map<string, string>()
-    const linkedinMap = new Map<string, string>()
-    existing?.forEach(p => {
-      if (p.email) emailMap.set(p.email.toLowerCase(), p.name)
-      if (p.linkedin_url) linkedinMap.set(p.linkedin_url.toLowerCase(), p.name)
+    // Collect emails and linkedins to check
+    const emails: string[] = []
+    const linkedins: string[] = []
+    csvData.forEach(raw => {
+      Object.entries(mapping).forEach(([csvCol, field]) => {
+        if (field === 'email' && raw[csvCol]) emails.push(raw[csvCol].trim())
+        if (field === 'linkedin_url' && raw[csvCol]) linkedins.push(raw[csvCol].trim())
+      })
     })
+
+    // Use service-role API to check duplicates across the entire area (bypasses RLS)
+    let dupEmails: Record<string, string> = {}
+    let dupLinkedins: Record<string, string> = {}
+    try {
+      const res = await fetch('/api/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ area_id: selectedAreaId, emails, linkedins }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        dupEmails = data.dupEmails ?? {}
+        dupLinkedins = data.dupLinkedins ?? {}
+      }
+    } catch {
+      // If check fails, proceed without dedup (will still insert)
+    }
 
     const parsed: ParsedRow[] = csvData.map(raw => {
       const mapped: Record<string, string> = {}
@@ -177,10 +195,10 @@ export function CSVImportWizard() {
         return { raw, mapped, status: 'error', error: 'Missing name', skip: true }
       }
 
-      const email = mapped.email?.toLowerCase()
-      const linkedin = mapped.linkedin_url?.toLowerCase()
-      const emailMatch = email ? emailMap.get(email) : null
-      const linkedinMatch = linkedin ? linkedinMap.get(linkedin) : null
+      const email = mapped.email?.trim().toLowerCase()
+      const linkedin = mapped.linkedin_url?.trim().toLowerCase()
+      const emailMatch = email ? dupEmails[email] : null
+      const linkedinMatch = linkedin ? dupLinkedins[linkedin] : null
 
       let status: ParsedRow['status'] = 'new'
       let duplicateType: ParsedRow['duplicateType']
@@ -222,7 +240,6 @@ export function CSVImportWizard() {
 
   async function runImportWithRows(targetRows: ParsedRow[]) {
     setImporting(true)
-    const supabase = createClient()
     let imported = 0, skipped = 0, forced = 0
 
     const toInsert = targetRows.filter(r => r.status !== 'error' && !r.skip)
@@ -255,11 +272,22 @@ export function CSVImportWizard() {
       }
     })
 
-    for (let i = 0; i < records.length; i += 100) {
-      const batch = records.slice(i, i + 100)
-      const { error } = await supabase.from('prospects').insert(batch)
-      if (!error) imported += batch.length
-      else skipped += batch.length
+    if (records.length > 0) {
+      try {
+        const res = await fetch('/api/import', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ records }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          imported = data.imported ?? 0
+        } else {
+          skipped += records.length
+        }
+      } catch {
+        skipped += records.length
+      }
     }
 
     await logAuditEvent({

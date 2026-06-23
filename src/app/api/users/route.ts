@@ -126,11 +126,15 @@ export async function PATCH(req: NextRequest) {
 
   // Unassign all leads from this SDR
   if (action === 'unassign') {
-    const { count, error } = await adminClient
+    // Count first, then update
+    const { count } = await adminClient
+      .from('prospects')
+      .select('id', { count: 'exact', head: true })
+      .eq('assigned_to', id)
+    const { error } = await adminClient
       .from('prospects')
       .update({ assigned_to: null })
       .eq('assigned_to', id)
-      .select('id', { count: 'exact', head: true })
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ ok: true, count: count ?? 0 })
   }
