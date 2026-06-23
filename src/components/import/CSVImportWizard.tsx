@@ -108,6 +108,7 @@ export function CSVImportWizard() {
   // Step 5: import
   const [importing, setImporting] = useState(false)
   const [results, setResults] = useState<{ imported: number; skipped: number; forced: number } | null>(null)
+  const [importError, setImportError] = useState<string | null>(null)
 
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -280,13 +281,16 @@ export function CSVImportWizard() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ records }),
         })
+        const data = await res.json()
         if (res.ok) {
-          const data = await res.json()
           imported = data.imported ?? 0
+          if (data.errors?.length) setImportError(data.errors.join(', '))
         } else {
+          setImportError(data.error ?? `HTTP ${res.status}`)
           skipped += records.length
         }
-      } catch {
+      } catch (e) {
+        setImportError(e instanceof Error ? e.message : 'Error de red')
         skipped += records.length
       }
     }
@@ -317,6 +321,7 @@ export function CSVImportWizard() {
     setMapping({})
     setRows([])
     setResults(null)
+    setImportError(null)
   }
 
   const newCount = rows.filter(r => r.status === 'new').length
@@ -644,8 +649,14 @@ export function CSVImportWizard() {
       {/* STEP 5: Results */}
       {step === 5 && results && (
         <div style={{ ...S.card, textAlign: 'center' }}>
-          <CheckCircle size={52} color="#22C55E" style={{ margin: '0 auto 16px' }} />
+          <CheckCircle size={52} color={results.imported > 0 ? '#22C55E' : '#52526A'} style={{ margin: '0 auto 16px' }} />
           <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>{t('importComplete')}</h2>
+
+          {importError && (
+            <div style={{ padding: '10px 14px', backgroundColor: '#EF444415', border: '1px solid #EF444440', borderRadius: 8, marginBottom: 16, fontSize: 12, color: '#EF4444', textAlign: 'left' }}>
+              <strong>Error:</strong> {importError}
+            </div>
+          )}
 
           {selectedArea && (
             <div style={{ display: 'inline-block', marginBottom: 20, padding: '4px 14px', borderRadius: 20, backgroundColor: AREA_COLORS[selectedArea] + '20', color: AREA_COLORS[selectedArea], fontSize: 13, fontWeight: 600, border: `1px solid ${AREA_COLORS[selectedArea]}40` }}>
