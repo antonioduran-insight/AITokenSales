@@ -62,6 +62,7 @@ export function ProspectsTable() {
   // Filters
   const [search, setSearch] = useState('')
   const [filterArea, setFilterArea] = useState('')
+  const [filterSdr, setFilterSdr] = useState('')
   const [filterStatus, setFilterStatus] = useState<OutreachStatus | ''>('')
   const [filterTemp, setFilterTemp] = useState<LeadTemperature | ''>('')
 
@@ -100,6 +101,8 @@ export function ProspectsTable() {
 
       if (!isAdmin && user?.area_id) query = query.eq('area_id', user.area_id)
       if (filterArea) query = query.eq('area_id', filterArea)
+      if (filterSdr === 'unassigned') query = query.is('assigned_to', null)
+      else if (filterSdr) query = query.eq('assigned_to', filterSdr)
       if (filterStatus) query = query.eq('outreach_status', filterStatus)
       if (filterTemp) query = query.eq('lead_temperature', filterTemp)
       if (search.trim()) {
@@ -112,7 +115,7 @@ export function ProspectsTable() {
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, search, filterArea, filterStatus, filterTemp, isAdmin, user?.area_id])
+  }, [page, pageSize, search, filterArea, filterSdr, filterStatus, filterTemp, isAdmin, user?.area_id])
 
   useEffect(() => {
     if (user) fetchProspects()
@@ -193,11 +196,12 @@ export function ProspectsTable() {
   function clearFilters() {
     setSearch('')
     setFilterArea('')
+    setFilterSdr('')
     setFilterStatus('')
     setFilterTemp('')
   }
 
-  const hasFilters = search || filterArea || filterStatus || filterTemp
+  const hasFilters = search || filterArea || filterSdr || filterStatus || filterTemp
   const totalPages = Math.ceil(total / pageSize)
   const allSelected = prospects.length > 0 && selected.size === prospects.length
 
@@ -224,6 +228,15 @@ export function ProspectsTable() {
             <select value={filterArea} onChange={e => setFilterArea(e.target.value)} style={S.select}>
               <option value="">{t('areas.all')}</option>
               {areas.map(a => <option key={a.id} value={a.id}>{a.label_en}</option>)}
+            </select>
+          )}
+
+          {/* SDR filter (admin only) */}
+          {isAdmin && (
+            <select value={filterSdr} onChange={e => setFilterSdr(e.target.value)} style={S.select}>
+              <option value="">Todos los SDR</option>
+              <option value="unassigned">Sin asignar</option>
+              {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
             </select>
           )}
 
