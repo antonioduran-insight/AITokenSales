@@ -14,7 +14,7 @@ import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, Area, User, LeadTemperature } from '@/lib/types'
 import { OUTREACH_STATUSES, LEAD_TEMPERATURES } from '@/lib/types'
 
-const PAGE_SIZE = 25
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 250]
 
 const STATUS_COLORS: Record<OutreachStatus, string> = {
   new: '#6C63FF',
@@ -54,6 +54,7 @@ export function ProspectsTable() {
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(25)
   const [loading, setLoading] = useState(true)
   const [areas, setAreas] = useState<Area[]>([])
   const [sdrs, setSdrs] = useState<User[]>([])
@@ -94,7 +95,7 @@ export function ProspectsTable() {
         .from('prospects')
         .select('*, area:areas(*), assigned_user:users!assigned_to(id, full_name, email, role, area_id, is_active, created_at)', { count: 'exact' })
         .order('created_at', { ascending: false })
-        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+        .range(page * pageSize, (page + 1) * pageSize - 1)
 
       if (!isAdmin && user?.area_id) query = query.eq('area_id', user.area_id)
       if (filterArea) query = query.eq('area_id', filterArea)
@@ -110,14 +111,14 @@ export function ProspectsTable() {
     } finally {
       setLoading(false)
     }
-  }, [page, search, filterArea, filterStatus, filterTemp, isAdmin, user?.area_id])
+  }, [page, pageSize, search, filterArea, filterStatus, filterTemp, isAdmin, user?.area_id])
 
   useEffect(() => {
     if (user) fetchProspects()
   }, [user, fetchProspects])
 
-  // Reset page when filters change
-  useEffect(() => { setPage(0) }, [search, filterArea, filterStatus, filterTemp])
+  // Reset page when filters or page size change
+  useEffect(() => { setPage(0) }, [search, filterArea, filterStatus, filterTemp, pageSize])
 
   function toggleSelect(id: string) {
     setSelected(prev => {
@@ -193,7 +194,7 @@ export function ProspectsTable() {
   }
 
   const hasFilters = search || filterArea || filterStatus || filterTemp
-  const totalPages = Math.ceil(total / PAGE_SIZE)
+  const totalPages = Math.ceil(total / pageSize)
   const allSelected = prospects.length > 0 && selected.size === prospects.length
 
   return (
@@ -241,6 +242,14 @@ export function ProspectsTable() {
           )}
 
           <div style={{ flex: 1 }} />
+
+          <select
+            value={pageSize}
+            onChange={e => setPageSize(Number(e.target.value))}
+            style={{ ...S.select, fontSize: 12 }}
+          >
+            {PAGE_SIZE_OPTIONS.map(n => <option key={n} value={n}>{n} / pág</option>)}
+          </select>
 
           <button onClick={fetchProspects} disabled={loading} style={{ padding: '7px 8px', borderRadius: 6, border: '1px solid #2A2A3A', backgroundColor: 'transparent', color: '#8B8BA0', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
             <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />

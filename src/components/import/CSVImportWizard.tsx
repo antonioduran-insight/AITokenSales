@@ -40,7 +40,7 @@ function autoDetect(col: string): ProspectFieldKey | '' {
   if (['title', 'jobtitle', 'position', 'role', 'jobrole'].includes(c)) return 'title'
   if (['industry', 'sector', 'vertical'].includes(c)) return 'industry'
   if (['companysize', 'size', 'employees', 'headcount'].includes(c)) return 'company_size'
-  if (['icpscore', 'score', 'icp'].includes(c)) return 'icp_score'
+  if (['icpscore', 'icp', 'icprating', 'icpfit'].includes(c)) return 'icp_score'
   if (['temperature', 'leadtemperature', 'temp', 'leadtemp'].includes(c)) return 'lead_temperature'
   if (['searchcombo', 'combo', 'comboused'].includes(c)) return 'search_combo'
   if (['scrapedate', 'date', 'scrapeddate', 'scrapedat'].includes(c)) return 'scrape_date'
