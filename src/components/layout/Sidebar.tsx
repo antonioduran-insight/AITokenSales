@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
   LayoutGrid, Users2, UploadCloud, ClipboardList, BarChart3, Users, LogOut, Trophy,
+  LayoutDashboard, Play, History, Download,
 } from 'lucide-react'
 import { AreaBadge } from '@/components/ui/AreaBadge'
 import type { UserWithArea } from '@/contexts/UserContext'
@@ -92,6 +93,46 @@ export function Sidebar({ user }: Props) {
             </Link>
           )
         })}
+
+        {/* Scraper section — admin only */}
+        {isAdmin && (
+          <>
+            <div style={{ margin: '10px 4px 6px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ flex: 1, height: 1, backgroundColor: '#2A2A3A' }} />
+              <span style={{ fontSize: 10, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Scraper</span>
+              <div style={{ flex: 1, height: 1, backgroundColor: '#2A2A3A' }} />
+            </div>
+            {[
+              { href: '/dashboard', label: 'Dashboard',  icon: LayoutDashboard },
+              { href: '/run',       label: 'New Run',     icon: Play },
+              { href: '/history',   label: 'History',     icon: History },
+              { href: '/leads',     label: 'Leads',       icon: Users2 },
+              { href: '/export',    label: 'Export CSV',  icon: Download },
+            ].map(item => {
+              const fullHref = `/${locale}${item.href}`
+              const isActive = pathname === fullHref || pathname.startsWith(fullHref + '/')
+              const Icon = item.icon
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href as '/dashboard'}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '8px 12px', borderRadius: 8, marginBottom: 2,
+                    fontSize: 13,
+                    fontWeight: isActive ? 600 : 400,
+                    color: isActive ? '#A78BFA' : '#52526A',
+                    backgroundColor: isActive ? '#6C63FF15' : 'transparent',
+                    textDecoration: 'none', transition: 'all 0.15s',
+                  }}
+                >
+                  <Icon size={14} strokeWidth={isActive ? 2.2 : 1.8} />
+                  {item.label}
+                </Link>
+              )
+            })}
+          </>
+        )}
       </nav>
 
       {/* User footer */}
