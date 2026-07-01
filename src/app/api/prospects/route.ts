@@ -30,9 +30,9 @@ export async function PATCH(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Mode A: from_user_id → to_user_id (bulk transfer)
+  // Mode A: from_user_id → to_user_id (bulk transfer, optional limit)
   if (body.from_user_id && body.to_user_id) {
-    const { from_user_id, to_user_id } = body
+    const { from_user_id, to_user_id, limit } = body
 
     const { data: sdr } = await adminClient
       .from('users')
@@ -44,15 +44,37 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid or inactive SDR' }, { status: 400 })
     }
 
-    const { data: updated, error } = await adminClient
+    let idsToMove: string[]
+
+    if (limit && Number(limit) > 0) {
+      // Pick the oldest N prospects (FIFO)
+      const { data: picked } = await adminClient
+        .from('prospects')
+        .select('id')
+        .eq('assigned_to', from_user_id)
+        .order('created_at', { ascending: true })
+        .limit(Number(limit))
+      idsToMove = (picked ?? []).map((p: { id: string }) => p.id)
+    } else {
+      const { data: all } = await adminClient
+        .from('prospects')
+        .select('id')
+        .eq('assigned_to', from_user_id)
+      idsToMove = (all ?? []).map((p: { id: string }) => p.id)
+    }
+
+    if (idsToMove.length === 0) {
+      return NextResponse.json({ ok: true, reassigned: 0, sdr_name: sdr.full_name })
+    }
+
+    const { error } = await adminClient
       .from('prospects')
       .update({ assigned_to: to_user_id, updated_at: new Date().toISOString() })
-      .eq('assigned_to', from_user_id)
-      .select('id')
+      .in('id', idsToMove)
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
-    return NextResponse.json({ ok: true, reassigned: updated?.length ?? 0, sdr_name: sdr.full_name })
+    return NextResponse.json({ ok: true, reassigned: idsToMove.length, sdr_name: sdr.full_name })
   }
 
   // Mode B: specific IDs

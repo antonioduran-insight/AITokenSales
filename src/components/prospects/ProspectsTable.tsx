@@ -77,6 +77,7 @@ export function ProspectsTable() {
   const [sdrReassignFrom, setSdrReassignFrom] = useState('')
   const [sdrReassignTo, setSdrReassignTo] = useState('')
   const [sdrReassignCount, setSdrReassignCount] = useState<number | null>(null)
+  const [sdrReassignLimit, setSdrReassignLimit] = useState('')
   const [sdrReassigning, setSdrReassigning] = useState(false)
   const [reassignToast, setReassignToast] = useState<string | null>(null)
 
@@ -164,7 +165,7 @@ export function ProspectsTable() {
       const res = await fetch('/api/prospects', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from_user_id: sdrReassignFrom, to_user_id: sdrReassignTo }),
+        body: JSON.stringify({ from_user_id: sdrReassignFrom, to_user_id: sdrReassignTo, limit: sdrReassignLimit ? Number(sdrReassignLimit) : undefined }),
       })
       const data = await res.json()
       if (!res.ok) { setSdrReassigning(false); return }
@@ -183,6 +184,7 @@ export function ProspectsTable() {
       setSdrReassignFrom('')
       setSdrReassignTo('')
       setSdrReassignCount(null)
+      setSdrReassignLimit('')
       setReassignToast(`${data.reassigned} lead${data.reassigned !== 1 ? 's' : ''} reasignado${data.reassigned !== 1 ? 's' : ''} a ${data.sdr_name}`)
       setTimeout(() => setReassignToast(null), 3500)
       fetchProspects()
@@ -554,7 +556,7 @@ export function ProspectsTable() {
       {sdrReassignOpen && (
         <div
           style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
-          onClick={e => { if (e.target === e.currentTarget) { setSdrReassignOpen(false); setSdrReassignFrom(''); setSdrReassignTo(''); setSdrReassignCount(null) } }}
+          onClick={e => { if (e.target === e.currentTarget) { setSdrReassignOpen(false); setSdrReassignFrom(''); setSdrReassignTo(''); setSdrReassignCount(null); setSdrReassignLimit('') } }}
         >
           <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 28, width: 420, maxWidth: '90vw' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
@@ -570,7 +572,7 @@ export function ProspectsTable() {
                 <label style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>De</label>
                 <select
                   value={sdrReassignFrom}
-                  onChange={e => { setSdrReassignFrom(e.target.value); setSdrReassignTo('') }}
+                  onChange={e => { setSdrReassignFrom(e.target.value); setSdrReassignTo(''); setSdrReassignLimit('') }}
                   style={{ ...S.select, width: '100%' }}
                 >
                   <option value="">Seleccionar SDR...</option>
@@ -596,26 +598,53 @@ export function ProspectsTable() {
               </div>
             </div>
 
-            {/* Count preview */}
+            {/* Quantity input */}
+            {sdrReassignFrom && sdrReassignCount !== null && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
+                  Cantidad a reasignar
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <input
+                    type="number"
+                    min={1}
+                    max={sdrReassignCount}
+                    value={sdrReassignLimit}
+                    onChange={e => setSdrReassignLimit(e.target.value)}
+                    placeholder={`Todos (${sdrReassignCount})`}
+                    style={{ ...S.input, padding: '7px 10px', width: 140, fontFamily: 'JetBrains Mono, monospace' }}
+                  />
+                  <span style={{ fontSize: 12, color: '#52526A' }}>de {sdrReassignCount} disponibles</span>
+                </div>
+              </div>
+            )}
+
+            {/* Transfer preview */}
             {sdrReassignFrom && sdrReassignCount !== null && (
               <div style={{ padding: '10px 14px', backgroundColor: '#6C63FF10', border: '1px solid #6C63FF30', borderRadius: 8, marginBottom: 20, fontSize: 13, color: '#8B8BA0' }}>
-                <strong style={{ color: '#6C63FF' }}>{sdrReassignCount}</strong> lead{sdrReassignCount !== 1 ? 's' : ''} serán reasignados
-                {sdrReassignTo && sdrs.find(s => s.id === sdrReassignTo) && (
-                  <> a <strong style={{ color: '#F0F0F5' }}>{sdrs.find(s => s.id === sdrReassignTo)?.full_name}</strong></>
-                )}
+                {(() => {
+                  const n = sdrReassignLimit && Number(sdrReassignLimit) > 0
+                    ? Math.min(Number(sdrReassignLimit), sdrReassignCount)
+                    : sdrReassignCount
+                  const toSdr = sdrs.find(s => s.id === sdrReassignTo)
+                  return <>
+                    <strong style={{ color: '#6C63FF' }}>{n}</strong> lead{n !== 1 ? 's' : ''} serán reasignados
+                    {toSdr && <> a <strong style={{ color: '#F0F0F5' }}>{toSdr.full_name}</strong></>}
+                  </>
+                })()}
               </div>
             )}
 
             <div style={{ display: 'flex', gap: 10 }}>
               <Button
-                onClick={() => { setSdrReassignOpen(false); setSdrReassignFrom(''); setSdrReassignTo(''); setSdrReassignCount(null) }}
+                onClick={() => { setSdrReassignOpen(false); setSdrReassignFrom(''); setSdrReassignTo(''); setSdrReassignCount(null); setSdrReassignLimit('') }}
                 style={{ flex: 1, backgroundColor: '#2A2A3A', color: '#F0F0F5' }}
               >
                 {t('common.cancel')}
               </Button>
               <Button
                 onClick={handleSdrReassign}
-                disabled={!sdrReassignFrom || !sdrReassignTo || sdrReassigning || sdrReassignCount === 0}
+                disabled={!sdrReassignFrom || !sdrReassignTo || sdrReassigning || sdrReassignCount === 0 || (sdrReassignLimit !== '' && Number(sdrReassignLimit) <= 0)}
                 style={{ flex: 1, backgroundColor: '#6C63FF', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
               >
                 {sdrReassigning ? 'Reasignando...' : 'Confirmar reasignación'}
