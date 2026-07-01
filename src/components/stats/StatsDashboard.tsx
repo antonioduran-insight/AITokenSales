@@ -185,7 +185,7 @@ export function StatsDashboard() {
       <div style={{ marginBottom: 8 }}>
         <div style={S.sectionLabel}>
           <Trophy size={14} color="#F59E0B" />
-          Conversion Rate
+          {t('conversionSection')}
         </div>
       </div>
 
@@ -194,13 +194,13 @@ export function StatsDashboard() {
         {/* Card 1 — Global */}
         <div style={{ ...S.bigCard, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#52526A', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>
-            Global
+            {t('conversionGlobal')}
           </div>
           <div style={{ fontSize: 56, fontWeight: 800, color: globalConvColor, lineHeight: 1, marginBottom: 8 }}>
             {globalConvRate.toFixed(1)}%
           </div>
           <div style={{ fontSize: 12, color: '#52526A' }}>
-            {closedTotal} closed of {total} total
+            {closedTotal} {t('closedOf')} {total} total
           </div>
           <div style={{ width: '100%', marginTop: 16 }}>
             <ProgressBar value={closedTotal} max={total} color={globalConvColor} height={6} />
@@ -209,9 +209,9 @@ export function StatsDashboard() {
 
         {/* Card 2 — By SDR */}
         <div style={S.bigCard}>
-          <div style={S.sectionTitle}>Por SDR</div>
+          <div style={S.sectionTitle}>{t('conversionBySdr')}</div>
           {sdrStats.length === 0 ? (
-            <p style={{ color: '#52526A', fontSize: 13 }}>Sin datos</p>
+            <p style={{ color: '#52526A', fontSize: 13 }}>{t('noData')}</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {sdrStats.map(sdr => {
@@ -242,9 +242,9 @@ export function StatsDashboard() {
 
         {/* Card 3 — By Area */}
         <div style={S.bigCard}>
-          <div style={S.sectionTitle}>Por Área</div>
+          <div style={S.sectionTitle}>{t('conversionByArea')}</div>
           {areaStats.length === 0 ? (
-            <p style={{ color: '#52526A', fontSize: 13 }}>Sin datos</p>
+            <p style={{ color: '#52526A', fontSize: 13 }}>{t('noData')}</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {areaStats.map(a => {

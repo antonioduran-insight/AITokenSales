@@ -210,7 +210,7 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
           <div style={{ display: 'flex', gap: 4, marginTop: 12 }}>
             {(['info', 'messages', 'notes', 'conversations'] as const).map(tab_ => (
               <button key={tab_} style={TAB_STYLE(tab === tab_)} onClick={() => setTab(tab_)}>
-                {tab_ === 'info' ? t('prospect.info') : tab_ === 'messages' ? t('prospect.messages') : tab_ === 'notes' ? t('prospect.notes') : 'Chats'}
+                {tab_ === 'info' ? t('prospect.info') : tab_ === 'messages' ? t('prospect.messages') : tab_ === 'notes' ? t('prospect.notes') : t('prospect.chats')}
               </button>
             ))}
           </div>
@@ -398,7 +398,11 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
 
           {/* CONVERSATIONS TAB */}
           {tab === 'conversations' && (
-            <ConversationsLog prospectId={prospect.id} prospectName={prospect.name} />
+            <ConversationsLog
+              prospectId={prospect.id}
+              prospectName={prospect.name}
+              isClosed={prospect.outreach_status === 'closed'}
+            />
           )}
         </div>
 
