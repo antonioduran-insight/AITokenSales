@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_SCRAPER_API_URL || "http://localhost:8000";
+const API_URL = "/api/scraper";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
@@ -19,7 +19,7 @@ export const scraperApi = {
   delete: <T>(path: string)               => request<T>(path, { method: "DELETE" }),
 };
 
-export const SCRAPER_API_URL = API_URL;
+export const SCRAPER_API_URL = process.env.NEXT_PUBLIC_SCRAPER_API_URL || "http://localhost:8000";
 
 export type RunStatus = "pending" | "running" | "scoring" | "drafting" | "completed" | "failed" | "cancelled";
 

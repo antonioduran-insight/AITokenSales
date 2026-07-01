@@ -100,7 +100,7 @@ export default function RunPage() {
       wsRef.current = ws;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setSubmitError(`[${process.env.NEXT_PUBLIC_SCRAPER_API_URL ?? 'undefined'}] ${msg}`);
+      setSubmitError(msg.includes('502') ? 'No se pudo conectar al backend de Railway.' : msg);
     } finally { setSubmitting(false); }
   };
 
