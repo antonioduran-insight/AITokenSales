@@ -6,8 +6,9 @@ import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
 import { useUser } from '@/contexts/UserContext'
 import { format } from 'date-fns'
-import { Trophy, Search, X, RefreshCw, MessageSquare, AlertTriangle } from 'lucide-react'
+import { Trophy, Search, X, RefreshCw, MessageSquare, AlertTriangle, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ConversationsLog } from '@/components/conversations/ConversationsLog'
 import type { Area, User } from '@/lib/types'
 
 interface ClosedProspect {
@@ -40,6 +41,9 @@ export function ConvertidosPage() {
   const [sdrs, setSdrs] = useState<User[]>([])
   const [search, setSearch] = useState('')
   const [filterSdr, setFilterSdr] = useState('')
+
+  // View modal state
+  const [viewTarget, setViewTarget] = useState<ClosedProspect | null>(null)
 
   // Upload modal state
   const [uploadTarget, setUploadTarget] = useState<ClosedProspect | null>(null)
@@ -254,26 +258,63 @@ export function ConvertidosPage() {
                     </div>
                   )}
 
-                  {/* Action button */}
-                  <button
-                    onClick={() => setUploadTarget(p)}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                      padding: '8px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                      border: 'none',
-                      backgroundColor: hasChat ? '#2A2A3A' : '#6C63FF',
-                      color: hasChat ? '#8B8BA0' : '#FFF',
-                    }}
-                  >
-                    <MessageSquare size={13} />
-                    {hasChat ? t('addAnotherChat') : t('uploadChat')}
-                  </button>
+                  {/* Action buttons */}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {hasChat && (
+                      <button
+                        onClick={() => setViewTarget(p)}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          padding: '8px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                          border: '1px solid #2A2A3A', backgroundColor: 'transparent', color: '#8B8BA0', flex: 1,
+                        }}
+                      >
+                        <Eye size={13} />
+                        {t('viewChats')}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setUploadTarget(p)}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        padding: '8px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                        border: 'none',
+                        backgroundColor: hasChat ? '#2A2A3A' : '#6C63FF',
+                        color: hasChat ? '#8B8BA0' : '#FFF',
+                        flex: hasChat ? 'none' : 1,
+                      }}
+                    >
+                      <MessageSquare size={13} />
+                      {hasChat ? t('addAnotherChat') : t('uploadChat')}
+                    </button>
+                  </div>
                 </div>
               )
             })}
           </div>
         )}
       </div>
+
+      {/* View chats modal */}
+      {viewTarget && (
+        <div
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
+          onClick={e => { if (e.target === e.currentTarget) setViewTarget(null) }}
+        >
+          <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 24, width: 600, maxWidth: '94vw', maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: '#F0F0F5', margin: 0 }}>{viewTarget.name}</h3>
+                {viewTarget.company && <div style={{ fontSize: 13, color: '#52526A', marginTop: 3 }}>{viewTarget.company}</div>}
+              </div>
+              <button onClick={() => setViewTarget(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52526A' }}>
+                <X size={16} />
+              </button>
+            </div>
+            <ConversationsLog prospectId={viewTarget.id} prospectName={viewTarget.name} isClosed={true} />
+          </div>
+        </div>
+      )}
 
       {/* Upload modal */}
       {uploadTarget && (
