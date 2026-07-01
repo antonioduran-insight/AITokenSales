@@ -97,7 +97,10 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
       .eq('is_active', true)
       .eq('area_id', prospect.area_id)
       .order('full_name')
-      .then(({ data }) => { if (data) setSdrsForArea(data as User[]) })
+      .then(({ data, error }) => {
+        console.log('[ProspectDrawer] sdrsForArea fetch — area_id:', prospect.area_id, '| data:', data, '| error:', error)
+        if (data) setSdrsForArea(data as User[])
+      })
   }, [isAdmin, prospect.area_id])
 
   async function handleReassign(newSdrId: string) {
