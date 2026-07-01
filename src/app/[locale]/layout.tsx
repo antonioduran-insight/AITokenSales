@@ -27,15 +27,18 @@ export default async function LocaleLayout({
     const { data: { user: authUser } } = await supabase.auth.getUser()
 
     if (authUser) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('users')
         .select('*, area:areas(*)')
         .eq('id', authUser.id)
         .maybeSingle()
+      console.log('[layout] auth uid:', authUser.id)
+      console.log('[layout] users table row:', data)
+      console.log('[layout] users table error:', error)
       userProfile = data as UserWithArea | null
     }
-  } catch {
-    // Not authenticated — AppShell handles the login redirect
+  } catch (e) {
+    console.log('[layout] catch error:', e)
   }
 
   return (

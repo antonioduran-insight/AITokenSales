@@ -49,6 +49,7 @@ const S: Record<string, React.CSSProperties> = {
 
 export function ProspectsTable() {
   const { user, isAdmin } = useUser()
+  console.log('[ProspectsTable] user role:', user?.role, '| isAdmin:', isAdmin)
   const t = useTranslations()
 
   const [prospects, setProspects] = useState<Prospect[]>([])
