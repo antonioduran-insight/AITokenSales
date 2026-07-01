@@ -6,8 +6,8 @@ import { Link } from '@/i18n/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
-  LayoutGrid, Users2, UploadCloud, ClipboardList, BarChart3, Users, LogOut, Trophy,
-  LayoutDashboard, Play, History, Download,
+  LayoutGrid, Users2, ClipboardList, BarChart3, Users, LogOut, Trophy,
+  LayoutDashboard, Play, History,
 } from 'lucide-react'
 import { AreaBadge } from '@/components/ui/AreaBadge'
 import type { UserWithArea } from '@/contexts/UserContext'
@@ -27,7 +27,6 @@ export function Sidebar({ user }: Props) {
   const navItems = [
     { href: '/kanban', label: t('kanban'), icon: LayoutGrid, always: true },
     { href: '/prospects', label: t('prospects'), icon: Users2, always: true },
-    { href: '/import', label: t('import'), icon: UploadCloud, always: true },
     { href: '/convertidos', label: t('convertidos'), icon: Trophy, always: true },
     { href: '/audit', label: t('audit'), icon: ClipboardList, adminOnly: true },
     { href: '/stats', label: t('stats'), icon: BarChart3, adminOnly: true },
@@ -103,11 +102,10 @@ export function Sidebar({ user }: Props) {
               <div style={{ flex: 1, height: 1, backgroundColor: '#2A2A3A' }} />
             </div>
             {[
-              { href: '/dashboard', label: 'Dashboard',  icon: LayoutDashboard },
-              { href: '/run',       label: 'New Run',     icon: Play },
-              { href: '/history',   label: 'History',     icon: History },
-              { href: '/leads',     label: 'Leads',       icon: Users2 },
-              { href: '/export',    label: 'Export CSV',  icon: Download },
+              { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+              { href: '/run',       label: 'New Run',   icon: Play },
+              { href: '/history',   label: 'History',   icon: History },
+              { href: '/leads',     label: 'Leads',     icon: Users2 },
             ].map(item => {
               const fullHref = `/${locale}${item.href}`
               const isActive = pathname === fullHref || pathname.startsWith(fullHref + '/')

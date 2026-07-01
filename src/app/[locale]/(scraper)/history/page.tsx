@@ -1,11 +1,21 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { scraperApi, SCRAPER_API_URL, type Run, type Lead } from '@/lib/scraper-api';
+import { scraperApi, type Run, type Lead } from '@/lib/scraper-api';
+import { createClient } from '@/lib/supabase/client';
 import { StatusBadge } from '@/components/scraper/StatusBadge';
 import { TemperatureBadge } from '@/components/scraper/TemperatureBadge';
 import { ICPScore } from '@/components/scraper/ICPScore';
-import { ChevronDown, ChevronUp, Trash2, Download } from 'lucide-react';
+import { ChevronDown, ChevronUp, Trash2, DatabaseZap, CheckCircle2 } from 'lucide-react';
+import type { Area, User } from '@/lib/types';
+
+interface ImportState {
+  area_id: string;
+  assigned_to: string;
+  loading: boolean;
+  result: { imported: number; duplicates: number; no_name: number } | null;
+  error: string | null;
+}
 
 const S: Record<string, React.CSSProperties> = {
   page: { padding: '24px', color: '#F0F0F5', maxWidth: 900 },
@@ -21,50 +31,93 @@ export default function HistoryPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [clearAllConfirm, setClearAllConfirm] = useState(false);
   const [clearAllInput, setClearAllInput] = useState('');
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  const fetchRuns = async () => {
-    try { setRuns(await scraperApi.get<Run[]>('/run/?limit=50')); }
-    catch { /* silent */ }
-    finally { setLoading(false); }
-  };
-  useEffect(() => { fetchRuns(); }, []);
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [sdrs, setSdrs] = useState<User[]>([]);
+  const [importOpen, setImportOpen] = useState<string | null>(null);
+  const [importState, setImportState] = useState<Record<string, ImportState>>({});
+
+  useEffect(() => {
+    scraperApi.get<Run[]>('/run/?limit=50')
+      .then(data => setRuns(data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+
+    const supabase = createClient();
+    supabase.from('areas').select('*').then(({ data }) => { if (data) setAreas(data as Area[]) });
+    supabase.from('users').select('*').eq('role', 'sdr').eq('is_active', true).then(({ data }) => { if (data) setSdrs(data as User[]) });
+  }, []);
 
   const toggleExpand = async (runId: string) => {
     if (expandedId === runId) { setExpandedId(null); return; }
     setExpandedId(runId);
     if (!runLeads[runId]) {
       setLeadsLoading(p => ({ ...p, [runId]: true }));
-      try { const d = await scraperApi.get<Lead[]>(`/leads/?run_id=${runId}&limit=200`); setRunLeads(p => ({ ...p, [runId]: d })); }
-      catch { /* backend unavailable */ }
+      try {
+        const d = await scraperApi.get<Lead[]>(`/leads/?run_id=${runId}&limit=200`);
+        setRunLeads(p => ({ ...p, [runId]: d }));
+      } catch { /* backend unavailable */ }
       finally { setLeadsLoading(p => ({ ...p, [runId]: false })); }
     }
   };
 
   const handleDelete = async (runId: string) => {
-    try { await scraperApi.delete(`/run/${runId}`); setRuns(prev => prev.filter(r => r.id !== runId)); if (expandedId === runId) setExpandedId(null); }
-    catch { /* error */ }
+    try {
+      await scraperApi.delete(`/run/${runId}`);
+      setRuns(prev => prev.filter(r => r.id !== runId));
+      if (expandedId === runId) setExpandedId(null);
+    } catch { /* error */ }
     finally { setDeleteConfirmId(null); }
   };
 
   const handleClearAll = async () => {
     if (clearAllInput !== 'DELETE') return;
-    try { await scraperApi.delete('/run/clear-all'); setRuns([]); setExpandedId(null); setRunLeads({}); }
-    catch { /* error */ }
+    try {
+      await scraperApi.delete('/run/clear-all');
+      setRuns([]); setExpandedId(null); setRunLeads({});
+    } catch { /* error */ }
     finally { setClearAllConfirm(false); setClearAllInput(''); }
   };
 
-  const handleDownloadCSV = async (runId: string) => {
-    setDownloadingId(runId);
+  const openImport = (runId: string) => {
+    setImportOpen(runId);
+    if (!importState[runId]) {
+      setImportState(p => ({
+        ...p,
+        [runId]: { area_id: areas[0]?.id ?? '', assigned_to: '', loading: false, result: null, error: null },
+      }));
+    }
+  };
+
+  const setImportField = (runId: string, field: keyof ImportState, value: unknown) => {
+    setImportState(p => ({ ...p, [runId]: { ...p[runId], [field]: value } }));
+  };
+
+  const handleImportToCRM = async (runId: string) => {
+    const s = importState[runId];
+    if (!s?.area_id) return;
+    setImportField(runId, 'loading', true);
+    setImportField(runId, 'error', null);
+    setImportField(runId, 'result', null);
     try {
-      const res = await fetch(`${SCRAPER_API_URL}/export/csv/${runId}`, { method: 'POST' });
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = `export_${runId.slice(0, 8)}.csv`; a.click();
-      URL.revokeObjectURL(url);
-    } catch { /* error */ }
-    finally { setDownloadingId(null); }
+      const res = await fetch('/api/scraper/to-crm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ run_id: runId, area_id: s.area_id, assigned_to: s.assigned_to || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setImportField(runId, 'error', data.error ?? 'Error al importar'); }
+      else { setImportField(runId, 'result', data); }
+    } catch (e) {
+      setImportField(runId, 'error', String(e));
+    } finally {
+      setImportField(runId, 'loading', false);
+    }
+  };
+
+  const SELECT = {
+    padding: '7px 10px', borderRadius: 7, backgroundColor: '#1C1C27',
+    border: '1px solid #2A2A3A', color: '#F0F0F5', fontSize: 12, outline: 'none',
   };
 
   return (
@@ -101,6 +154,9 @@ export default function HistoryPage() {
         const leads = runLeads[run.id] ?? [];
         const leadsLoad = leadsLoading[run.id] ?? false;
         const isDel = deleteConfirmId === run.id;
+        const imp = importState[run.id];
+        const showImport = importOpen === run.id;
+
         return (
           <div key={run.id} style={S.row}>
             <div onClick={() => !isDel && toggleExpand(run.id)}
@@ -109,7 +165,6 @@ export default function HistoryPage() {
                 {new Date(run.created_at).toLocaleDateString()}
               </span>
               <span style={{ fontSize: 13, fontWeight: 600, minWidth: 80 }}>{run.market}</span>
-              <span style={{ fontSize: 13, color: '#8B8BA0', fontFamily: 'monospace', display: 'none' }}>{run.total_leads} leads</span>
               <div style={{ flex: 1, display: 'flex', gap: 12, fontSize: 11 }}>
                 {run.hot_count  > 0 && <span style={{ color: '#EF4444' }}>🔥 {run.hot_count}</span>}
                 {run.warm_count > 0 && <span style={{ color: '#F59E0B' }}>🌡 {run.warm_count}</span>}
@@ -172,18 +227,66 @@ export default function HistoryPage() {
                         ))}
                       </tbody>
                     </table>
-                    {leads.length > 15 && <p style={{ padding: '6px 12px', fontSize: 11, color: '#52526A', textAlign: 'center', borderTop: '1px solid #2A2A3A', margin: 0 }}>... y {leads.length - 15} más en el CSV</p>}
+                    {leads.length > 15 && <p style={{ padding: '6px 12px', fontSize: 11, color: '#52526A', textAlign: 'center', borderTop: '1px solid #2A2A3A', margin: 0 }}>... y {leads.length - 15} más</p>}
                   </div>
                 ) : <p style={{ fontSize: 12, color: '#52526A' }}>Sin leads para este run.</p>}
 
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {run.status === 'completed' && (
-                    <button onClick={() => handleDownloadCSV(run.id)} disabled={downloadingId === run.id}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, backgroundColor: '#6C63FF', color: '#FFF', padding: '7px 14px', borderRadius: 7, border: 'none', cursor: 'pointer', opacity: downloadingId === run.id ? 0.5 : 1 }}>
-                      <Download size={12} />{downloadingId === run.id ? 'Descargando...' : 'Descargar CSV'}
-                    </button>
+                {/* Actions */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {run.status === 'completed' && !imp?.result && (
+                      <button
+                        onClick={() => showImport ? setImportOpen(null) : openImport(run.id)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, backgroundColor: showImport ? '#2A2A3A' : '#6C63FF', color: '#FFF', padding: '7px 14px', borderRadius: 7, border: 'none', cursor: 'pointer' }}>
+                        <DatabaseZap size={13} />{showImport ? 'Cancelar' : 'Incluir en CRM'}
+                      </button>
+                    )}
+                    <button onClick={() => setExpandedId(null)} style={{ fontSize: 12, color: '#52526A', border: '1px solid #2A2A3A', padding: '7px 14px', borderRadius: 7, background: 'transparent', cursor: 'pointer' }}>Cerrar</button>
+                  </div>
+
+                  {/* Import form */}
+                  {showImport && run.status === 'completed' && imp && !imp.result && (
+                    <div style={{ backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 8, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <p style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', margin: 0, letterSpacing: '0.06em' }}>Importar a CRM</p>
+                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 180 }}>
+                          <label style={{ fontSize: 11, color: '#8B8BA0', display: 'block', marginBottom: 4 }}>Área *</label>
+                          <select value={imp.area_id} onChange={e => setImportField(run.id, 'area_id', e.target.value)} style={{ ...SELECT, width: '100%' }}>
+                            <option value="">Seleccioná...</option>
+                            {areas.filter(a => a.is_active).map(a => (
+                              <option key={a.id} value={a.id}>{a.label_en}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 180 }}>
+                          <label style={{ fontSize: 11, color: '#8B8BA0', display: 'block', marginBottom: 4 }}>Asignar a SDR (opcional)</label>
+                          <select value={imp.assigned_to} onChange={e => setImportField(run.id, 'assigned_to', e.target.value)} style={{ ...SELECT, width: '100%' }}>
+                            <option value="">Sin asignar</option>
+                            {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      {imp.error && <p style={{ fontSize: 12, color: '#EF4444', margin: 0 }}>{imp.error}</p>}
+                      <button
+                        onClick={() => handleImportToCRM(run.id)}
+                        disabled={!imp.area_id || imp.loading}
+                        style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, backgroundColor: !imp.area_id || imp.loading ? '#2A2A3A' : '#6C63FF', color: '#FFF', padding: '7px 16px', borderRadius: 7, border: 'none', cursor: !imp.area_id || imp.loading ? 'default' : 'pointer', opacity: !imp.area_id ? 0.5 : 1 }}>
+                        <DatabaseZap size={13} />{imp.loading ? 'Importando...' : `Importar ${leads.length} leads`}
+                      </button>
+                    </div>
                   )}
-                  <button onClick={() => setExpandedId(null)} style={{ fontSize: 12, color: '#52526A', border: '1px solid #2A2A3A', padding: '7px 14px', borderRadius: 7, background: 'transparent', cursor: 'pointer' }}>Cerrar</button>
+
+                  {/* Import result */}
+                  {imp?.result && (
+                    <div style={{ backgroundColor: '#14532D20', border: '1px solid #16A34A40', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <CheckCircle2 size={16} color="#22C55E" />
+                      <div style={{ fontSize: 13 }}>
+                        <span style={{ color: '#22C55E', fontWeight: 600 }}>Importados: {imp.result.imported}</span>
+                        <span style={{ color: '#52526A', marginLeft: 12 }}>Duplicados: {imp.result.duplicates}</span>
+                        {imp.result.no_name > 0 && <span style={{ color: '#52526A', marginLeft: 12 }}>Sin nombre: {imp.result.no_name}</span>}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

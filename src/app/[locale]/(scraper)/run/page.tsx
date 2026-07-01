@@ -7,7 +7,9 @@ import { createLogSocket } from '@/lib/scraper-websocket';
 import { StatusBadge } from '@/components/scraper/StatusBadge';
 import { TemperatureBadge } from '@/components/scraper/TemperatureBadge';
 import { ICPScore } from '@/components/scraper/ICPScore';
-import { Play, ChevronLeft, AlertCircle, Search, BarChart2, MessageSquare, XCircle } from 'lucide-react';
+import { Play, ChevronLeft, AlertCircle, Search, BarChart2, MessageSquare, XCircle, DatabaseZap, CheckCircle2 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import type { Area, User } from '@/lib/types';
 
 const COMBOS = [
   { code: 'combo_A', label: 'A', desc: 'IT Manager / CIO' },
@@ -63,6 +65,38 @@ export default function RunPage() {
   const [run, setRun] = useState<Run | null>(null);
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
+
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [sdrs, setSdrs] = useState<User[]>([]);
+  const [crmAreaId, setCrmAreaId] = useState('');
+  const [crmSdrId, setCrmSdrId] = useState('');
+  const [crmLoading, setCrmLoading] = useState(false);
+  const [crmResult, setCrmResult] = useState<{ imported: number; duplicates: number; no_name: number } | null>(null);
+  const [crmError, setCrmError] = useState<string | null>(null);
+  const [showCrmForm, setShowCrmForm] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.from('areas').select('*').then(({ data }) => { if (data) setAreas(data as Area[]) });
+    supabase.from('users').select('*').eq('role', 'sdr').eq('is_active', true).then(({ data }) => { if (data) setSdrs(data as User[]) });
+  }, []);
+
+  const handleImportToCRM = async () => {
+    if (!crmAreaId || !runId) return;
+    setCrmLoading(true); setCrmError(null); setCrmResult(null);
+    try {
+      const res = await fetch('/api/scraper/to-crm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ run_id: runId, area_id: crmAreaId, assigned_to: crmSdrId || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setCrmError(data.error ?? 'Error al importar'); }
+      else { setCrmResult(data); setShowCrmForm(false); }
+    } catch (e) {
+      setCrmError(String(e));
+    } finally { setCrmLoading(false); }
+  };
 
   const toggleCombo = (code: string) =>
     setSelectedCombos(prev => prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]);
@@ -307,13 +341,58 @@ export default function RunPage() {
           </table>
         </div>
       )}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
         <Link href={`/leads?run_id=${runId}`} style={{ backgroundColor: '#6C63FF', color: '#FFF', padding: '9px 18px', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>Ver todos los leads →</Link>
-        <Link href={`/export?run_id=${runId}`} style={{ backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', color: '#8B8BA0', padding: '9px 18px', borderRadius: 8, textDecoration: 'none', fontSize: 13 }}>Descargar CSV</Link>
+        {!crmResult && (
+          <button onClick={() => setShowCrmForm(f => !f)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, backgroundColor: showCrmForm ? '#2A2A3A' : '#22C55E20', border: `1px solid ${showCrmForm ? '#2A2A3A' : '#22C55E40'}`, color: showCrmForm ? '#8B8BA0' : '#22C55E', padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            <DatabaseZap size={14} />{showCrmForm ? 'Cancelar' : 'Incluir en CRM'}
+          </button>
+        )}
         <button onClick={resetToForm} style={{ fontSize: 13, color: '#52526A', background: 'none', border: 'none', cursor: 'pointer', padding: '9px 10px' }}>
           <ChevronLeft size={13} style={{ display: 'inline', marginRight: 4 }} />Nuevo run
         </button>
       </div>
+
+      {/* CRM import result */}
+      {crmResult && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, backgroundColor: '#14532D20', border: '1px solid #16A34A40', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
+          <CheckCircle2 size={16} color="#22C55E" />
+          <span style={{ fontSize: 13, color: '#22C55E', fontWeight: 600 }}>Importados: {crmResult.imported}</span>
+          <span style={{ fontSize: 13, color: '#52526A' }}>Duplicados: {crmResult.duplicates}</span>
+          {crmResult.no_name > 0 && <span style={{ fontSize: 13, color: '#52526A' }}>Sin nombre: {crmResult.no_name}</span>}
+        </div>
+      )}
+
+      {/* CRM import form */}
+      {showCrmForm && !crmResult && (
+        <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, padding: '16px 20px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <p style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', margin: 0, letterSpacing: '0.06em' }}>Importar al CRM</p>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <label style={{ fontSize: 11, color: '#8B8BA0', display: 'block', marginBottom: 4 }}>Área *</label>
+              <select value={crmAreaId} onChange={e => setCrmAreaId(e.target.value)}
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 7, backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', color: '#F0F0F5', fontSize: 12, outline: 'none' }}>
+                <option value="">Seleccioná...</option>
+                {areas.filter(a => a.is_active).map(a => <option key={a.id} value={a.id}>{a.label_en}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <label style={{ fontSize: 11, color: '#8B8BA0', display: 'block', marginBottom: 4 }}>Asignar a SDR (opcional)</label>
+              <select value={crmSdrId} onChange={e => setCrmSdrId(e.target.value)}
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 7, backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', color: '#F0F0F5', fontSize: 12, outline: 'none' }}>
+                <option value="">Sin asignar</option>
+                {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+              </select>
+            </div>
+          </div>
+          {crmError && <p style={{ fontSize: 12, color: '#EF4444', margin: 0 }}>{crmError}</p>}
+          <button onClick={handleImportToCRM} disabled={!crmAreaId || crmLoading}
+            style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6, backgroundColor: !crmAreaId || crmLoading ? '#2A2A3A' : '#22C55E', color: '#FFF', padding: '8px 18px', borderRadius: 8, border: 'none', cursor: !crmAreaId || crmLoading ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, opacity: !crmAreaId ? 0.5 : 1 }}>
+            <DatabaseZap size={14} />{crmLoading ? 'Importando...' : 'Importar al CRM'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
