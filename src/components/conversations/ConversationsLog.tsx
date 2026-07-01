@@ -7,6 +7,7 @@ import { logAuditEvent } from '@/lib/utils/audit'
 import { format } from 'date-fns'
 import { MessageSquare, Plus, X, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useUser } from '@/contexts/UserContext'
 import type { Conversation, User } from '@/lib/types'
 
 interface Props {
@@ -50,6 +51,7 @@ const S: Record<string, React.CSSProperties> = {
 
 export function ConversationsLog({ prospectId, prospectName, isClosed = false }: Props) {
   const t = useTranslations('conversations')
+  const { isAdmin } = useUser()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [addOpen, setAddOpen] = useState(false)
   const [viewFull, setViewFull] = useState<Conversation | null>(null)
@@ -123,8 +125,8 @@ export function ConversationsLog({ prospectId, prospectName, isClosed = false }:
 
   return (
     <div>
-      {/* Mandatory alert for closed leads with no chat */}
-      {isClosed && conversations.length === 0 && (
+      {/* Mandatory alert for closed leads with no chat — only for SDRs */}
+      {isClosed && !isAdmin && conversations.length === 0 && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '10px 12px', borderRadius: 8, marginBottom: 14,
@@ -150,7 +152,7 @@ export function ConversationsLog({ prospectId, prospectName, isClosed = false }:
         </div>
         <button
           onClick={() => setAddOpen(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid #6C63FF40', backgroundColor: isClosed && conversations.length === 0 ? '#6C63FF' : '#6C63FF15', color: isClosed && conversations.length === 0 ? '#FFF' : '#6C63FF', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid #6C63FF40', backgroundColor: isClosed && !isAdmin && conversations.length === 0 ? '#6C63FF' : '#6C63FF15', color: isClosed && !isAdmin && conversations.length === 0 ? '#FFF' : '#6C63FF', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
         >
           <Plus size={12} /> {t('addChat')}
         </button>
