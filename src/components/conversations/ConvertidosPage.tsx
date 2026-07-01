@@ -114,33 +114,25 @@ export function ConvertidosPage() {
   async function handleSave() {
     if (!uploadTarget || !canSave) return
     setSaving(true)
-    const supabase = createClient()
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (!authUser) { setSaving(false); return }
 
-    const { data: userData } = await supabase.from('users').select('full_name').eq('id', authUser.id).single()
+    const finalReason = isFirstUpload ? t('firstChatHint') : reason.trim()
 
-    const finalReason = isFirstUpload
-      ? t('firstChatHint')
-      : reason.trim()
-
-    const { error } = await supabase.from('conversations').insert({
-      prospect_id: uploadTarget.id,
-      author_id: authUser.id,
-      chat_content: chatContent.trim(),
-      reason: finalReason,
+    const res = await fetch('/api/conversations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prospect_id: uploadTarget.id,
+        chat_content: chatContent,
+        reason: finalReason,
+      }),
     })
 
-    if (!error) {
+    if (res.ok) {
       await logAuditEvent({
         event_type: 'conversation_added',
         prospect_id: uploadTarget.id,
         prospect_name: uploadTarget.name,
-        metadata: {
-          reason: finalReason,
-          author: userData?.full_name ?? authUser.email ?? 'Unknown',
-          source: 'convertidos',
-        },
+        metadata: { reason: finalReason, source: 'convertidos' },
       })
       setReason('')
       setChatContent('')

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
-import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
 import { format } from 'date-fns'
 import { MessageSquare, Plus, X, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
@@ -61,12 +60,11 @@ export function ConversationsLog({ prospectId, prospectName, isClosed = false }:
   const [saving, setSaving] = useState(false)
 
   async function fetchConversations() {
-    const { data } = await createClient()
-      .from('conversations')
-      .select('*, author:users!author_id(id, full_name, email, role, area_id, is_active, created_at)')
-      .eq('prospect_id', prospectId)
-      .order('created_at', { ascending: false })
-    if (data) setConversations(data as unknown as Conversation[])
+    const res = await fetch(`/api/conversations?prospect_id=${prospectId}`)
+    if (res.ok) {
+      const data = await res.json()
+      setConversations(data as Conversation[])
+    }
   }
 
   useEffect(() => { fetchConversations() }, [prospectId])
@@ -80,32 +78,21 @@ export function ConversationsLog({ prospectId, prospectName, isClosed = false }:
   async function handleSave() {
     if (!canSave) return
     setSaving(true)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); return }
 
-    const { data: userData } = await supabase.from('users').select('full_name').eq('id', user.id).single()
+    const finalReason = isFirstUpload ? t('firstUploadHint') : reason.trim()
 
-    const finalReason = isFirstUpload
-      ? t('firstUploadHint')
-      : reason.trim()
-
-    const { error } = await supabase.from('conversations').insert({
-      prospect_id: prospectId,
-      author_id: user.id,
-      chat_content: chatContent.trim(),
-      reason: finalReason,
+    const res = await fetch('/api/conversations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prospect_id: prospectId, chat_content: chatContent, reason: finalReason }),
     })
 
-    if (!error) {
+    if (res.ok) {
       await logAuditEvent({
         event_type: 'conversation_added',
         prospect_id: prospectId,
         prospect_name: prospectName,
-        metadata: {
-          reason: finalReason,
-          author: userData?.full_name ?? user.email ?? 'Unknown',
-        },
+        metadata: { reason: finalReason },
       })
       setReason('')
       setChatContent('')
