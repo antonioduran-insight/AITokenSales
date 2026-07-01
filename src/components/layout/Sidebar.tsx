@@ -6,7 +6,7 @@ import { Link } from '@/i18n/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
-  LayoutGrid, Users2, UploadCloud, ClipboardList, BarChart3, Users, LogOut, MessageSquare, Trophy,
+  LayoutGrid, Users2, UploadCloud, ClipboardList, BarChart3, Users, LogOut, Trophy,
 } from 'lucide-react'
 import { AreaBadge } from '@/components/ui/AreaBadge'
 import type { UserWithArea } from '@/contexts/UserContext'
@@ -27,7 +27,6 @@ export function Sidebar({ user }: Props) {
     { href: '/kanban', label: t('kanban'), icon: LayoutGrid, always: true },
     { href: '/prospects', label: t('prospects'), icon: Users2, always: true },
     { href: '/import', label: t('import'), icon: UploadCloud, always: true },
-    { href: '/conversations', label: t('conversations'), icon: MessageSquare, always: true },
     { href: '/convertidos', label: t('convertidos'), icon: Trophy, always: true },
     { href: '/audit', label: t('audit'), icon: ClipboardList, adminOnly: true },
     { href: '/stats', label: t('stats'), icon: BarChart3, adminOnly: true },
