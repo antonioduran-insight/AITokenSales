@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
@@ -11,9 +11,9 @@ import { TemperatureBadge } from '@/components/ui/TemperatureBadge'
 import { ICPScore } from '@/components/ui/ICPScore'
 import { NotesLog } from './NotesLog'
 import { useUser } from '@/contexts/UserContext'
-import { ExternalLink, Copy, Check, Star, ChevronDown } from 'lucide-react'
+import { ExternalLink, Copy, Check, Star, ChevronDown, CheckCircle } from 'lucide-react'
 import { format } from 'date-fns'
-import type { Prospect, OutreachStatus, LeadTemperature } from '@/lib/types'
+import type { Prospect, OutreachStatus, LeadTemperature, User } from '@/lib/types'
 import { OUTREACH_STATUSES, LEAD_TEMPERATURES } from '@/lib/types'
 
 interface Props {
@@ -79,8 +79,57 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
   const [tab, setTab] = useState<'info' | 'messages' | 'notes'>('info')
   const [saving, setSaving] = useState(false)
 
+  // Reassign (admin only)
+  const [sdrsForArea, setSdrsForArea] = useState<User[]>([])
+  const [reassigning, setReassigning] = useState(false)
+  const [reassignToast, setReassignToast] = useState<string | null>(null)
+
   // Keep in sync when parent updates
   if (initial.id !== prospect.id) setProspect(initial)
+
+  useEffect(() => {
+    if (!isAdmin || !prospect.area_id) return
+    createClient()
+      .from('users')
+      .select('*')
+      .eq('role', 'sdr')
+      .eq('is_active', true)
+      .eq('area_id', prospect.area_id)
+      .order('full_name')
+      .then(({ data }) => { if (data) setSdrsForArea(data as User[]) })
+  }, [isAdmin, prospect.area_id])
+
+  async function handleReassign(newSdrId: string) {
+    if (!newSdrId || newSdrId === prospect.assigned_to) return
+    setReassigning(true)
+    const fromName = (prospect.assigned_user as User | undefined)?.full_name ?? 'Sin asignar'
+    try {
+      const res = await fetch('/api/prospects', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [prospect.id], assigned_to: newSdrId }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setReassigning(false); return }
+
+      const newSdr = sdrsForArea.find(s => s.id === newSdrId)
+      const updated = { ...prospect, assigned_to: newSdrId, assigned_user: newSdr }
+      setProspect(updated as Prospect)
+      onUpdated(updated as Prospect)
+
+      await logAuditEvent({
+        event_type: 'prospect_reassigned',
+        prospect_id: prospect.id,
+        prospect_name: prospect.name,
+        metadata: { from_sdr: fromName, to_sdr: data.sdr_name },
+      })
+
+      setReassignToast(`Lead reasignado a ${data.sdr_name}`)
+      setTimeout(() => setReassignToast(null), 3000)
+    } finally {
+      setReassigning(false)
+    }
+  }
 
   async function updateField(field: string, value: unknown) {
     setSaving(true)
@@ -269,11 +318,40 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
                     </span>
                   </Field>
                 )}
-                {prospect.assigned_user && (
+                {isAdmin ? (
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 11, color: '#52526A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                      {t('prospect.assignedTo')}
+                    </div>
+                    <div style={{ position: 'relative' }}>
+                      <select
+                        value={prospect.assigned_to ?? ''}
+                        onChange={e => handleReassign(e.target.value)}
+                        disabled={reassigning || sdrsForArea.length === 0}
+                        style={{
+                          width: '100%', padding: '7px 28px 7px 10px',
+                          backgroundColor: '#1C1C27', border: '1px solid #2A2A3A',
+                          borderRadius: 6, color: '#F0F0F5', fontSize: 13,
+                          cursor: 'pointer', appearance: 'none',
+                          opacity: reassigning ? 0.6 : 1,
+                        }}
+                      >
+                        <option value="">Sin asignar</option>
+                        {sdrsForArea.map(s => (
+                          <option key={s.id} value={s.id}>{s.full_name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={12} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: '#52526A', pointerEvents: 'none' }} />
+                    </div>
+                    {sdrsForArea.length === 0 && (
+                      <p style={{ fontSize: 11, color: '#52526A', marginTop: 4 }}>No hay SDRs activos en esta área</p>
+                    )}
+                  </div>
+                ) : prospect.assigned_user ? (
                   <Field label={t('prospect.assignedTo')}>
                     {(prospect.assigned_user as { full_name: string }).full_name}
                   </Field>
-                )}
+                ) : null}
                 <Field label={t('prospect.createdAt')}>
                   <span className="font-mono-data" style={{ fontSize: 11, color: '#8B8BA0' }}>
                     {format(new Date(prospect.created_at), 'dd MMM yyyy, HH:mm')}
@@ -315,6 +393,20 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
             <NotesLog prospectId={prospect.id} prospectName={prospect.name} />
           )}
         </div>
+
+        {/* Reassign toast */}
+        {reassignToast && (
+          <div style={{
+            position: 'absolute', bottom: 20, left: 20, right: 20,
+            backgroundColor: '#1A3A2A', border: '1px solid #22C55E40',
+            borderRadius: 8, padding: '10px 14px',
+            display: 'flex', alignItems: 'center', gap: 8,
+            fontSize: 13, color: '#22C55E', zIndex: 10,
+          }}>
+            <CheckCircle size={14} />
+            {reassignToast}
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   )

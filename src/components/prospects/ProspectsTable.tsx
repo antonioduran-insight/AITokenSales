@@ -8,7 +8,7 @@ import { useUser } from '@/contexts/UserContext'
 import { ProspectDrawer } from './ProspectDrawer'
 import { TemperatureBadge } from '@/components/ui/TemperatureBadge'
 import { AreaBadge } from '@/components/ui/AreaBadge'
-import { Search, ChevronLeft, ChevronRight, Users, RefreshCw, X, Trash2 } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, Users, RefreshCw, X, Trash2, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, Area, User, LeadTemperature } from '@/lib/types'
@@ -70,6 +70,7 @@ export function ProspectsTable() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [reassignTo, setReassignTo] = useState('')
   const [reassigning, setReassigning] = useState(false)
+  const [reassignToast, setReassignToast] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -144,23 +145,34 @@ export function ProspectsTable() {
     if (!reassignTo || selected.size === 0) return
     setReassigning(true)
     try {
-      const supabase = createClient()
       const ids = Array.from(selected)
-      await supabase.from('prospects').update({ assigned_to: reassignTo }).in('id', ids)
+      const res = await fetch('/api/prospects', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, assigned_to: reassignTo }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setReassigning(false); return }
 
-      const sdr = sdrs.find(s => s.id === reassignTo)
+      const toName: string = data.sdr_name ?? reassignTo
       for (const id of ids) {
-        const prospect = prospects.find(p => p.id === id)
+        const p = prospects.find(x => x.id === id)
         await logAuditEvent({
           event_type: 'prospect_reassigned',
           prospect_id: id,
-          prospect_name: prospect?.name,
-          metadata: { to: sdr?.full_name ?? reassignTo },
+          prospect_name: p?.name,
+          metadata: {
+            from_sdr: (p?.assigned_user as User | undefined)?.full_name ?? 'Sin asignar',
+            to_sdr: toName,
+            bulk: true,
+          },
         })
       }
 
       setSelected(new Set())
       setReassignTo('')
+      setReassignToast(`${ids.length} lead${ids.length > 1 ? 's' : ''} reasignado${ids.length > 1 ? 's' : ''} a ${toName}`)
+      setTimeout(() => setReassignToast(null), 3500)
       fetchProspects()
     } finally {
       setReassigning(false)
@@ -204,6 +216,14 @@ export function ProspectsTable() {
   const hasFilters = search || filterArea || filterSdr || filterStatus || filterTemp
   const totalPages = Math.ceil(total / pageSize)
   const allSelected = prospects.length > 0 && selected.size === prospects.length
+
+  // Compute SDRs available for bulk reassign based on selected prospects' areas
+  const selectedProspectsList = prospects.filter(p => selected.has(p.id))
+  const selectedAreaIds = [...new Set(selectedProspectsList.map(p => p.area_id).filter(Boolean))]
+  const isMixedAreas = selectedAreaIds.length > 1
+  const sdrsForReassign = isMixedAreas
+    ? []
+    : sdrs.filter(s => selectedAreaIds.length === 0 || s.area_id === selectedAreaIds[0])
 
   return (
     <div style={S.page}>
@@ -275,38 +295,6 @@ export function ProspectsTable() {
           <span style={{ fontSize: 12, color: '#52526A' }}>{t('common.leadsCount', { count: total })}</span>
         </div>
 
-        {/* Bulk reassign bar */}
-        {isAdmin && selected.size > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', backgroundColor: '#6C63FF15', border: '1px solid #6C63FF40', borderRadius: 8, marginBottom: 12 }}>
-            <Users size={14} color="#6C63FF" />
-            <span style={{ fontSize: 13, color: '#F0F0F5' }}>{t('common.selected', { count: selected.size })}</span>
-            <select
-              value={reassignTo}
-              onChange={e => setReassignTo(e.target.value)}
-              style={{ ...S.select, minWidth: 180 }}
-            >
-              <option value="">{t('users.assignToSDR')}</option>
-              {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
-            </select>
-            <Button
-              onClick={handleBulkReassign}
-              disabled={!reassignTo || reassigning}
-              style={{ backgroundColor: '#6C63FF', color: '#FFF', height: 32, fontSize: 13 }}
-            >
-              {reassigning ? t('common.reassigning') : t('common.reassign')}
-            </Button>
-            <div style={{ width: 1, height: 20, backgroundColor: '#2A2A3A' }} />
-            <button
-              onClick={() => setConfirmDelete(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 5, border: '1px solid #EF444440', backgroundColor: '#EF444410', color: '#EF4444', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
-            >
-              <Trash2 size={12} /> Eliminar ({selected.size})
-            </button>
-            <button onClick={() => setSelected(new Set())} style={{ padding: '4px 8px', borderRadius: 4, border: 'none', backgroundColor: 'transparent', color: '#52526A', cursor: 'pointer', fontSize: 12 }}>
-              {t('common.cancel')}
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Table */}
@@ -496,6 +484,76 @@ export function ProspectsTable() {
               </Button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Fixed bottom action bar (admin, selection active) */}
+      {isAdmin && selected.size > 0 && (
+        <div style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40,
+          backgroundColor: '#0D0D14', borderTop: '1px solid #2A2A3A',
+          padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Users size={14} color="#6C63FF" />
+            <span style={{ fontSize: 13, color: '#F0F0F5', fontWeight: 600 }}>
+              {selected.size} lead{selected.size > 1 ? 's' : ''} seleccionado{selected.size > 1 ? 's' : ''}
+            </span>
+          </div>
+
+          <div style={{ width: 1, height: 20, backgroundColor: '#2A2A3A' }} />
+
+          {isMixedAreas ? (
+            <span style={{ fontSize: 12, color: '#F59E0B' }}>Selecciona prospectos del mismo área para reasignar</span>
+          ) : (
+            <>
+              <select
+                value={reassignTo}
+                onChange={e => setReassignTo(e.target.value)}
+                style={{ ...S.select, minWidth: 200 }}
+              >
+                <option value="">Seleccionar SDR...</option>
+                {sdrsForReassign.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+              </select>
+              <Button
+                onClick={handleBulkReassign}
+                disabled={!reassignTo || reassigning || sdrsForReassign.length === 0}
+                style={{ backgroundColor: '#6C63FF', color: '#FFF', height: 34, fontSize: 13 }}
+              >
+                {reassigning ? 'Reasignando...' : 'Reasignar'}
+              </Button>
+            </>
+          )}
+
+          <div style={{ width: 1, height: 20, backgroundColor: '#2A2A3A' }} />
+
+          <button
+            onClick={() => setConfirmDelete(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 14px', borderRadius: 5, border: '1px solid #EF444440', backgroundColor: '#EF444410', color: '#EF4444', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+          >
+            <Trash2 size={12} /> Eliminar ({selected.size})
+          </button>
+
+          <button
+            onClick={() => { setSelected(new Set()); setReassignTo('') }}
+            style={{ marginLeft: 'auto', padding: '5px 10px', borderRadius: 5, border: 'none', backgroundColor: 'transparent', color: '#52526A', cursor: 'pointer', fontSize: 12 }}
+          >
+            {t('common.cancel')}
+          </button>
+        </div>
+      )}
+
+      {/* Reassign success toast */}
+      {reassignToast && (
+        <div style={{
+          position: 'fixed', bottom: selected.size > 0 ? 68 : 20, right: 24, zIndex: 50,
+          backgroundColor: '#1A3A2A', border: '1px solid #22C55E40',
+          borderRadius: 8, padding: '10px 16px',
+          display: 'flex', alignItems: 'center', gap: 8,
+          fontSize: 13, color: '#22C55E', boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+        }}>
+          <CheckCircle size={14} />
+          {reassignToast}
         </div>
       )}
     </div>
