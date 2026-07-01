@@ -45,14 +45,23 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const { data, error } = await db
+  const { data: convs, error } = await db
     .from('conversations')
-    .select('*, author:users!author_id(id, full_name, email, role, area_id, is_active, created_at)')
+    .select('id, prospect_id, author_id, chat_content, reason, created_at')
     .eq('prospect_id', prospect_id)
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+  if (!convs || convs.length === 0) return NextResponse.json([])
+
+  // Fetch author names separately to avoid FK join issues
+  const authorIds = [...new Set(convs.map(c => c.author_id))]
+  const { data: authors } = await db.from('users').select('id, full_name').in('id', authorIds)
+  const authorMap: Record<string, string> = {}
+  authors?.forEach(a => { authorMap[a.id] = a.full_name })
+
+  const result = convs.map(c => ({ ...c, author_name: authorMap[c.author_id] ?? 'Usuario' }))
+  return NextResponse.json(result)
 }
 
 // POST /api/conversations

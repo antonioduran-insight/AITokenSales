@@ -1,13 +1,20 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useTranslations } from 'next-intl'
-import { logAuditEvent } from '@/lib/utils/audit'
 import { format } from 'date-fns'
-import { MessageSquare, Plus, X, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Plus, X, ChevronDown, ChevronUp } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
-import type { Conversation, User } from '@/lib/types'
+import { logAuditEvent } from '@/lib/utils/audit'
+
+interface ConvRow {
+  id: string
+  prospect_id: string
+  author_id: string
+  author_name: string
+  chat_content: string
+  reason: string
+  created_at: string
+}
 
 interface Props {
   prospectId: string
@@ -15,270 +22,108 @@ interface Props {
   isClosed?: boolean
 }
 
-const S: Record<string, React.CSSProperties> = {
-  card: {
-    backgroundColor: '#1C1C27',
-    border: '1px solid #2A2A3A',
-    borderRadius: 8,
-    padding: '10px 12px',
-    marginBottom: 8,
-  },
-  label: {
-    fontSize: 11,
-    color: '#52526A',
-    fontWeight: 600,
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.05em',
-    display: 'block',
-    marginBottom: 6,
-  },
-  textarea: {
-    width: '100%',
-    backgroundColor: '#13131A',
-    border: '1px solid #2A2A3A',
-    borderRadius: 6,
-    padding: '8px 10px',
-    color: '#F0F0F5',
-    fontSize: 13,
-    resize: 'vertical' as const,
-    outline: 'none',
-    fontFamily: 'inherit',
-    lineHeight: 1.5,
-    boxSizing: 'border-box' as const,
-  },
-}
-
 export function ConversationsLog({ prospectId, prospectName, isClosed = false }: Props) {
-  const t = useTranslations('conversations')
   const { isAdmin } = useUser()
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [addOpen, setAddOpen] = useState(false)
-  const [viewFull, setViewFull] = useState<Conversation | null>(null)
+  const [convs, setConvs] = useState<ConvRow[]>([])
+  const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [reason, setReason] = useState('')
+  const [addOpen, setAddOpen] = useState(false)
   const [chatContent, setChatContent] = useState('')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
-  async function fetchConversations() {
+  async function load() {
+    setLoading(true)
     const res = await fetch(`/api/conversations?prospect_id=${prospectId}`)
-    if (res.ok) {
-      const data = await res.json()
-      setConversations(data as Conversation[])
-    }
+    if (res.ok) setConvs(await res.json())
+    setLoading(false)
   }
 
-  useEffect(() => { fetchConversations() }, [prospectId])
-
-  // First upload: no reason required; subsequent: reason required
-  const isFirstUpload = conversations.length === 0
-  const canSave = isFirstUpload
-    ? chatContent.trim().length > 0
-    : reason.trim().length > 0 && chatContent.trim().length > 0
+  useEffect(() => { load() }, [prospectId])
 
   async function handleSave() {
-    if (!canSave) return
+    if (!chatContent.trim()) return
     setSaving(true)
-
-    const finalReason = isFirstUpload ? t('firstUploadHint') : reason.trim()
-
+    setError('')
     const res = await fetch('/api/conversations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prospect_id: prospectId, chat_content: chatContent, reason: finalReason }),
+      body: JSON.stringify({ prospect_id: prospectId, chat_content: chatContent, reason: '' }),
     })
-
     if (res.ok) {
-      await logAuditEvent({
-        event_type: 'conversation_added',
-        prospect_id: prospectId,
-        prospect_name: prospectName,
-        metadata: { reason: finalReason },
-      })
-      setReason('')
+      await logAuditEvent({ event_type: 'conversation_added', prospect_id: prospectId, prospect_name: prospectName, metadata: {} })
       setChatContent('')
       setAddOpen(false)
-      fetchConversations()
+      load()
+    } else {
+      const body = await res.json().catch(() => ({}))
+      setError(body.error ?? 'Error al guardar')
     }
     setSaving(false)
   }
 
-  function toggleExpand(id: string) {
-    setExpanded(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
   return (
-    <div>
-      {/* Mandatory alert for closed leads with no chat — only for SDRs */}
-      {isClosed && !isAdmin && conversations.length === 0 && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '10px 12px', borderRadius: 8, marginBottom: 14,
-          backgroundColor: '#F59E0B15', border: '1px solid #F59E0B40',
-        }}>
-          <AlertTriangle size={14} color="#F59E0B" style={{ flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: '#F59E0B' }}>{t('closedAlert')}</span>
-        </div>
-      )}
-
-      {/* Header */}
+    <div style={{ padding: '4px 0' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <MessageSquare size={14} color="#6C63FF" />
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#8B8BA0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {t('title')}
-          </span>
-          {conversations.length > 0 && (
-            <span style={{ fontSize: 11, backgroundColor: '#6C63FF20', color: '#6C63FF', borderRadius: 10, padding: '1px 7px', fontWeight: 600 }}>
-              {conversations.length}
-            </span>
-          )}
-        </div>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#8B8BA0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Chats de venta {convs.length > 0 && <span style={{ fontSize: 11, backgroundColor: '#6C63FF20', color: '#6C63FF', borderRadius: 10, padding: '1px 7px', marginLeft: 6 }}>{convs.length}</span>}
+        </span>
         <button
           onClick={() => setAddOpen(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid #6C63FF40', backgroundColor: isClosed && !isAdmin && conversations.length === 0 ? '#6C63FF' : '#6C63FF15', color: isClosed && !isAdmin && conversations.length === 0 ? '#FFF' : '#6C63FF', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 6, border: 'none', backgroundColor: '#6C63FF', color: '#FFF', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
         >
-          <Plus size={12} /> {t('addChat')}
+          <Plus size={12} /> Subir chat
         </button>
       </div>
 
-      {/* List */}
-      {conversations.length === 0 ? (
-        <p style={{ color: '#52526A', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>
-          {t('noData')}
-        </p>
-      ) : (
-        conversations.map(c => {
-          const author = c.author as User | undefined
-          const isExpanded = expanded.has(c.id)
-          return (
-            <div key={c.id} style={S.card}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-                <div>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#8B8BA0' }}>{author?.full_name ?? '—'}</span>
-                  <span style={{ fontSize: 11, color: '#52526A', marginLeft: 8, fontFamily: 'JetBrains Mono, monospace' }}>
-                    {format(new Date(c.created_at), 'dd MMM yyyy, HH:mm')}
-                  </span>
-                </div>
-                <button
-                  onClick={() => toggleExpand(c.id)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52526A', padding: 2, flexShrink: 0 }}
-                >
-                  {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                </button>
+      {loading && <p style={{ color: '#52526A', fontSize: 13 }}>Cargando...</p>}
+      {!loading && convs.length === 0 && <p style={{ color: '#52526A', fontSize: 13 }}>Sin chats subidos.</p>}
+
+      {convs.map(c => {
+        const isExp = expanded.has(c.id)
+        return (
+          <div key={c.id} style={{ backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 8, padding: '10px 12px', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <div style={{ fontSize: 12, color: '#8B8BA0' }}>
+                <span style={{ fontWeight: 600 }}>{c.author_name}</span>
+                <span style={{ color: '#52526A', marginLeft: 10, fontFamily: 'monospace' }}>
+                  {format(new Date(c.created_at), 'dd MMM yyyy, HH:mm')}
+                </span>
               </div>
-
-              <div style={{ fontSize: 12, color: '#6C63FF', marginBottom: 6, fontStyle: 'italic' }}>
-                "{c.reason}"
-              </div>
-
-              <div style={{ fontSize: 13, color: '#8B8BA0', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                {isExpanded ? c.chat_content : (
-                  c.chat_content.length > 100 ? c.chat_content.slice(0, 100) + '…' : c.chat_content
-                )}
-              </div>
-
-              {!isExpanded && c.chat_content.length > 100 && (
-                <button
-                  onClick={() => setViewFull(c)}
-                  style={{ marginTop: 6, fontSize: 11, color: '#6C63FF', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
-                >
-                  {t('viewFull')}
-                </button>
-              )}
-            </div>
-          )
-        })
-      )}
-
-      {/* Add modal */}
-      {addOpen && (
-        <div
-          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}
-          onClick={e => { if (e.target === e.currentTarget) setAddOpen(false) }}
-        >
-          <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 24, width: 520, maxWidth: '92vw', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#F0F0F5', margin: 0 }}>
-                {isFirstUpload ? t('firstUploadHint') : t('anotherChatTitle')}
-              </h3>
-              <button onClick={() => setAddOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52526A' }}>
-                <X size={16} />
+              <button onClick={() => setExpanded(prev => { const n = new Set(prev); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return n })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52526A' }}>
+                {isExp ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
               </button>
             </div>
-
-            {/* Reason — only shown on 2nd+ upload */}
-            {!isFirstUpload && (
-              <div style={{ marginBottom: 16 }}>
-                <label style={S.label}>{t('reason')} <span style={{ color: '#EF4444' }}>*</span></label>
-                <textarea
-                  value={reason}
-                  onChange={e => setReason(e.target.value.slice(0, 200))}
-                  placeholder={t('reasonPlaceholder')}
-                  rows={2}
-                  style={S.textarea}
-                />
-                <div style={{ fontSize: 11, color: reason.length > 180 ? '#F59E0B' : '#52526A', textAlign: 'right', marginTop: 4 }}>
-                  {reason.length}/200
-                </div>
-              </div>
-            )}
-
-            <div style={{ marginBottom: 20 }}>
-              <label style={S.label}>{t('chat')} <span style={{ color: '#EF4444' }}>*</span></label>
-              <textarea
-                value={chatContent}
-                onChange={e => setChatContent(e.target.value)}
-                placeholder={t('chatPlaceholder')}
-                rows={10}
-                style={S.textarea}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: 10 }}>
-              <Button onClick={() => setAddOpen(false)} style={{ flex: 1, backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>
-                {t('cancel')}
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={saving || !canSave}
-                style={{ flex: 1, backgroundColor: '#6C63FF', color: '#FFF' }}
-              >
-                {saving ? t('saving') : t('save')}
-              </Button>
+            <div style={{ fontSize: 13, color: '#F0F0F5', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+              {isExp ? c.chat_content : (c.chat_content.length > 120 ? c.chat_content.slice(0, 120) + '…' : c.chat_content)}
             </div>
           </div>
-        </div>
-      )}
+        )
+      })}
 
-      {/* View full modal */}
-      {viewFull && (
-        <div
-          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}
-          onClick={e => { if (e.target === e.currentTarget) setViewFull(null) }}
-        >
-          <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 24, width: 600, maxWidth: '92vw', maxHeight: '85vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#F0F0F5' }}>
-                  {(viewFull.author as User | undefined)?.full_name ?? '—'}
-                </div>
-                <div style={{ fontSize: 12, color: '#52526A', marginTop: 2 }}>
-                  {format(new Date(viewFull.created_at), 'dd MMM yyyy, HH:mm')}
-                </div>
-              </div>
-              <button onClick={() => setViewFull(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52526A' }}>
-                <X size={16} />
+      {addOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
+          <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 24, width: 560, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#F0F0F5' }}>Chat de venta — {prospectName}</h3>
+              <button onClick={() => { setAddOpen(false); setChatContent(''); setError('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52526A' }}><X size={16} /></button>
+            </div>
+            <label style={{ fontSize: 12, color: '#52526A', display: 'block', marginBottom: 6 }}>Pegá la conversación completa con el cliente:</label>
+            <textarea
+              value={chatContent}
+              onChange={e => setChatContent(e.target.value)}
+              rows={14}
+              placeholder="Conversación..."
+              style={{ width: '100%', backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 6, padding: '10px 12px', color: '#F0F0F5', fontSize: 13, resize: 'vertical', outline: 'none', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box' }}
+            />
+            {error && <p style={{ color: '#EF4444', fontSize: 12, margin: '8px 0 0' }}>{error}</p>}
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button onClick={() => { setAddOpen(false); setChatContent(''); setError('') }} style={{ flex: 1, padding: '9px 0', borderRadius: 7, border: '1px solid #2A2A3A', backgroundColor: 'transparent', color: '#8B8BA0', cursor: 'pointer', fontSize: 13 }}>
+                Cancelar
               </button>
-            </div>
-            <div style={{ fontSize: 12, color: '#6C63FF', fontStyle: 'italic', marginBottom: 14, padding: '6px 10px', backgroundColor: '#6C63FF10', borderRadius: 6 }}>
-              "{viewFull.reason}"
-            </div>
-            <div style={{ fontSize: 13, color: '#F0F0F5', lineHeight: 1.7, whiteSpace: 'pre-wrap', backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 8, padding: '12px 14px' }}>
-              {viewFull.chat_content}
+              <button onClick={handleSave} disabled={saving || !chatContent.trim()} style={{ flex: 1, padding: '9px 0', borderRadius: 7, border: 'none', backgroundColor: saving || !chatContent.trim() ? '#2A2A3A' : '#6C63FF', color: '#FFF', cursor: saving || !chatContent.trim() ? 'default' : 'pointer', fontSize: 13, fontWeight: 600 }}>
+                {saving ? 'Guardando...' : 'Guardar chat'}
+              </button>
             </div>
           </div>
         </div>
