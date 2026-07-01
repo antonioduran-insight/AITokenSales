@@ -75,7 +75,6 @@ const TAB_STYLE = (active: boolean) => ({
 export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: Props) {
   const t = useTranslations()
   const { isAdmin, user } = useUser()
-  console.log('[ProspectDrawer] user role:', user?.role, '| isAdmin:', isAdmin)
   const [prospect, setProspect] = useState(initial)
   const [tab, setTab] = useState<'info' | 'messages' | 'notes'>('info')
   const [saving, setSaving] = useState(false)
@@ -97,8 +96,7 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
       .eq('is_active', true)
       .eq('area_id', prospect.area_id)
       .order('full_name')
-      .then(({ data, error }) => {
-        console.log('[ProspectDrawer] sdrsForArea fetch — area_id:', prospect.area_id, '| data:', data, '| error:', error)
+      .then(({ data }) => {
         if (data) setSdrsForArea(data as User[])
       })
   }, [isAdmin, prospect.area_id])

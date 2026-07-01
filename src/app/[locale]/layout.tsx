@@ -27,14 +27,11 @@ export default async function LocaleLayout({
     const { data: { user: authUser } } = await supabase.auth.getUser()
 
     if (authUser) {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('users')
         .select('*, area:areas(*)')
         .eq('id', authUser.id)
         .maybeSingle()
-      console.log('[layout] auth uid:', authUser.id)
-      console.log('[layout] users table row:', data)
-      console.log('[layout] users table error:', error)
       userProfile = data as UserWithArea | null
     }
   } catch (e) {

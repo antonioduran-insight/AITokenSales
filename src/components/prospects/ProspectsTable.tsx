@@ -8,7 +8,7 @@ import { useUser } from '@/contexts/UserContext'
 import { ProspectDrawer } from './ProspectDrawer'
 import { TemperatureBadge } from '@/components/ui/TemperatureBadge'
 import { AreaBadge } from '@/components/ui/AreaBadge'
-import { Search, ChevronLeft, ChevronRight, Users, RefreshCw, X, Trash2, CheckCircle } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, Users, RefreshCw, X, Trash2, CheckCircle, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, Area, User, LeadTemperature } from '@/lib/types'
@@ -49,7 +49,6 @@ const S: Record<string, React.CSSProperties> = {
 
 export function ProspectsTable() {
   const { user, isAdmin } = useUser()
-  console.log('[ProspectsTable] user role:', user?.role, '| isAdmin:', isAdmin)
   const t = useTranslations()
 
   const [prospects, setProspects] = useState<Prospect[]>([])
@@ -67,14 +66,19 @@ export function ProspectsTable() {
   const [filterStatus, setFilterStatus] = useState<OutreachStatus | ''>('')
   const [filterTemp, setFilterTemp] = useState<LeadTemperature | ''>('')
 
-  // Selection
+  // Selection (for bulk delete)
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [reassignTo, setReassignTo] = useState('')
-  const [reassigning, setReassigning] = useState(false)
-  const [reassignToast, setReassignToast] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  // SDR reassign modal
+  const [sdrReassignOpen, setSdrReassignOpen] = useState(false)
+  const [sdrReassignFrom, setSdrReassignFrom] = useState('')
+  const [sdrReassignTo, setSdrReassignTo] = useState('')
+  const [sdrReassignCount, setSdrReassignCount] = useState<number | null>(null)
+  const [sdrReassigning, setSdrReassigning] = useState(false)
+  const [reassignToast, setReassignToast] = useState<string | null>(null)
 
   // Drawer
   const [drawerProspect, setDrawerProspect] = useState<Prospect | null>(null)
@@ -142,41 +146,48 @@ export function ProspectsTable() {
     }
   }
 
-  async function handleBulkReassign() {
-    if (!reassignTo || selected.size === 0) return
-    setReassigning(true)
+  // Fetch count of leads for the FROM SDR whenever it changes
+  useEffect(() => {
+    if (!sdrReassignFrom) { setSdrReassignCount(null); return }
+    createClient()
+      .from('prospects')
+      .select('id', { count: 'exact', head: true })
+      .eq('assigned_to', sdrReassignFrom)
+      .then(({ count }) => setSdrReassignCount(count ?? 0))
+  }, [sdrReassignFrom])
+
+  async function handleSdrReassign() {
+    if (!sdrReassignFrom || !sdrReassignTo) return
+    setSdrReassigning(true)
     try {
-      const ids = Array.from(selected)
+      const fromSdr = sdrs.find(s => s.id === sdrReassignFrom)
       const res = await fetch('/api/prospects', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids, assigned_to: reassignTo }),
+        body: JSON.stringify({ from_user_id: sdrReassignFrom, to_user_id: sdrReassignTo }),
       })
       const data = await res.json()
-      if (!res.ok) { setReassigning(false); return }
+      if (!res.ok) { setSdrReassigning(false); return }
 
-      const toName: string = data.sdr_name ?? reassignTo
-      for (const id of ids) {
-        const p = prospects.find(x => x.id === id)
-        await logAuditEvent({
-          event_type: 'prospect_reassigned',
-          prospect_id: id,
-          prospect_name: p?.name,
-          metadata: {
-            from_sdr: (p?.assigned_user as User | undefined)?.full_name ?? 'Sin asignar',
-            to_sdr: toName,
-            bulk: true,
-          },
-        })
-      }
+      await logAuditEvent({
+        event_type: 'prospect_reassigned',
+        metadata: {
+          from_sdr: fromSdr?.full_name ?? sdrReassignFrom,
+          to_sdr: data.sdr_name ?? sdrReassignTo,
+          bulk: true,
+          count: data.reassigned,
+        },
+      })
 
-      setSelected(new Set())
-      setReassignTo('')
-      setReassignToast(`${ids.length} lead${ids.length > 1 ? 's' : ''} reasignado${ids.length > 1 ? 's' : ''} a ${toName}`)
+      setSdrReassignOpen(false)
+      setSdrReassignFrom('')
+      setSdrReassignTo('')
+      setSdrReassignCount(null)
+      setReassignToast(`${data.reassigned} lead${data.reassigned !== 1 ? 's' : ''} reasignado${data.reassigned !== 1 ? 's' : ''} a ${data.sdr_name}`)
       setTimeout(() => setReassignToast(null), 3500)
       fetchProspects()
     } finally {
-      setReassigning(false)
+      setSdrReassigning(false)
     }
   }
 
@@ -218,13 +229,12 @@ export function ProspectsTable() {
   const totalPages = Math.ceil(total / pageSize)
   const allSelected = prospects.length > 0 && selected.size === prospects.length
 
-  // Compute SDRs available for bulk reassign based on selected prospects' areas
-  const selectedProspectsList = prospects.filter(p => selected.has(p.id))
-  const selectedAreaIds = [...new Set(selectedProspectsList.map(p => p.area_id).filter(Boolean))]
-  const isMixedAreas = selectedAreaIds.length > 1
-  const sdrsForReassign = isMixedAreas
-    ? []
-    : sdrs.filter(s => selectedAreaIds.length === 0 || s.area_id === selectedAreaIds[0])
+  // SDRs available for the TO select (same area as FROM, excluding FROM itself)
+  const sdrReassignFromObj = sdrs.find(s => s.id === sdrReassignFrom)
+  const sdrsForReassignTo = sdrs.filter(s =>
+    s.id !== sdrReassignFrom &&
+    (!sdrReassignFromObj?.area_id || s.area_id === sdrReassignFromObj.area_id)
+  )
 
   return (
     <div style={S.page}>
@@ -288,6 +298,15 @@ export function ProspectsTable() {
           >
             {PAGE_SIZE_OPTIONS.map(n => <option key={n} value={n}>{n} / pág</option>)}
           </select>
+
+          {isAdmin && (
+            <button
+              onClick={() => setSdrReassignOpen(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 6, border: '1px solid #6C63FF40', backgroundColor: '#6C63FF15', color: '#6C63FF', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+            >
+              <Users size={13} /> Reasignar SDR
+            </button>
+          )}
 
           <button onClick={fetchProspects} disabled={loading} style={{ padding: '7px 8px', borderRadius: 6, border: '1px solid #2A2A3A', backgroundColor: 'transparent', color: '#8B8BA0', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
             <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
@@ -488,43 +507,16 @@ export function ProspectsTable() {
         </div>
       )}
 
-      {/* Fixed bottom action bar (admin, selection active) */}
+      {/* Fixed bottom action bar (admin, selection active) — bulk delete */}
       {isAdmin && selected.size > 0 && (
         <div style={{
           position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40,
           backgroundColor: '#0D0D14', borderTop: '1px solid #2A2A3A',
-          padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+          padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 12,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Users size={14} color="#6C63FF" />
-            <span style={{ fontSize: 13, color: '#F0F0F5', fontWeight: 600 }}>
-              {selected.size} lead{selected.size > 1 ? 's' : ''} seleccionado{selected.size > 1 ? 's' : ''}
-            </span>
-          </div>
-
-          <div style={{ width: 1, height: 20, backgroundColor: '#2A2A3A' }} />
-
-          {isMixedAreas ? (
-            <span style={{ fontSize: 12, color: '#F59E0B' }}>Selecciona prospectos del mismo área para reasignar</span>
-          ) : (
-            <>
-              <select
-                value={reassignTo}
-                onChange={e => setReassignTo(e.target.value)}
-                style={{ ...S.select, minWidth: 200 }}
-              >
-                <option value="">Seleccionar SDR...</option>
-                {sdrsForReassign.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
-              </select>
-              <Button
-                onClick={handleBulkReassign}
-                disabled={!reassignTo || reassigning || sdrsForReassign.length === 0}
-                style={{ backgroundColor: '#6C63FF', color: '#FFF', height: 34, fontSize: 13 }}
-              >
-                {reassigning ? 'Reasignando...' : 'Reasignar'}
-              </Button>
-            </>
-          )}
+          <span style={{ fontSize: 13, color: '#F0F0F5', fontWeight: 600 }}>
+            {selected.size} lead{selected.size > 1 ? 's' : ''} seleccionado{selected.size > 1 ? 's' : ''}
+          </span>
 
           <div style={{ width: 1, height: 20, backgroundColor: '#2A2A3A' }} />
 
@@ -536,7 +528,7 @@ export function ProspectsTable() {
           </button>
 
           <button
-            onClick={() => { setSelected(new Set()); setReassignTo('') }}
+            onClick={() => setSelected(new Set())}
             style={{ marginLeft: 'auto', padding: '5px 10px', borderRadius: 5, border: 'none', backgroundColor: 'transparent', color: '#52526A', cursor: 'pointer', fontSize: 12 }}
           >
             {t('common.cancel')}
@@ -547,7 +539,7 @@ export function ProspectsTable() {
       {/* Reassign success toast */}
       {reassignToast && (
         <div style={{
-          position: 'fixed', bottom: selected.size > 0 ? 68 : 20, right: 24, zIndex: 50,
+          position: 'fixed', bottom: 20, right: 24, zIndex: 60,
           backgroundColor: '#1A3A2A', border: '1px solid #22C55E40',
           borderRadius: 8, padding: '10px 16px',
           display: 'flex', alignItems: 'center', gap: 8,
@@ -555,6 +547,81 @@ export function ProspectsTable() {
         }}>
           <CheckCircle size={14} />
           {reassignToast}
+        </div>
+      )}
+
+      {/* SDR Reassign modal */}
+      {sdrReassignOpen && (
+        <div
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
+          onClick={e => { if (e.target === e.currentTarget) { setSdrReassignOpen(false); setSdrReassignFrom(''); setSdrReassignTo(''); setSdrReassignCount(null) } }}
+        >
+          <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 28, width: 420, maxWidth: '90vw' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', backgroundColor: '#6C63FF20', border: '1px solid #6C63FF40', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Users size={16} color="#6C63FF" />
+              </div>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: '#F0F0F5' }}>Reasignar leads entre SDRs</h2>
+            </div>
+
+            {/* FROM → TO selects */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>De</label>
+                <select
+                  value={sdrReassignFrom}
+                  onChange={e => { setSdrReassignFrom(e.target.value); setSdrReassignTo('') }}
+                  style={{ ...S.select, width: '100%' }}
+                >
+                  <option value="">Seleccionar SDR...</option>
+                  {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+                </select>
+              </div>
+
+              <div style={{ paddingTop: 22 }}>
+                <ArrowRight size={16} color="#52526A" />
+              </div>
+
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>A</label>
+                <select
+                  value={sdrReassignTo}
+                  onChange={e => setSdrReassignTo(e.target.value)}
+                  disabled={!sdrReassignFrom}
+                  style={{ ...S.select, width: '100%', opacity: sdrReassignFrom ? 1 : 0.5 }}
+                >
+                  <option value="">Seleccionar SDR...</option>
+                  {sdrsForReassignTo.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Count preview */}
+            {sdrReassignFrom && sdrReassignCount !== null && (
+              <div style={{ padding: '10px 14px', backgroundColor: '#6C63FF10', border: '1px solid #6C63FF30', borderRadius: 8, marginBottom: 20, fontSize: 13, color: '#8B8BA0' }}>
+                <strong style={{ color: '#6C63FF' }}>{sdrReassignCount}</strong> lead{sdrReassignCount !== 1 ? 's' : ''} serán reasignados
+                {sdrReassignTo && sdrs.find(s => s.id === sdrReassignTo) && (
+                  <> a <strong style={{ color: '#F0F0F5' }}>{sdrs.find(s => s.id === sdrReassignTo)?.full_name}</strong></>
+                )}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Button
+                onClick={() => { setSdrReassignOpen(false); setSdrReassignFrom(''); setSdrReassignTo(''); setSdrReassignCount(null) }}
+                style={{ flex: 1, backgroundColor: '#2A2A3A', color: '#F0F0F5' }}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button
+                onClick={handleSdrReassign}
+                disabled={!sdrReassignFrom || !sdrReassignTo || sdrReassigning || sdrReassignCount === 0}
+                style={{ flex: 1, backgroundColor: '#6C63FF', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+              >
+                {sdrReassigning ? 'Reasignando...' : 'Confirmar reasignación'}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>
