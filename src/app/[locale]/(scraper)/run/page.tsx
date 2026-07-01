@@ -99,10 +99,8 @@ export default function RunPage() {
       );
       wsRef.current = ws;
     } catch (e) {
-      const msg = String(e);
-      setSubmitError(msg.includes('fetch') || msg.includes('network') || msg.toLowerCase().includes('failed')
-        ? 'No se pudo conectar al backend. Verificá que esté corriendo.'
-        : msg);
+      const msg = e instanceof Error ? e.message : String(e);
+      setSubmitError(`[${process.env.NEXT_PUBLIC_SCRAPER_API_URL ?? 'undefined'}] ${msg}`);
     } finally { setSubmitting(false); }
   };
 
