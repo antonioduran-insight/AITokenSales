@@ -20,6 +20,7 @@ export type AuditEventType =
   | 'status_changed'
   | 'prospect_reassigned'
   | 'note_added'
+  | 'conversation_added'
   | 'duplicate_attempt'
   | 'sdr_created'
   | 'sdr_deactivated'
@@ -87,6 +88,18 @@ export interface Note {
   content: string
   created_at: string
   author?: User
+}
+
+export interface Conversation {
+  id: string
+  prospect_id: string
+  author_id: string
+  chat_content: string
+  reason: string
+  created_at: string
+  // Joined
+  author?: User
+  prospect?: Pick<Prospect, 'id' | 'name' | 'company' | 'title' | 'outreach_status' | 'lead_temperature' | 'area_id' | 'assigned_to' | 'linkedin_url' | 'email' | 'icp_score' | 'custom1' | 'custom2' | 'custom3' | 'source' | 'created_at' | 'updated_at' | 'market' | 'search_combo' | 'scrape_date' | 'industry' | 'company_size' | 'flag_tomorrow' | 'created_by'> & { area?: Area; assigned_user?: User }
 }
 
 export interface AuditLog {

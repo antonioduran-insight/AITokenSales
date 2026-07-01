@@ -14,6 +14,7 @@ const EVENT_COLORS: Record<AuditEventType, string> = {
   status_changed: '#6C63FF',
   prospect_reassigned: '#3B82F6',
   note_added: '#8B8BA0',
+  conversation_added: '#A78BFA',
   duplicate_attempt: '#F59E0B',
   sdr_created: '#10B981',
   sdr_deactivated: '#EF4444',
@@ -22,7 +23,7 @@ const EVENT_COLORS: Record<AuditEventType, string> = {
 
 const ALL_EVENTS: AuditEventType[] = [
   'prospect_created', 'status_changed', 'prospect_reassigned', 'note_added',
-  'duplicate_attempt', 'sdr_created', 'sdr_deactivated', 'csv_import',
+  'conversation_added', 'duplicate_attempt', 'sdr_created', 'sdr_deactivated', 'csv_import',
 ]
 
 const S: Record<string, React.CSSProperties> = {

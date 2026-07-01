@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/contexts/UserContext'
-import { TrendingUp, Users2, Calendar, Target } from 'lucide-react'
+import { TrendingUp, Users2, Calendar, Target, Trophy } from 'lucide-react'
 import { format, startOfWeek, endOfWeek } from 'date-fns'
 import type { OutreachStatus, AreaName } from '@/lib/types'
 import { OUTREACH_STATUSES } from '@/lib/types'
@@ -23,9 +23,14 @@ interface ProspectRow {
 interface SDRStat {
   id: string
   full_name: string
-  area: string
   total: number
   replied: number
+  closed: number
+}
+
+interface AreaStat {
+  label: string
+  total: number
   closed: number
 }
 
@@ -45,11 +50,28 @@ const TEMP_COLORS: Record<string, string> = {
   Hot: '#EF4444',
 }
 
+function convRateColor(rate: number): string {
+  if (rate > 5) return '#22C55E'
+  if (rate >= 1) return '#F59E0B'
+  return '#EF4444'
+}
+
+function ProgressBar({ value, max, color = '#6C63FF', height = 5 }: { value: number; max: number; color?: string; height?: number }) {
+  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0
+  return (
+    <div style={{ flex: 1, height, backgroundColor: '#2A2A3A', borderRadius: height, overflow: 'hidden' }}>
+      <div style={{ height: '100%', width: `${pct}%`, backgroundColor: color, borderRadius: height, transition: 'width 0.5s ease' }} />
+    </div>
+  )
+}
+
 const S: Record<string, React.CSSProperties> = {
   page: { padding: '20px 24px', color: '#F0F0F5', overflowY: 'auto', height: '100%' },
   card: { backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, padding: 20 },
+  bigCard: { backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 24 },
   statCard: { backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 },
-  sectionTitle: { fontSize: 14, fontWeight: 600, color: '#8B8BA0', marginBottom: 16, textTransform: 'uppercase' as const, letterSpacing: '0.05em' },
+  sectionTitle: { fontSize: 13, fontWeight: 600, color: '#52526A', marginBottom: 16, textTransform: 'uppercase' as const, letterSpacing: '0.07em' },
+  sectionLabel: { fontSize: 12, fontWeight: 700, color: '#8B8BA0', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 },
   th: { padding: '8px 12px', textAlign: 'left' as const, fontSize: 11, fontWeight: 600, color: '#52526A', textTransform: 'uppercase' as const, letterSpacing: '0.05em', borderBottom: '1px solid #2A2A3A' },
   td: { padding: '9px 12px', borderBottom: '1px solid #1C1C27', fontSize: 13 },
 }
@@ -87,7 +109,7 @@ export function StatsDashboard() {
     )
   }
 
-  // Computed stats
+  // ── Core counts ────────────────────────────────────────────────────────────
   const total = prospects.length
   const now = new Date()
   const weekStart = startOfWeek(now, { weekStartsOn: 1 })
@@ -99,16 +121,20 @@ export function StatsDashboard() {
 
   const replied = prospects.filter(p => ['replied', 'demo_scheduled', 'closed'].includes(p.outreach_status)).length
   const demos = prospects.filter(p => p.outreach_status === 'demo_scheduled').length
+  const closedTotal = prospects.filter(p => p.outreach_status === 'closed').length
   const replyRate = total > 0 ? ((replied / total) * 100).toFixed(1) : '0.0'
 
-  // By status
+  const globalConvRate = total > 0 ? (closedTotal / total) * 100 : 0
+  const globalConvColor = convRateColor(globalConvRate)
+
+  // ── By status ──────────────────────────────────────────────────────────────
   const byStatus = OUTREACH_STATUSES.map(s => ({
     status: s,
     count: prospects.filter(p => p.outreach_status === s).length,
   }))
   const maxByStatus = Math.max(...byStatus.map(s => s.count), 1)
 
-  // By temperature
+  // ── By temperature ─────────────────────────────────────────────────────────
   const tempCounts = { Cold: 0, Warm: 0, Hot: 0, null: 0 }
   prospects.forEach(p => {
     const k = p.lead_temperature as keyof typeof tempCounts ?? 'null'
@@ -116,34 +142,137 @@ export function StatsDashboard() {
     else tempCounts['null']++
   })
 
-  // By area
-  const areaMap = new Map<string, { label: string; count: number }>()
-  prospects.forEach(p => {
-    const key = p.area_id
-    const label = p.area?.label_en ?? key
-    const prev = areaMap.get(key) ?? { label, count: 0 }
-    areaMap.set(key, { label, count: prev.count + 1 })
-  })
-  const byArea = Array.from(areaMap.values()).sort((a, b) => b.count - a.count)
-
-  // SDR performance
+  // ── SDR stats (sorted by conversion rate desc) ─────────────────────────────
   const sdrMap = new Map<string, SDRStat>()
   prospects.forEach(p => {
     if (!p.assigned_to || !p.assigned_user) return
     const u = p.assigned_user
-    const prev = sdrMap.get(u.id) ?? { id: u.id, full_name: u.full_name, area: '', total: 0, replied: 0, closed: 0 }
+    const prev = sdrMap.get(u.id) ?? { id: u.id, full_name: u.full_name, total: 0, replied: 0, closed: 0 }
     prev.total++
     if (['replied', 'demo_scheduled', 'closed'].includes(p.outreach_status)) prev.replied++
     if (p.outreach_status === 'closed') prev.closed++
     sdrMap.set(u.id, prev)
   })
-  const sdrStats = Array.from(sdrMap.values()).sort((a, b) => b.total - a.total)
+  const sdrStats = Array.from(sdrMap.values()).sort((a, b) => {
+    const ra = a.total > 0 ? a.closed / a.total : 0
+    const rb = b.total > 0 ? b.closed / b.total : 0
+    return rb - ra
+  })
+  const maxSdrRate = Math.max(...sdrStats.map(s => s.total > 0 ? (s.closed / s.total) * 100 : 0), 1)
+
+  // ── Area stats (sorted by conversion rate desc) ────────────────────────────
+  const areaStatsMap = new Map<string, AreaStat>()
+  prospects.forEach(p => {
+    const key = p.area_id
+    const label = p.area?.label_en ?? key
+    const prev = areaStatsMap.get(key) ?? { label, total: 0, closed: 0 }
+    prev.total++
+    if (p.outreach_status === 'closed') prev.closed++
+    areaStatsMap.set(key, prev)
+  })
+  const areaStats = Array.from(areaStatsMap.values()).sort((a, b) => {
+    const ra = a.total > 0 ? a.closed / a.total : 0
+    const rb = b.total > 0 ? b.closed / b.total : 0
+    return rb - ra
+  })
+  const maxAreaRate = Math.max(...areaStats.map(a => a.total > 0 ? (a.closed / a.total) * 100 : 0), 1)
 
   return (
     <div style={S.page}>
-      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>{t('title')}</h1>
+      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>{t('title')}</h1>
 
-      {/* Summary cards */}
+      {/* ── SECTION 1: Conversion Rate ─────────────────────────────────────── */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={S.sectionLabel}>
+          <Trophy size={14} color="#F59E0B" />
+          Conversion Rate
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr 1fr', gap: 14, marginBottom: 28 }}>
+
+        {/* Card 1 — Global */}
+        <div style={{ ...S.bigCard, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#52526A', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>
+            Global
+          </div>
+          <div style={{ fontSize: 56, fontWeight: 800, color: globalConvColor, lineHeight: 1, marginBottom: 8 }}>
+            {globalConvRate.toFixed(1)}%
+          </div>
+          <div style={{ fontSize: 12, color: '#52526A' }}>
+            {closedTotal} closed of {total} total
+          </div>
+          <div style={{ width: '100%', marginTop: 16 }}>
+            <ProgressBar value={closedTotal} max={total} color={globalConvColor} height={6} />
+          </div>
+        </div>
+
+        {/* Card 2 — By SDR */}
+        <div style={S.bigCard}>
+          <div style={S.sectionTitle}>Por SDR</div>
+          {sdrStats.length === 0 ? (
+            <p style={{ color: '#52526A', fontSize: 13 }}>Sin datos</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {sdrStats.map(sdr => {
+                const rate = sdr.total > 0 ? (sdr.closed / sdr.total) * 100 : 0
+                const color = convRateColor(rate)
+                return (
+                  <div key={sdr.id}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                      <span style={{ fontSize: 13, color: '#F0F0F5', fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                        {sdr.full_name}
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, marginLeft: 10 }}>
+                        <span style={{ fontSize: 11, color: '#52526A', fontFamily: 'JetBrains Mono, monospace' }}>
+                          {sdr.closed}/{sdr.total}
+                        </span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color, fontFamily: 'JetBrains Mono, monospace', minWidth: 44, textAlign: 'right' }}>
+                          {rate.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                    <ProgressBar value={rate} max={maxSdrRate} color={color} height={4} />
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Card 3 — By Area */}
+        <div style={S.bigCard}>
+          <div style={S.sectionTitle}>Por Área</div>
+          {areaStats.length === 0 ? (
+            <p style={{ color: '#52526A', fontSize: 13 }}>Sin datos</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {areaStats.map(a => {
+                const rate = a.total > 0 ? (a.closed / a.total) * 100 : 0
+                const color = convRateColor(rate)
+                return (
+                  <div key={a.label}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ fontSize: 13, color: '#F0F0F5', fontWeight: 600 }}>{a.label}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 11, color: '#52526A', fontFamily: 'JetBrains Mono, monospace' }}>
+                          {a.closed}/{a.total}
+                        </span>
+                        <span style={{ fontSize: 15, fontWeight: 800, color, fontFamily: 'JetBrains Mono, monospace', minWidth: 52, textAlign: 'right' }}>
+                          {rate.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                    <ProgressBar value={rate} max={maxAreaRate} color={color} height={6} />
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── SECTION 2: Quick metrics ───────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
         <div style={S.statCard}>
           <div style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#6C63FF20', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -190,6 +319,7 @@ export function StatsDashboard() {
         </div>
       </div>
 
+      {/* ── SECTION 3: Pipeline Funnel + Temperature ───────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
         {/* Funnel by status */}
         <div style={S.card}>
@@ -203,31 +333,20 @@ export function StatsDashboard() {
                   </span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: STATUS_COLORS[status], fontFamily: 'JetBrains Mono, monospace' }}>{count}</span>
                 </div>
-                <div style={{ height: 6, backgroundColor: '#2A2A3A', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%',
-                    width: `${(count / maxByStatus) * 100}%`,
-                    backgroundColor: STATUS_COLORS[status],
-                    borderRadius: 3,
-                    transition: 'width 0.5s ease',
-                  }} />
-                </div>
+                <ProgressBar value={count} max={maxByStatus} color={STATUS_COLORS[status]} height={6} />
               </div>
             ))}
           </div>
         </div>
 
-        {/* Temperature + Area */}
+        {/* Temperature + By Area */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Temperature */}
           <div style={S.card}>
             <div style={S.sectionTitle}>{t('temperatureDistribution')}</div>
             <div style={{ display: 'flex', gap: 12 }}>
               {(['Cold', 'Warm', 'Hot'] as const).map(temp => (
                 <div key={temp} style={{ flex: 1, textAlign: 'center' }}>
-                  <div style={{ fontSize: 28, fontWeight: 700, color: TEMP_COLORS[temp] }}>
-                    {tempCounts[temp]}
-                  </div>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: TEMP_COLORS[temp] }}>{tempCounts[temp]}</div>
                   <div style={{ fontSize: 11, color: TEMP_COLORS[temp], marginTop: 2, fontWeight: 600 }}>{temp}</div>
                   <div style={{ fontSize: 10, color: '#52526A', marginTop: 2 }}>
                     {total > 0 ? ((tempCounts[temp] / total) * 100).toFixed(0) : 0}%
@@ -235,28 +354,24 @@ export function StatsDashboard() {
                 </div>
               ))}
               <div style={{ flex: 1, textAlign: 'center' }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: '#52526A' }}>
-                  {tempCounts['null']}
-                </div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: '#52526A' }}>{tempCounts['null']}</div>
                 <div style={{ fontSize: 11, color: '#52526A', marginTop: 2, fontWeight: 600 }}>{tc('unset')}</div>
               </div>
             </div>
           </div>
 
-          {/* By area */}
-          {isAdmin && byArea.length > 0 && (
+          {/* By area (compact) */}
+          {isAdmin && areaStats.length > 0 && (
             <div style={S.card}>
               <div style={S.sectionTitle}>{t('byArea')}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {byArea.map(a => (
+                {areaStats.map(a => (
                   <div key={a.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 13, color: '#8B8BA0' }}>{a.label}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 80, height: 4, backgroundColor: '#2A2A3A', borderRadius: 2, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${(a.count / total) * 100}%`, backgroundColor: '#6C63FF', borderRadius: 2 }} />
-                      </div>
+                      <ProgressBar value={a.total} max={total} color="#6C63FF" height={4} />
                       <span style={{ fontSize: 12, fontWeight: 700, color: '#F0F0F5', fontFamily: 'JetBrains Mono, monospace', minWidth: 24, textAlign: 'right' }}>
-                        {a.count}
+                        {a.total}
                       </span>
                     </div>
                   </div>
@@ -267,7 +382,7 @@ export function StatsDashboard() {
         </div>
       </div>
 
-      {/* SDR Performance */}
+      {/* ── SECTION 5: SDR Performance ─────────────────────────────────────── */}
       {sdrStats.length > 0 && (
         <div style={S.card}>
           <div style={S.sectionTitle}>{t('sdrPerformance')}</div>
@@ -283,7 +398,8 @@ export function StatsDashboard() {
             </thead>
             <tbody>
               {sdrStats.map(sdr => {
-                const rate = sdr.total > 0 ? ((sdr.replied / sdr.total) * 100).toFixed(0) : '0'
+                const convRate = sdr.total > 0 ? (sdr.closed / sdr.total) * 100 : 0
+                const color = convRateColor(convRate)
                 return (
                   <tr key={sdr.id}>
                     <td style={{ ...S.td, color: '#F0F0F5', fontWeight: 500 }}>{sdr.full_name}</td>
@@ -292,10 +408,12 @@ export function StatsDashboard() {
                     <td style={{ ...S.td, fontFamily: 'JetBrains Mono, monospace', color: '#10B981' }}>{sdr.closed}</td>
                     <td style={S.td}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ flex: 1, height: 4, backgroundColor: '#2A2A3A', borderRadius: 2, overflow: 'hidden', maxWidth: 80 }}>
-                          <div style={{ height: '100%', width: `${rate}%`, backgroundColor: '#22C55E', borderRadius: 2 }} />
+                        <div style={{ width: 80, flexShrink: 0 }}>
+                          <ProgressBar value={convRate} max={Math.max(maxSdrRate, 1)} color={color} height={4} />
                         </div>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: '#22C55E', fontFamily: 'JetBrains Mono, monospace' }}>{rate}%</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color, fontFamily: 'JetBrains Mono, monospace' }}>
+                          {convRate.toFixed(1)}%
+                        </span>
                       </div>
                     </td>
                   </tr>
