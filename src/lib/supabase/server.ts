@@ -19,3 +19,25 @@ export async function createClient() {
     }
   )
 }
+
+export async function getCurrentUser() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data } = await supabase
+    .from('users')
+    .select('id, full_name, email, role, organization_id, area_id')
+    .eq('id', user.id)
+    .single()
+
+  return data ?? null
+}
+
+export function isGlobalAdmin(user: { role?: string; organization_id?: string | null } | null) {
+  return user?.role === 'admin' && (user?.organization_id === null || user?.organization_id === undefined)
+}
+
+export function isOrgAdmin(user: { role?: string; organization_id?: string | null } | null) {
+  return user?.role === 'admin' && user?.organization_id != null
+}

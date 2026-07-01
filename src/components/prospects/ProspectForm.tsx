@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
+import { getCurrentOrganizationId } from '@/lib/utils/organization'
 import { checkDuplicate } from '@/lib/utils/dedup'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -126,6 +127,7 @@ export function ProspectForm({ open, onClose, onCreated, defaultAreaId }: Props)
 
     const supabase = createClient()
     const { data: authUser } = await supabase.auth.getUser()
+    const orgId = await getCurrentOrganizationId()
 
     const payload = {
       name: form.name,
@@ -149,6 +151,7 @@ export function ProspectForm({ open, onClose, onCreated, defaultAreaId }: Props)
       flag_tomorrow: form.flag_tomorrow,
       source: 'manual' as const,
       created_by: authUser.user?.id ?? null,
+      organization_id: orgId,
     }
 
     const { data, error } = await supabase.from('prospects').insert(payload).select().single()

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
+import { getCurrentOrganizationId } from '@/lib/utils/organization'
 import { format } from 'date-fns'
 import { Send } from 'lucide-react'
 import type { Note } from '@/lib/types'
@@ -39,10 +40,12 @@ export function NotesLog({ prospectId, prospectName }: Props) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setSaving(false); return }
 
+    const orgId = await getCurrentOrganizationId()
     const { error } = await supabase.from('notes').insert({
       prospect_id: prospectId,
       author_id: user.id,
       content: content.trim(),
+      organization_id: orgId,
     })
 
     if (!error) {

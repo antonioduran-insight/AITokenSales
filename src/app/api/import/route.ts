@@ -14,7 +14,7 @@ async function getCallerProfile() {
   if (!user) return null
   const { data: profile } = await supabase
     .from('users')
-    .select('id, role, area_id')
+    .select('id, role, area_id, organization_id')
     .eq('id', user.id)
     .single()
   return profile ?? null
@@ -82,14 +82,16 @@ export async function PUT(req: NextRequest) {
   let skippedConstraint = 0
   const errors: string[] = []
 
+  const orgId = caller.organization_id ?? null
+
   for (let i = 0; i < records.length; i += 100) {
-    const batch = records.slice(i, i + 100)
+    const batch = records.slice(i, i + 100).map((r: Record<string, unknown>) => ({ ...r, organization_id: orgId }))
     const { error, data } = await admin.from('prospects').insert(batch).select('id')
     if (error) {
       if (error.code === '23505') {
         // Unique constraint violation in batch — retry one by one to skip only conflicts
         for (const record of batch) {
-          const { error: e, data: d } = await admin.from('prospects').insert(record).select('id')
+          const { error: e, data: d } = await admin.from('prospects').insert({ ...record, organization_id: orgId }).select('id')
           if (!e) {
             imported += d?.length ?? 0
           } else if (e.code === '23505') {

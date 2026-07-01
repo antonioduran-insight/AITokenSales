@@ -12,8 +12,8 @@ async function getAuthUser() {
   )
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
-  const { data: profile } = await supabase.from('users').select('id, role').eq('id', user.id).single()
-  return profile ? { ...user, role: profile.role as string } : null
+  const { data: profile } = await supabase.from('users').select('id, role, organization_id').eq('id', user.id).single()
+  return profile ? { ...user, role: profile.role as string, organization_id: profile.organization_id as string | null } : null
 }
 
 function adminClient() {
@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
       author_id: user.id,
       chat_content: chat_content.trim(),
       reason: reason ?? '',
+      organization_id: user.organization_id ?? null,
     })
     .select()
     .single()

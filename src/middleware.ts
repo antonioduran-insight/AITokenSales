@@ -47,7 +47,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(`/${locale}/login`, request.url))
   }
 
-  return intlMiddleware(request)
+  // Fetch profile to expose role + org_id to client components via cookies
+  const { data: userData } = await supabase
+    .from('users')
+    .select('role, organization_id')
+    .eq('id', user.id)
+    .single()
+
+  const intlResponse = intlMiddleware(request)
+  if (userData) {
+    intlResponse.cookies.set('user_role',   userData.role ?? '',              { path: '/', sameSite: 'lax' })
+    intlResponse.cookies.set('user_org_id', userData.organization_id ?? '',  { path: '/', sameSite: 'lax' })
+  }
+  return intlResponse
 }
 
 export const config = {
