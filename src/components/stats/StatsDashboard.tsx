@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/contexts/UserContext'
 import { useOrgId } from '@/lib/hooks/useOrgId'
 import { TrendingUp, Users2, Calendar, Target, Trophy } from 'lucide-react'
+import { PremiumFeature } from '@/components/ui/PremiumFeature'
 import { format, startOfWeek, endOfWeek } from 'date-fns'
 import type { OutreachStatus, AreaName } from '@/lib/types'
 import { OUTREACH_STATUSES } from '@/lib/types'
@@ -82,7 +83,7 @@ const STATS_SELECT = 'id, outreach_status, lead_temperature, area_id, assigned_t
 export function StatsDashboard() {
   const t = useTranslations('stats')
   const tc = useTranslations('common')
-  const { user, isAdmin: userIsAdmin } = useUser()
+  const { user, isAdmin: userIsAdmin, orgPlan } = useUser()
   const { isImpersonating, impersonateOrgId, isAdmin } = useOrgId()
 
   const [prospects, setProspects] = useState<ProspectRow[]>([])
@@ -191,95 +192,97 @@ export function StatsDashboard() {
       <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>{t('title')}</h1>
 
       {/* ── SECTION 1: Conversion Rate ─────────────────────────────────────── */}
-      <div style={{ marginBottom: 8 }}>
-        <div style={S.sectionLabel}>
-          <Trophy size={14} color="#F59E0B" />
-          {t('conversionSection')}
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr 1fr', gap: 14, marginBottom: 28 }}>
-
-        {/* Card 1 — Global */}
-        <div style={{ ...S.bigCard, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#52526A', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>
-            {t('conversionGlobal')}
-          </div>
-          <div style={{ fontSize: 56, fontWeight: 800, color: globalConvColor, lineHeight: 1, marginBottom: 8 }}>
-            {globalConvRate.toFixed(1)}%
-          </div>
-          <div style={{ fontSize: 12, color: '#52526A' }}>
-            {closedTotal} {t('closedOf')} {total} total
-          </div>
-          <div style={{ width: '100%', marginTop: 16 }}>
-            <ProgressBar value={closedTotal} max={total} color={globalConvColor} height={6} />
+      <PremiumFeature plan={orgPlan} requiredPlan="premium" featureName="Conversion Rate Analytics">
+        <div style={{ marginBottom: 8 }}>
+          <div style={S.sectionLabel}>
+            <Trophy size={14} color="#F59E0B" />
+            {t('conversionSection')}
           </div>
         </div>
 
-        {/* Card 2 — By SDR */}
-        <div style={S.bigCard}>
-          <div style={S.sectionTitle}>{t('conversionBySdr')}</div>
-          {sdrStats.length === 0 ? (
-            <p style={{ color: '#52526A', fontSize: 13 }}>{t('noData')}</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {sdrStats.map(sdr => {
-                const rate = sdr.total > 0 ? (sdr.closed / sdr.total) * 100 : 0
-                const color = convRateColor(rate)
-                return (
-                  <div key={sdr.id}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-                      <span style={{ fontSize: 13, color: '#F0F0F5', fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                        {sdr.full_name}
-                      </span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, marginLeft: 10 }}>
-                        <span style={{ fontSize: 11, color: '#52526A', fontFamily: 'JetBrains Mono, monospace' }}>
-                          {sdr.closed}/{sdr.total}
-                        </span>
-                        <span style={{ fontSize: 13, fontWeight: 700, color, fontFamily: 'JetBrains Mono, monospace', minWidth: 44, textAlign: 'right' }}>
-                          {rate.toFixed(1)}%
-                        </span>
-                      </div>
-                    </div>
-                    <ProgressBar value={rate} max={maxSdrRate} color={color} height={4} />
-                  </div>
-                )
-              })}
+        <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr 1fr', gap: 14, marginBottom: 28 }}>
+
+          {/* Card 1 — Global */}
+          <div style={{ ...S.bigCard, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#52526A', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>
+              {t('conversionGlobal')}
             </div>
-          )}
-        </div>
-
-        {/* Card 3 — By Area */}
-        <div style={S.bigCard}>
-          <div style={S.sectionTitle}>{t('conversionByArea')}</div>
-          {areaStats.length === 0 ? (
-            <p style={{ color: '#52526A', fontSize: 13 }}>{t('noData')}</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {areaStats.map(a => {
-                const rate = a.total > 0 ? (a.closed / a.total) * 100 : 0
-                const color = convRateColor(rate)
-                return (
-                  <div key={a.label}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <span style={{ fontSize: 13, color: '#F0F0F5', fontWeight: 600 }}>{a.label}</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontSize: 11, color: '#52526A', fontFamily: 'JetBrains Mono, monospace' }}>
-                          {a.closed}/{a.total}
-                        </span>
-                        <span style={{ fontSize: 15, fontWeight: 800, color, fontFamily: 'JetBrains Mono, monospace', minWidth: 52, textAlign: 'right' }}>
-                          {rate.toFixed(1)}%
-                        </span>
-                      </div>
-                    </div>
-                    <ProgressBar value={rate} max={maxAreaRate} color={color} height={6} />
-                  </div>
-                )
-              })}
+            <div style={{ fontSize: 56, fontWeight: 800, color: globalConvColor, lineHeight: 1, marginBottom: 8 }}>
+              {globalConvRate.toFixed(1)}%
             </div>
-          )}
+            <div style={{ fontSize: 12, color: '#52526A' }}>
+              {closedTotal} {t('closedOf')} {total} total
+            </div>
+            <div style={{ width: '100%', marginTop: 16 }}>
+              <ProgressBar value={closedTotal} max={total} color={globalConvColor} height={6} />
+            </div>
+          </div>
+
+          {/* Card 2 — By SDR */}
+          <div style={S.bigCard}>
+            <div style={S.sectionTitle}>{t('conversionBySdr')}</div>
+            {sdrStats.length === 0 ? (
+              <p style={{ color: '#52526A', fontSize: 13 }}>{t('noData')}</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {sdrStats.map(sdr => {
+                  const rate = sdr.total > 0 ? (sdr.closed / sdr.total) * 100 : 0
+                  const color = convRateColor(rate)
+                  return (
+                    <div key={sdr.id}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                        <span style={{ fontSize: 13, color: '#F0F0F5', fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                          {sdr.full_name}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, marginLeft: 10 }}>
+                          <span style={{ fontSize: 11, color: '#52526A', fontFamily: 'JetBrains Mono, monospace' }}>
+                            {sdr.closed}/{sdr.total}
+                          </span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color, fontFamily: 'JetBrains Mono, monospace', minWidth: 44, textAlign: 'right' }}>
+                            {rate.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                      <ProgressBar value={rate} max={maxSdrRate} color={color} height={4} />
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Card 3 — By Area */}
+          <div style={S.bigCard}>
+            <div style={S.sectionTitle}>{t('conversionByArea')}</div>
+            {areaStats.length === 0 ? (
+              <p style={{ color: '#52526A', fontSize: 13 }}>{t('noData')}</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {areaStats.map(a => {
+                  const rate = a.total > 0 ? (a.closed / a.total) * 100 : 0
+                  const color = convRateColor(rate)
+                  return (
+                    <div key={a.label}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span style={{ fontSize: 13, color: '#F0F0F5', fontWeight: 600 }}>{a.label}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 11, color: '#52526A', fontFamily: 'JetBrains Mono, monospace' }}>
+                            {a.closed}/{a.total}
+                          </span>
+                          <span style={{ fontSize: 15, fontWeight: 800, color, fontFamily: 'JetBrains Mono, monospace', minWidth: 52, textAlign: 'right' }}>
+                            {rate.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                      <ProgressBar value={rate} max={maxAreaRate} color={color} height={6} />
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      </PremiumFeature>
 
       {/* ── SECTION 2: Quick metrics ───────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
@@ -393,44 +396,46 @@ export function StatsDashboard() {
 
       {/* ── SECTION 5: SDR Performance ─────────────────────────────────────── */}
       {sdrStats.length > 0 && (
-        <div style={S.card}>
-          <div style={S.sectionTitle}>{t('sdrPerformance')}</div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={S.th}>{t('sdrName')}</th>
-                <th style={S.th}>{t('assigned')}</th>
-                <th style={S.th}>{t('repliedCount')}</th>
-                <th style={S.th}>{t('closed')}</th>
-                <th style={S.th}>{t('conversionRate')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sdrStats.map(sdr => {
-                const convRate = sdr.total > 0 ? (sdr.closed / sdr.total) * 100 : 0
-                const color = convRateColor(convRate)
-                return (
-                  <tr key={sdr.id}>
-                    <td style={{ ...S.td, color: '#F0F0F5', fontWeight: 500 }}>{sdr.full_name}</td>
-                    <td style={{ ...S.td, fontFamily: 'JetBrains Mono, monospace', color: '#6C63FF' }}>{sdr.total}</td>
-                    <td style={{ ...S.td, fontFamily: 'JetBrains Mono, monospace', color: '#F59E0B' }}>{sdr.replied}</td>
-                    <td style={{ ...S.td, fontFamily: 'JetBrains Mono, monospace', color: '#10B981' }}>{sdr.closed}</td>
-                    <td style={S.td}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 80, flexShrink: 0 }}>
-                          <ProgressBar value={convRate} max={Math.max(maxSdrRate, 1)} color={color} height={4} />
+        <PremiumFeature plan={orgPlan} requiredPlan="premium" featureName="SDR Performance is a Premium feature">
+          <div style={S.card}>
+            <div style={S.sectionTitle}>{t('sdrPerformance')}</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={S.th}>{t('sdrName')}</th>
+                  <th style={S.th}>{t('assigned')}</th>
+                  <th style={S.th}>{t('repliedCount')}</th>
+                  <th style={S.th}>{t('closed')}</th>
+                  <th style={S.th}>{t('conversionRate')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sdrStats.map(sdr => {
+                  const convRate = sdr.total > 0 ? (sdr.closed / sdr.total) * 100 : 0
+                  const color = convRateColor(convRate)
+                  return (
+                    <tr key={sdr.id}>
+                      <td style={{ ...S.td, color: '#F0F0F5', fontWeight: 500 }}>{sdr.full_name}</td>
+                      <td style={{ ...S.td, fontFamily: 'JetBrains Mono, monospace', color: '#6C63FF' }}>{sdr.total}</td>
+                      <td style={{ ...S.td, fontFamily: 'JetBrains Mono, monospace', color: '#F59E0B' }}>{sdr.replied}</td>
+                      <td style={{ ...S.td, fontFamily: 'JetBrains Mono, monospace', color: '#10B981' }}>{sdr.closed}</td>
+                      <td style={S.td}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ width: 80, flexShrink: 0 }}>
+                            <ProgressBar value={convRate} max={Math.max(maxSdrRate, 1)} color={color} height={4} />
+                          </div>
+                          <span style={{ fontSize: 12, fontWeight: 700, color, fontFamily: 'JetBrains Mono, monospace' }}>
+                            {convRate.toFixed(1)}%
+                          </span>
                         </div>
-                        <span style={{ fontSize: 12, fontWeight: 700, color, fontFamily: 'JetBrains Mono, monospace' }}>
-                          {convRate.toFixed(1)}%
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </PremiumFeature>
       )}
     </div>
   )

@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
   LayoutGrid, Users2, ClipboardList, BarChart3, Users, LogOut, Trophy,
-  LayoutDashboard, Play, History,
+  LayoutDashboard, Play, History, Settings2,
 } from 'lucide-react'
 import { AreaBadge } from '@/components/ui/AreaBadge'
 import type { UserWithArea } from '@/contexts/UserContext'
@@ -40,6 +40,7 @@ export function Sidebar({ user }: Props) {
     { href: '/audit', label: t('audit'), icon: ClipboardList, adminOnly: true },
     { href: '/stats', label: t('stats'), icon: BarChart3, adminOnly: true },
     { href: '/admin/users', label: t('users'), icon: Users, adminOnly: true },
+    { href: '/settings', label: 'Settings', icon: Settings2, adminOnly: true },
   ]
 
   async function handleLogout() {
