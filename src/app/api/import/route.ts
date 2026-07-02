@@ -25,22 +25,17 @@ function getYearMonth() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 }
 
-async function incrementMonthlyLeadCount(admin: ReturnType<typeof createAdminClient>, orgId: string, count: number) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function incrementMonthlyLeads(admin: any, orgId: string, count: number) {
   if (count <= 0) return
   const yearMonth = getYearMonth()
-  await admin.rpc('increment_monthly_leads', { p_org_id: orgId, p_year_month: yearMonth, p_count: count })
-    .then(async ({ error }) => {
-      if (error) {
-        // Fallback: upsert manually if the RPC doesn't exist yet
-        await admin.from('monthly_lead_counts').upsert(
-          { organization_id: orgId, year_month: yearMonth, count },
-          { onConflict: 'organization_id,year_month', ignoreDuplicates: false }
-        )
-        // If upsert inserted, it's fine; if updated we need to add count not replace
-        // Safe enough fallback: try raw increment
-        await admin.rpc('increment_monthly_leads', { p_org_id: orgId, p_year_month: yearMonth, p_count: count })
-      }
-    })
+  await admin.rpc('increment_monthly_leads', {
+    p_org_id: orgId,
+    p_year_month: yearMonth,
+    p_count: count,
+  }).catch(() => {
+    // RPC not yet applied — non-fatal
+  })
 }
 
 // POST /api/import — dedup check + return domain blacklist
@@ -136,27 +131,7 @@ export async function PUT(req: NextRequest) {
   }
 
   // Increment monthly lead counter
-  if (imported > 0 && orgId) {
-    const yearMonth = getYearMonth()
-    // Try simple upsert with increment via INSERT ... ON CONFLICT DO UPDATE
-    const { error: upsertErr } = await admin.from('monthly_lead_counts').upsert(
-      { organization_id: orgId, year_month: yearMonth, count: imported },
-      { onConflict: 'organization_id,year_month' }
-    )
-    if (upsertErr) {
-      // If upsert failed (table may not exist yet), silently continue
-    } else {
-      // The upsert above sets count = imported on conflict (not additive).
-      // Use raw SQL increment instead when there's an existing row
-      await admin.rpc('increment_monthly_leads', {
-        p_org_id: orgId,
-        p_year_month: yearMonth,
-        p_count: imported,
-      }).catch(() => {
-        // RPC not yet created — table-level upsert was close enough for now
-      })
-    }
-  }
+  if (orgId) await incrementMonthlyLeads(admin, orgId, imported)
 
   if (errors.length > 0 && imported === 0 && skippedConstraint === 0) {
     return NextResponse.json({ error: errors[0] }, { status: 400 })

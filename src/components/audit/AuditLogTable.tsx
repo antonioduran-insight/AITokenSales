@@ -39,7 +39,11 @@ function formatDetail(log: AuditLog): string {
   const m = log.metadata ?? {}
   switch (log.event_type) {
     case 'status_changed': return `${m.from_status} → ${m.to_status}`
-    case 'prospect_reassigned': return `→ ${m.to ?? '?'}`
+    case 'prospect_reassigned': {
+      const from = (m.from_sdr ?? m.from) as string | undefined
+      const to = (m.to_sdr ?? m.to) as string | undefined
+      return from ? `${from} → ${to ?? '?'}` : `→ ${to ?? '?'}`
+    }
     case 'duplicate_attempt': return `${m.type ?? ''} duplicate`
     case 'csv_import': return `${m.imported ?? 0} imported, ${m.skipped ?? 0} skipped, ${m.forced ?? 0} forced`
     case 'sdr_created': return `${m.email ?? ''} → area ${m.area ?? ''}`
