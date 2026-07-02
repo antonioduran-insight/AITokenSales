@@ -5,6 +5,7 @@ import { DndContext, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/
 import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
 import { useUser } from '@/contexts/UserContext'
+import { useImpersonate } from '@/contexts/ImpersonateContext'
 import { useTranslations } from 'next-intl'
 import { KanbanColumn } from './KanbanColumn'
 import { ProspectCard } from './ProspectCard'
@@ -18,6 +19,7 @@ import { OUTREACH_STATUSES } from '@/lib/types'
 
 export function KanbanBoard() {
   const { user, isAdmin } = useUser()
+  const { isImpersonating, impersonateOrgId } = useImpersonate()
   const t = useTranslations()
 
   const [prospects, setProspects] = useState<Prospect[]>([])
@@ -45,7 +47,7 @@ export function KanbanBoard() {
   const effectiveAreaId = isAdmin ? selectedAreaId : user?.area_id ?? null
 
   const fetchProspects = useCallback(async () => {
-    if (!effectiveAreaId && !isAdmin) return
+    if (!effectiveAreaId && !isAdmin && !isImpersonating) return
     setLoading(true)
     try {
       const supabase = createClient()
@@ -55,7 +57,9 @@ export function KanbanBoard() {
         .select('*, area:areas(*), assigned_user:users!assigned_to(id, full_name, email, role, area_id, is_active, created_at)')
         .order('created_at', { ascending: false })
 
-      if (effectiveAreaId) {
+      if (isImpersonating && impersonateOrgId) {
+        query = query.eq('organization_id', impersonateOrgId)
+      } else if (effectiveAreaId) {
         query = query.eq('area_id', effectiveAreaId)
       }
 
@@ -64,7 +68,7 @@ export function KanbanBoard() {
     } finally {
       setLoading(false)
     }
-  }, [effectiveAreaId, isAdmin])
+  }, [effectiveAreaId, isAdmin, isImpersonating, impersonateOrgId])
 
   useEffect(() => {
     if (user) fetchProspects()
@@ -76,7 +80,7 @@ export function KanbanBoard() {
 
   async function handleDragEnd({ active, over }: DragEndEvent) {
     setDraggingId(null)
-    if (!over) return
+    if (!over || isImpersonating) return
 
     const newStatus = over.id as OutreachStatus
     const prospect = prospects.find(p => p.id === active.id)
@@ -212,13 +216,15 @@ export function KanbanBoard() {
           <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
         </button>
 
-        <Button
-          onClick={() => setFormOpen(true)}
-          style={{ backgroundColor: '#6C63FF', color: '#F0F0F5', fontSize: 13, height: 34, gap: 6, display: 'flex', alignItems: 'center' }}
-        >
-          <Plus size={14} />
-          {t('prospect.new')}
-        </Button>
+        {!isImpersonating && (
+          <Button
+            onClick={() => setFormOpen(true)}
+            style={{ backgroundColor: '#6C63FF', color: '#F0F0F5', fontSize: 13, height: 34, gap: 6, display: 'flex', alignItems: 'center' }}
+          >
+            <Plus size={14} />
+            {t('prospect.new')}
+          </Button>
+        )}
       </div>
 
       {/* Columns */}

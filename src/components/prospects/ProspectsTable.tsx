@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
 import { useUser } from '@/contexts/UserContext'
+import { useImpersonate } from '@/contexts/ImpersonateContext'
 import { ProspectDrawer } from './ProspectDrawer'
 import { TemperatureBadge } from '@/components/ui/TemperatureBadge'
 import { AreaBadge } from '@/components/ui/AreaBadge'
@@ -49,6 +50,7 @@ const S: Record<string, React.CSSProperties> = {
 
 export function ProspectsTable() {
   const { user, isAdmin } = useUser()
+  const { isImpersonating, impersonateOrgId } = useImpersonate()
   const t = useTranslations()
 
   const [prospects, setProspects] = useState<Prospect[]>([])
@@ -106,8 +108,12 @@ export function ProspectsTable() {
         .order('created_at', { ascending: false })
         .range(page * pageSize, (page + 1) * pageSize - 1)
 
-      if (!isAdmin && user?.area_id) query = query.eq('area_id', user.area_id)
-      if (filterArea) query = query.eq('area_id', filterArea)
+      if (isImpersonating && impersonateOrgId) {
+        query = query.eq('organization_id', impersonateOrgId)
+      } else {
+        if (!isAdmin && user?.area_id) query = query.eq('area_id', user.area_id)
+        if (filterArea) query = query.eq('area_id', filterArea)
+      }
       if (filterSdr === 'unassigned') query = query.is('assigned_to', null)
       else if (filterSdr) query = query.eq('assigned_to', filterSdr)
       if (filterStatus) query = query.eq('outreach_status', filterStatus)
@@ -122,7 +128,7 @@ export function ProspectsTable() {
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, search, filterArea, filterSdr, filterStatus, filterTemp, isAdmin, user?.area_id])
+  }, [page, pageSize, search, filterArea, filterSdr, filterStatus, filterTemp, isAdmin, user?.area_id, isImpersonating, impersonateOrgId])
 
   useEffect(() => {
     if (user) fetchProspects()
