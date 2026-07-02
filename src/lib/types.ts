@@ -196,3 +196,20 @@ export const PLAN_PRICES: Record<string, number> = {
   enterprise: 0,
   ultra: 0,
 }
+
+export interface UserArea {
+  id: string
+  user_id: string
+  area_id: string
+  created_at: string
+  area?: Area
+}
+
+export interface MonthlyLeadCount {
+  id: string
+  organization_id: string
+  year_month: string
+  count: number
+  created_at: string
+  updated_at: string
+}

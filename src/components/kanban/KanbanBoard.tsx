@@ -19,6 +19,12 @@ import { OUTREACH_STATUSES } from '@/lib/types'
 
 const PROSPECT_SELECT = '*, area:areas(*), assigned_user:users!assigned_to(id, full_name, email, role, area_id, is_active, created_at)'
 
+interface PipelineStage {
+  name: string
+  color: string
+  position: number
+}
+
 export function KanbanBoard() {
   const { user } = useUser()
   const { isImpersonating, impersonateOrgId, isAdmin } = useOrgId()
@@ -26,13 +32,16 @@ export function KanbanBoard() {
 
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [areas, setAreas] = useState<Area[]>([])
+  const [sdrAreas, setSdrAreas] = useState<Area[]>([])
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
   const [activeProspect, setActiveProspect] = useState<Prospect | null>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [stageMap, setStageMap] = useState<Map<number, PipelineStage>>(new Map())
 
+  // Admin: fetch all areas for filter
   useEffect(() => {
     if (!isAdmin) return
     createClient()
@@ -42,10 +51,48 @@ export function KanbanBoard() {
       .then(({ data }) => { if (data) setAreas(data as Area[]) })
   }, [isAdmin])
 
-  const effectiveAreaId = isAdmin ? selectedAreaId : user?.area_id ?? null
+  // SDR: fetch their assigned areas from user_areas
+  useEffect(() => {
+    if (!user || user.role !== 'sdr') return
+    createClient()
+      .from('user_areas')
+      .select('area:areas(*)')
+      .eq('user_id', user.id)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          const areaList = data.map(ua => (ua as unknown as { area: Area }).area).filter(Boolean)
+          setSdrAreas(areaList)
+        } else if (user.area_id) {
+          createClient()
+            .from('areas')
+            .select('*')
+            .eq('id', user.area_id)
+            .then(({ data: aData }) => { if (aData) setSdrAreas(aData as Area[]) })
+        }
+      })
+  }, [user])
+
+  // Fetch pipeline stages for custom column labels/colors
+  useEffect(() => {
+    if (isImpersonating) return
+    createClient()
+      .from('pipeline_stages')
+      .select('name, color, position')
+      .order('position')
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          const map = new Map<number, PipelineStage>()
+          data.forEach(s => map.set(s.position, s as PipelineStage))
+          setStageMap(map)
+        }
+      })
+  }, [isImpersonating])
+
+  const isSdr = user?.role === 'sdr'
+  const sdrAreaIds = sdrAreas.map(a => a.id)
 
   const fetchProspects = useCallback(async () => {
-    if (!effectiveAreaId && !isAdmin) return
+    if (!isAdmin && !isSdr && !isImpersonating) return
     setLoading(true)
     try {
       let data: Prospect[] = []
@@ -63,7 +110,18 @@ export function KanbanBoard() {
           .select(PROSPECT_SELECT)
           .order('created_at', { ascending: false })
 
-        if (effectiveAreaId) query = query.eq('area_id', effectiveAreaId)
+        if (isAdmin) {
+          if (selectedAreaId) query = query.eq('area_id', selectedAreaId)
+        } else if (isSdr) {
+          const filterIds = selectedAreaId ? [selectedAreaId] : sdrAreaIds
+          if (filterIds.length === 1) {
+            query = query.eq('area_id', filterIds[0])
+          } else if (filterIds.length > 1) {
+            query = query.in('area_id', filterIds)
+          } else if (user?.area_id) {
+            query = query.eq('area_id', user.area_id)
+          }
+        }
 
         const { data: rows } = await query
         data = (rows ?? []) as unknown as Prospect[]
@@ -73,7 +131,7 @@ export function KanbanBoard() {
     } finally {
       setLoading(false)
     }
-  }, [effectiveAreaId, isAdmin, isImpersonating, impersonateOrgId])
+  }, [selectedAreaId, isAdmin, isSdr, isImpersonating, impersonateOrgId, user, sdrAreaIds])
 
   useEffect(() => {
     if (user || isImpersonating) fetchProspects()
@@ -134,18 +192,20 @@ export function KanbanBoard() {
   }
 
   const draggingProspect = draggingId ? prospects.find(p => p.id === draggingId) : null
-  const currentArea = areas.find(a => a.id === effectiveAreaId) ?? user?.area
+  const currentArea = areas.find(a => a.id === selectedAreaId) ?? sdrAreas[0] ?? user?.area
 
-  // When impersonating and area filter is selected, filter in memory
   const visibleProspects = isImpersonating && selectedAreaId
     ? prospects.filter(p => p.area_id === selectedAreaId)
-    : isImpersonating
-    ? prospects
     : prospects
+
+  const filterAreas = isAdmin ? areas : (isSdr ? sdrAreas : [])
+  const showAreaFilter = filterAreas.length > 0
+
+  const defaultAreaForForm = selectedAreaId ?? (isSdr && sdrAreaIds.length === 1 ? sdrAreaIds[0] : undefined)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* Kanban Header */}
+      {/* Header */}
       <div
         style={{
           padding: '14px 20px',
@@ -157,7 +217,7 @@ export function KanbanBoard() {
           backgroundColor: '#13131A',
         }}
       >
-        {isAdmin && areas.length > 0 ? (
+        {showAreaFilter ? (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button
               onClick={() => setSelectedAreaId(null)}
@@ -171,10 +231,10 @@ export function KanbanBoard() {
             >
               {t('areas.all')}
             </button>
-            {areas.map(area => (
+            {filterAreas.map(area => (
               <button
                 key={area.id}
-                onClick={() => setSelectedAreaId(isImpersonating ? area.id : area.id)}
+                onClick={() => setSelectedAreaId(area.id)}
                 style={{
                   padding: '4px 10px', borderRadius: 6, border: '1px solid',
                   borderColor: selectedAreaId === area.id ? '#6C63FF' : '#2A2A3A',
@@ -222,14 +282,19 @@ export function KanbanBoard() {
       <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden', padding: '16px 16px 0' }}>
         <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={{ display: 'flex', gap: 12, height: '100%', minWidth: 'max-content' }}>
-            {OUTREACH_STATUSES.map(status => (
-              <KanbanColumn
-                key={status}
-                status={status}
-                prospects={visibleProspects.filter(p => p.outreach_status === status)}
-                onCardClick={handleCardClick}
-              />
-            ))}
+            {OUTREACH_STATUSES.map((status, i) => {
+              const stage = stageMap.get(i + 1)
+              return (
+                <KanbanColumn
+                  key={status}
+                  status={status}
+                  label={stage?.name}
+                  color={stage?.color}
+                  prospects={visibleProspects.filter(p => p.outreach_status === status)}
+                  onCardClick={handleCardClick}
+                />
+              )
+            })}
           </div>
 
           <DragOverlay dropAnimation={null}>
@@ -257,7 +322,7 @@ export function KanbanBoard() {
         open={formOpen}
         onClose={() => setFormOpen(false)}
         onCreated={handleProspectCreated}
-        defaultAreaId={effectiveAreaId ?? undefined}
+        defaultAreaId={defaultAreaForForm}
       />
     </div>
   )

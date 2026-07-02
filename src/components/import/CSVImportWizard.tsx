@@ -54,7 +54,7 @@ function autoDetect(col: string): ProspectFieldKey | '' {
 interface ParsedRow {
   raw: Record<string, string>
   mapped: Record<string, string>
-  status: 'new' | 'duplicate' | 'error'
+  status: 'new' | 'duplicate' | 'error' | 'blacklisted'
   duplicateType?: 'email' | 'linkedin' | 'both'
   duplicateName?: string
   error?: string
@@ -107,7 +107,7 @@ export function CSVImportWizard() {
 
   // Step 5: import
   const [importing, setImporting] = useState(false)
-  const [results, setResults] = useState<{ imported: number; skipped: number; forced: number; errors: number; totalRows: number; skippedConstraint: number } | null>(null)
+  const [results, setResults] = useState<{ imported: number; skipped: number; forced: number; errors: number; totalRows: number; skippedConstraint: number; blacklisted: number } | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
 
   const [dragOver, setDragOver] = useState(false)
@@ -168,9 +168,10 @@ export function CSVImportWizard() {
       })
     })
 
-    // Use service-role API to check duplicates across the entire area (bypasses RLS)
+    // Check duplicates + fetch org domain blacklist from the API
     let dupEmails: Record<string, string> = {}
     let dupLinkedins: Record<string, string> = {}
+    let blacklistedDomains: string[] = []
     try {
       const res = await fetch('/api/import', {
         method: 'POST',
@@ -181,6 +182,7 @@ export function CSVImportWizard() {
         const data = await res.json()
         dupEmails = data.dupEmails ?? {}
         dupLinkedins = data.dupLinkedins ?? {}
+        blacklistedDomains = data.blacklistedDomains ?? []
       }
     } catch {
       // If check fails, proceed without dedup (will still insert)
@@ -194,6 +196,23 @@ export function CSVImportWizard() {
 
       if (!mapped.name?.trim()) {
         return { raw, mapped, status: 'error', error: 'Missing name', skip: true }
+      }
+
+      // Domain blacklist check (email domain or linkedin domain)
+      if (blacklistedDomains.length > 0) {
+        const emailDomain = mapped.email?.trim().toLowerCase().split('@')[1] ?? ''
+        const linkedinDomain = (() => {
+          try { return new URL(mapped.linkedin_url?.trim() ?? '').hostname.replace('www.', '') } catch { return '' }
+        })()
+        const companyDomain = mapped.company?.trim().toLowerCase() ?? ''
+        const isBlacklisted = blacklistedDomains.some(d =>
+          (emailDomain && emailDomain.includes(d)) ||
+          (linkedinDomain && linkedinDomain.includes(d)) ||
+          (companyDomain && companyDomain.includes(d))
+        )
+        if (isBlacklisted) {
+          return { raw, mapped, status: 'blacklisted', error: 'Domain blacklisted', skip: true }
+        }
       }
 
       const email = mapped.email?.trim().toLowerCase()
@@ -243,9 +262,10 @@ export function CSVImportWizard() {
     setImporting(true)
     let imported = 0, skipped = 0, forced = 0, skippedConstraint = 0
 
-    const toInsert = targetRows.filter(r => r.status !== 'error' && !r.skip)
+    const blacklistedRows = targetRows.filter(r => r.status === 'blacklisted')
+    const toInsert = targetRows.filter(r => r.status !== 'error' && r.status !== 'blacklisted' && !r.skip)
     const errorRows = targetRows.filter(r => r.status === 'error')
-    skipped = targetRows.filter(r => r.skip && r.status !== 'error').length
+    skipped = targetRows.filter(r => r.skip && r.status !== 'error' && r.status !== 'blacklisted').length
 
     const records = toInsert.map(r => {
       if (r.status === 'duplicate') forced++
@@ -302,7 +322,7 @@ export function CSVImportWizard() {
       metadata: { imported, skipped, forced, errors: errorRows.length, total: targetRows.length, area: selectedArea },
     })
 
-    setResults({ imported, skipped, forced, errors: errorRows.length, totalRows: targetRows.length, skippedConstraint })
+    setResults({ imported, skipped, forced, errors: errorRows.length, totalRows: targetRows.length, skippedConstraint, blacklisted: blacklistedRows.length })
     setImporting(false)
     setStep(5)
   }
@@ -329,12 +349,13 @@ export function CSVImportWizard() {
   const newCount = rows.filter(r => r.status === 'new').length
   const dupCount = rows.filter(r => r.status === 'duplicate').length
   const errorCount = rows.filter(r => r.status === 'error').length
-  const willImport = rows.filter(r => !r.skip && r.status !== 'error').length
+  const blacklistedCount = rows.filter(r => r.status === 'blacklisted').length
+  const willImport = rows.filter(r => !r.skip && r.status !== 'error' && r.status !== 'blacklisted').length
 
   // SDRs skip step 2 (area), so remap display steps
   const adminSteps = [
     { s: 1 as Step, label: t('step1') },
-    { s: 2 as Step, label: 'Área' },
+    { s: 2 as Step, label: 'Area' },
     { s: 3 as Step, label: t('step2') },
     { s: 4 as Step, label: t('step3') },
     { s: 5 as Step, label: t('step4') },
@@ -405,9 +426,9 @@ export function CSVImportWizard() {
       {/* STEP 2: Area selection */}
       {step === 2 && (
         <div style={S.card}>
-          <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>¿A qué área pertenecen estos prospectos?</h2>
+          <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>Which area do these prospects belong to?</h2>
           <p style={{ fontSize: 13, color: '#52526A', marginBottom: 28 }}>
-            El área elegida se aplicará a todas las {csvData.length} filas del CSV.
+            The selected area will be applied to all {csvData.length} rows in the CSV.
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 32 }}>
@@ -465,7 +486,7 @@ export function CSVImportWizard() {
             <div>
               <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{t('columnMapping')}</h2>
               <p style={{ fontSize: 12, color: '#52526A' }}>
-                {csvData.length} filas · {csvHeaders.length} columnas · Área:{' '}
+                {csvData.length} rows · {csvHeaders.length} columns · Area:{' '}
                 <span style={{ color: AREA_COLORS[selectedArea!], fontWeight: 600 }}>
                   {AREA_OPTIONS.find(a => a.name === selectedArea)?.label}
                 </span>
@@ -585,10 +606,10 @@ export function CSVImportWizard() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead style={{ position: 'sticky', top: 0, backgroundColor: '#1C1C27' }}>
                 <tr>
-                  <th style={{ padding: '8px 12px', textAlign: 'left', color: '#52526A', fontWeight: 500, fontSize: 11 }}>Registro CSV</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', color: '#52526A', fontWeight: 500, fontSize: 11 }}>CSV Record</th>
                   <th style={{ padding: '8px 12px', textAlign: 'left', color: '#52526A', fontWeight: 500, fontSize: 11 }}>Match</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'left', color: '#52526A', fontWeight: 500, fontSize: 11 }}>Ya existe como</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'center', color: '#52526A', fontWeight: 500, fontSize: 11 }}>Decisión</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', color: '#52526A', fontWeight: 500, fontSize: 11 }}>Already exists as</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'center', color: '#52526A', fontWeight: 500, fontSize: 11 }}>Decision</th>
                 </tr>
               </thead>
               <tbody>
@@ -634,7 +655,8 @@ export function CSVImportWizard() {
           </div>
 
           <p style={{ fontSize: 11, color: '#52526A', marginTop: 10 }}>
-            {rows.filter(r => r.status === 'duplicate' && r.skip).length} {t('skipped').toLowerCase()} · {rows.filter(r => r.status === 'duplicate' && !r.skip).length} se importarán igual
+            {rows.filter(r => r.status === 'duplicate' && r.skip).length} {t('skipped').toLowerCase()} · {rows.filter(r => r.status === 'duplicate' && !r.skip).length} will be imported anyway
+            {blacklistedCount > 0 && ` · ${blacklistedCount} blocked by blacklist`}
           </p>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
@@ -666,7 +688,7 @@ export function CSVImportWizard() {
             </div>
           )}
 
-          <div style={{ fontSize: 12, color: '#52526A', marginBottom: 8 }}>{results.totalRows} filas en el CSV</div>
+          <div style={{ fontSize: 12, color: '#52526A', marginBottom: 8 }}>{results.totalRows} rows in the CSV</div>
 
           <div style={{ display: 'flex', justifyContent: 'center', gap: 20, margin: '20px 0', flexWrap: 'wrap' }}>
             <div style={{ textAlign: 'center' }}>
@@ -675,24 +697,30 @@ export function CSVImportWizard() {
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 34, fontWeight: 700, color: '#F59E0B' }}>{results.skipped}</div>
-              <div style={{ fontSize: 12, color: '#8B8BA0' }}>Duplicados omitidos</div>
+              <div style={{ fontSize: 12, color: '#8B8BA0' }}>Duplicates skipped</div>
             </div>
+            {results.blacklisted > 0 && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 34, fontWeight: 700, color: '#EF4444' }}>{results.blacklisted}</div>
+                <div style={{ fontSize: 12, color: '#8B8BA0' }}>Blocked by blacklist</div>
+              </div>
+            )}
             {results.skippedConstraint > 0 && (
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 34, fontWeight: 700, color: '#52526A' }}>{results.skippedConstraint}</div>
-                <div style={{ fontSize: 12, color: '#8B8BA0' }}>Ya existían (global)</div>
+                <div style={{ fontSize: 12, color: '#8B8BA0' }}>Already existed (global)</div>
               </div>
             )}
             {results.errors > 0 && (
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 34, fontWeight: 700, color: '#EF4444' }}>{results.errors}</div>
-                <div style={{ fontSize: 12, color: '#8B8BA0' }}>Sin nombre (error)</div>
+                <div style={{ fontSize: 12, color: '#8B8BA0' }}>No name (error)</div>
               </div>
             )}
             {results.forced > 0 && (
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 34, fontWeight: 700, color: '#6C63FF' }}>{results.forced}</div>
-                <div style={{ fontSize: 12, color: '#8B8BA0' }}>Duplicados forzados</div>
+                <div style={{ fontSize: 12, color: '#8B8BA0' }}>Forced duplicates</div>
               </div>
             )}
           </div>

@@ -7,6 +7,8 @@ import type { Prospect, OutreachStatus } from '@/lib/types'
 
 interface Props {
   status: OutreachStatus
+  label?: string
+  color?: string
   prospects: Prospect[]
   onCardClick: (prospect: Prospect) => void
 }
@@ -23,10 +25,10 @@ const COLUMN_ACCENT: Record<OutreachStatus, string> = {
 
 const TERMINAL: OutreachStatus[] = ['closed', 'nurture']
 
-export function KanbanColumn({ status, prospects, onCardClick }: Props) {
+export function KanbanColumn({ status, label, color, prospects, onCardClick }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: status })
   const isTerminal = TERMINAL.includes(status)
-  const accent = COLUMN_ACCENT[status]
+  const accent = color ?? COLUMN_ACCENT[status]
 
   return (
     <div
@@ -49,7 +51,10 @@ export function KanbanColumn({ status, prospects, onCardClick }: Props) {
           justifyContent: 'space-between',
         }}
       >
-        <StatusBadge status={status} size="md" />
+        {label
+          ? <span style={{ fontSize: 12, fontWeight: 600, color: accent, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
+          : <StatusBadge status={status} size="md" />
+        }
         <span
           style={{
             fontSize: 12,
