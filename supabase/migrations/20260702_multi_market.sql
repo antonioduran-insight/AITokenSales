@@ -111,12 +111,8 @@ END;
 $$;
 
 -- Schedule: run every day at 03:00 UTC
--- Requires pg_cron extension (enabled in Supabase dashboard)
-SELECT cron.schedule(
-  'delete-old-leads',
-  '0 3 * * *',
-  'SELECT delete_old_leads()'
-)
-WHERE NOT EXISTS (
-  SELECT 1 FROM cron.job WHERE jobname = 'delete-old-leads'
-);
+-- Enable pg_cron in Supabase dashboard first (Database → Extensions → pg_cron),
+-- then run this manually in the SQL editor:
+--
+-- SELECT cron.schedule('delete-old-leads', '0 3 * * *', 'SELECT delete_old_leads()');
+
