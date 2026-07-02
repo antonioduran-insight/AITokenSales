@@ -525,11 +525,15 @@ function PlanTab() {
   useEffect(() => {
     fetch('/api/settings/plan')
       .then(r => r.json())
-      .then((d: PlanData) => { setData(d); setLoading(false) })
+      .then((d: PlanData) => {
+        if (d && d.org) setData(d)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
   }, [])
 
   if (loading) return <div style={{ color: '#52526A', padding: 40, textAlign: 'center' }}>Loading…</div>
-  if (!data) return null
+  if (!data) return <div style={{ color: '#52526A', padding: 40, textAlign: 'center' }}>No se pudo cargar el plan. Recarga la página.</div>
 
   const { org, sdrCount, sdrs, leadsCount, periodStart, addons } = data
   const maxSeats = org.max_seats ?? 0

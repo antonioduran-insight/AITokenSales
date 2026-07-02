@@ -63,11 +63,14 @@ export async function GET() {
     periodStart = new Date(now.getFullYear(), now.getMonth() - 1, billingDay)
   }
 
-  const { count: leadsCount } = await admin
-    .from('prospects')
-    .select('*', { count: 'exact', head: true })
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const { data: leadCountRow } = await admin
+    .from('monthly_lead_counts')
+    .select('count')
     .eq('organization_id', ctx.orgId)
-    .gte('created_at', periodStart.toISOString())
+    .eq('year_month', yearMonth)
+    .maybeSingle()
+  const leadsCount = leadCountRow?.count ?? 0
 
   // Active add-ons
   const { data: addons } = await admin
