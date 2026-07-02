@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/contexts/UserContext'
+import { useOrgId } from '@/lib/hooks/useOrgId'
 import { TrendingUp, Users2, Calendar, Target, Trophy } from 'lucide-react'
 import { format, startOfWeek, endOfWeek } from 'date-fns'
 import type { OutreachStatus, AreaName } from '@/lib/types'
@@ -76,30 +77,38 @@ const S: Record<string, React.CSSProperties> = {
   td: { padding: '9px 12px', borderBottom: '1px solid #1C1C27', fontSize: 13 },
 }
 
+const STATS_SELECT = 'id, outreach_status, lead_temperature, area_id, assigned_to, created_at, area:areas(name, label_en), assigned_user:users!assigned_to(id, full_name, area_id)'
+
 export function StatsDashboard() {
   const t = useTranslations('stats')
   const tc = useTranslations('common')
-  const { user, isAdmin } = useUser()
+  const { user, isAdmin: userIsAdmin } = useUser()
+  const { isImpersonating, impersonateOrgId, isAdmin } = useOrgId()
 
   const [prospects, setProspects] = useState<ProspectRow[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!user) return
-    const supabase = createClient()
-    let query = supabase
-      .from('prospects')
-      .select('id, outreach_status, lead_temperature, area_id, assigned_to, created_at, area:areas(name, label_en), assigned_user:users!assigned_to(id, full_name, area_id)')
+    if (!user && !isImpersonating) return
 
-    if (!isAdmin && user.area_id) {
-      query = query.eq('area_id', user.area_id)
+    async function load() {
+      if (isImpersonating && impersonateOrgId) {
+        const params = new URLSearchParams({ impersonate_org_id: impersonateOrgId, select: STATS_SELECT, limit: '5000' })
+        const res = await fetch(`/api/crm/prospects?${params}`)
+        const json = await res.json()
+        if (json.data) setProspects(json.data as ProspectRow[])
+      } else {
+        const supabase = createClient()
+        let query = supabase.from('prospects').select(STATS_SELECT)
+        if (!userIsAdmin && user?.area_id) query = query.eq('area_id', user.area_id)
+        const { data } = await query
+        if (data) setProspects(data as unknown as ProspectRow[])
+      }
+      setLoading(false)
     }
 
-    query.then(({ data }) => {
-      if (data) setProspects(data as unknown as ProspectRow[])
-      setLoading(false)
-    })
-  }, [user, isAdmin])
+    load()
+  }, [user, userIsAdmin, isAdmin, isImpersonating, impersonateOrgId])
 
   if (loading) {
     return (

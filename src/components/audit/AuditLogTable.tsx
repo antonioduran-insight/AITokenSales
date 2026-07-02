@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { ChevronLeft, ChevronRight, Download, RefreshCw } from 'lucide-react'
 import { format } from 'date-fns'
 import type { AuditLog, AuditEventType } from '@/lib/types'
+import { useOrgId } from '@/lib/hooks/useOrgId'
 
 const PAGE_SIZE = 40
 
@@ -50,6 +51,7 @@ function formatDetail(log: AuditLog): string {
 export function AuditLogTable() {
   const t = useTranslations('audit')
   const tc = useTranslations('common')
+  const { isImpersonating, impersonateOrgId } = useOrgId()
 
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [total, setTotal] = useState(0)
@@ -64,25 +66,40 @@ export function AuditLogTable() {
   const fetchLogs = useCallback(async () => {
     setLoading(true)
     try {
-      const supabase = createClient()
-      let query = supabase
-        .from('audit_log')
-        .select('*', { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+      if (isImpersonating && impersonateOrgId) {
+        const params = new URLSearchParams({ impersonate_org_id: impersonateOrgId, limit: '1000' })
+        const res = await fetch(`/api/crm/audit_log?${params}`)
+        const json = await res.json()
+        let rows = (json.data ?? []) as AuditLog[]
 
-      if (filterEvent) query = query.eq('event_type', filterEvent)
-      if (filterActor) query = query.ilike('actor_name', `%${filterActor}%`)
-      if (dateFrom) query = query.gte('created_at', dateFrom)
-      if (dateTo) query = query.lte('created_at', dateTo + 'T23:59:59')
+        if (filterEvent) rows = rows.filter(l => l.event_type === filterEvent)
+        if (filterActor) rows = rows.filter(l => l.actor_name.toLowerCase().includes(filterActor.toLowerCase()))
+        if (dateFrom) rows = rows.filter(l => l.created_at >= dateFrom)
+        if (dateTo) rows = rows.filter(l => l.created_at <= dateTo + 'T23:59:59')
 
-      const { data, count } = await query
-      if (data) setLogs(data as AuditLog[])
-      if (count !== null) setTotal(count)
+        setTotal(rows.length)
+        setLogs(rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE))
+      } else {
+        const supabase = createClient()
+        let query = supabase
+          .from('audit_log')
+          .select('*', { count: 'exact' })
+          .order('created_at', { ascending: false })
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+
+        if (filterEvent) query = query.eq('event_type', filterEvent)
+        if (filterActor) query = query.ilike('actor_name', `%${filterActor}%`)
+        if (dateFrom) query = query.gte('created_at', dateFrom)
+        if (dateTo) query = query.lte('created_at', dateTo + 'T23:59:59')
+
+        const { data, count } = await query
+        if (data) setLogs(data as AuditLog[])
+        if (count !== null) setTotal(count)
+      }
     } finally {
       setLoading(false)
     }
-  }, [page, filterEvent, filterActor, dateFrom, dateTo])
+  }, [page, filterEvent, filterActor, dateFrom, dateTo, isImpersonating, impersonateOrgId])
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
   useEffect(() => { setPage(0) }, [filterEvent, filterActor, dateFrom, dateTo])

@@ -48,18 +48,9 @@ export default function OrganizationsPage() {
     return true
   })
 
-  async function handleImpersonate(org: Organization) {
+  function handleImpersonate(org: Organization) {
     setImpersonating(org.id)
-    const res = await fetch('/api/global-admin/impersonate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ org_id: org.id, org_name: org.name }),
-    })
-    if (res.ok) {
-      router.push(`/${locale}/kanban`)
-    } else {
-      setImpersonating(null)
-    }
+    router.push(`/${locale}/kanban?impersonate_org_id=${org.id}&impersonate_org_name=${encodeURIComponent(org.name)}`)
   }
 
   const selectStyle: React.CSSProperties = {

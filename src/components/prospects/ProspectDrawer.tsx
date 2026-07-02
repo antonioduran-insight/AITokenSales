@@ -12,6 +12,7 @@ import { ICPScore } from '@/components/ui/ICPScore'
 import { NotesLog } from './NotesLog'
 import { ConversationsLog } from '@/components/conversations/ConversationsLog'
 import { useUser } from '@/contexts/UserContext'
+import { useOrgId } from '@/lib/hooks/useOrgId'
 import { ExternalLink, Copy, Check, Star, ChevronDown, CheckCircle } from 'lucide-react'
 import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, LeadTemperature, User } from '@/lib/types'
@@ -76,6 +77,7 @@ const TAB_STYLE = (active: boolean) => ({
 export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: Props) {
   const t = useTranslations()
   const { isAdmin, user } = useUser()
+  const { isImpersonating } = useOrgId()
   const [prospect, setProspect] = useState(initial)
   const [tab, setTab] = useState<'info' | 'messages' | 'notes' | 'conversations'>('info')
   const [saving, setSaving] = useState(false)
@@ -135,6 +137,7 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
   }
 
   async function updateField(field: string, value: unknown) {
+    if (isImpersonating) return
     setSaving(true)
     const supabase = createClient()
     const { error } = await supabase.from('prospects').update({ [field]: value }).eq('id', prospect.id)
@@ -176,6 +179,13 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
           flexDirection: 'column',
         }}
       >
+        {/* Read-only banner when impersonating */}
+        {isImpersonating && (
+          <div style={{ backgroundColor: '#1C1410', borderBottom: '1px solid #F59E0B', padding: '6px 20px', fontSize: 11, color: '#FCD34D', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            👁 Read-only view
+          </div>
+        )}
+
         {/* Header */}
         <SheetHeader style={{ padding: '16px 20px', borderBottom: '1px solid #2A2A3A', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
@@ -195,7 +205,8 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
               <button
                 onClick={toggleFlag}
                 title={t('common.flagTomorrow')}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                disabled={isImpersonating}
+                style={{ background: 'none', border: 'none', cursor: isImpersonating ? 'default' : 'pointer', padding: 4, opacity: isImpersonating ? 0.4 : 1 }}
               >
                 <Star
                   size={16}

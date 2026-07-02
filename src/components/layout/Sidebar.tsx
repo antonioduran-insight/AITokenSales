@@ -1,8 +1,7 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { useTranslations, useLocale } from 'next-intl'
-import { Link } from '@/i18n/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
@@ -21,8 +20,18 @@ export function Sidebar({ user }: Props) {
   const locale = useLocale()
   const pathname = usePathname()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const isAdmin = user?.role === 'admin'
+  const impersonateOrgId = searchParams.get('impersonate_org_id')
+  const impersonateOrgName = searchParams.get('impersonate_org_name')
+  const isImpersonating = !!impersonateOrgId
+
+  const queryStr = impersonateOrgId
+    ? `?impersonate_org_id=${impersonateOrgId}&impersonate_org_name=${encodeURIComponent(impersonateOrgName ?? '')}`
+    : ''
+
+  const showAdmin = isAdmin || isImpersonating
 
   const navItems = [
     { href: '/kanban', label: t('kanban'), icon: LayoutGrid, always: true },
@@ -49,7 +58,7 @@ export function Sidebar({ user }: Props) {
         borderRight: '1px solid #2A2A3A',
         display: 'flex',
         flexDirection: 'column',
-        height: '100vh',
+        height: '100%',
       }}
     >
       {/* Logo */}
@@ -63,15 +72,16 @@ export function Sidebar({ user }: Props) {
       {/* Nav */}
       <nav style={{ flex: 1, padding: '12px 10px', overflowY: 'auto' }}>
         {navItems.map(item => {
-          if (item.adminOnly && !isAdmin) return null
+          if (item.adminOnly && !showAdmin) return null
           const fullHref = `/${locale}${item.href}`
           const isActive = pathname === fullHref || pathname.startsWith(fullHref + '/')
           const Icon = item.icon
+          const linkHref = `/${locale}${item.href}${queryStr}`
 
           return (
-            <Link
+            <a
               key={item.href}
-              href={item.href as '/kanban'}
+              href={linkHref}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -89,12 +99,12 @@ export function Sidebar({ user }: Props) {
             >
               <Icon size={16} strokeWidth={isActive ? 2.2 : 1.8} />
               {item.label}
-            </Link>
+            </a>
           )
         })}
 
-        {/* Scraper section — admin only */}
-        {isAdmin && (
+        {/* Scraper section — admin only, hide when impersonating */}
+        {isAdmin && !isImpersonating && (
           <>
             <div style={{ margin: '10px 4px 6px', display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ flex: 1, height: 1, backgroundColor: '#2A2A3A' }} />
@@ -111,9 +121,9 @@ export function Sidebar({ user }: Props) {
               const isActive = pathname === fullHref || pathname.startsWith(fullHref + '/')
               const Icon = item.icon
               return (
-                <Link
+                <a
                   key={item.href}
-                  href={item.href as '/dashboard'}
+                  href={`/${locale}${item.href}`}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10,
                     padding: '8px 12px', borderRadius: 8, marginBottom: 2,
@@ -126,7 +136,7 @@ export function Sidebar({ user }: Props) {
                 >
                   <Icon size={14} strokeWidth={isActive ? 2.2 : 1.8} />
                   {item.label}
-                </Link>
+                </a>
               )
             })}
           </>

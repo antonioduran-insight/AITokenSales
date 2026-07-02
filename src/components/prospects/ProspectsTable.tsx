@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
 import { useUser } from '@/contexts/UserContext'
-import { useImpersonate } from '@/contexts/ImpersonateContext'
+import { useOrgId } from '@/lib/hooks/useOrgId'
 import { ProspectDrawer } from './ProspectDrawer'
 import { TemperatureBadge } from '@/components/ui/TemperatureBadge'
 import { AreaBadge } from '@/components/ui/AreaBadge'
@@ -48,9 +48,11 @@ const S: Record<string, React.CSSProperties> = {
   td: { padding: '10px 14px', borderBottom: '1px solid #1C1C27', fontSize: 13, verticalAlign: 'middle' as const },
 }
 
+const PROSPECT_SELECT = '*, area:areas(*), assigned_user:users!assigned_to(id, full_name, email, role, area_id, is_active, created_at)'
+
 export function ProspectsTable() {
-  const { user, isAdmin } = useUser()
-  const { isImpersonating, impersonateOrgId } = useImpersonate()
+  const { user } = useUser()
+  const { isImpersonating, impersonateOrgId, isAdmin } = useOrgId()
   const t = useTranslations()
 
   const [prospects, setProspects] = useState<Prospect[]>([])
@@ -101,30 +103,56 @@ export function ProspectsTable() {
   const fetchProspects = useCallback(async () => {
     setLoading(true)
     try {
-      const supabase = createClient()
-      let query = supabase
-        .from('prospects')
-        .select('*, area:areas(*), assigned_user:users!assigned_to(id, full_name, email, role, area_id, is_active, created_at)', { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .range(page * pageSize, (page + 1) * pageSize - 1)
-
       if (isImpersonating && impersonateOrgId) {
-        query = query.eq('organization_id', impersonateOrgId)
+        const params = new URLSearchParams({
+          impersonate_org_id: impersonateOrgId,
+          select: PROSPECT_SELECT,
+          limit: '1000',
+        })
+        const res = await fetch(`/api/crm/prospects?${params}`)
+        const json = await res.json()
+        let rows = (json.data ?? []) as unknown as Prospect[]
+
+        // Client-side filters
+        if (filterStatus) rows = rows.filter(p => p.outreach_status === filterStatus)
+        if (filterTemp) rows = rows.filter(p => p.lead_temperature === filterTemp)
+        if (filterArea) rows = rows.filter(p => p.area_id === filterArea)
+        if (filterSdr === 'unassigned') rows = rows.filter(p => !p.assigned_to)
+        else if (filterSdr) rows = rows.filter(p => p.assigned_to === filterSdr)
+        if (search.trim()) {
+          const q = search.toLowerCase()
+          rows = rows.filter(p =>
+            p.name?.toLowerCase().includes(q) ||
+            p.company?.toLowerCase().includes(q) ||
+            p.email?.toLowerCase().includes(q)
+          )
+        }
+
+        setTotal(rows.length)
+        const start = page * pageSize
+        setProspects(rows.slice(start, start + pageSize))
       } else {
+        const supabase = createClient()
+        let query = supabase
+          .from('prospects')
+          .select(PROSPECT_SELECT, { count: 'exact' })
+          .order('created_at', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+
         if (!isAdmin && user?.area_id) query = query.eq('area_id', user.area_id)
         if (filterArea) query = query.eq('area_id', filterArea)
-      }
-      if (filterSdr === 'unassigned') query = query.is('assigned_to', null)
-      else if (filterSdr) query = query.eq('assigned_to', filterSdr)
-      if (filterStatus) query = query.eq('outreach_status', filterStatus)
-      if (filterTemp) query = query.eq('lead_temperature', filterTemp)
-      if (search.trim()) {
-        query = query.or(`name.ilike.%${search}%,company.ilike.%${search}%,email.ilike.%${search}%`)
-      }
+        if (filterSdr === 'unassigned') query = query.is('assigned_to', null)
+        else if (filterSdr) query = query.eq('assigned_to', filterSdr)
+        if (filterStatus) query = query.eq('outreach_status', filterStatus)
+        if (filterTemp) query = query.eq('lead_temperature', filterTemp)
+        if (search.trim()) {
+          query = query.or(`name.ilike.%${search}%,company.ilike.%${search}%,email.ilike.%${search}%`)
+        }
 
-      const { data, count } = await query
-      if (data) setProspects(data as unknown as Prospect[])
-      if (count !== null) setTotal(count)
+        const { data, count } = await query
+        if (data) setProspects(data as unknown as Prospect[])
+        if (count !== null) setTotal(count)
+      }
     } finally {
       setLoading(false)
     }
@@ -307,7 +335,7 @@ export function ProspectsTable() {
             {PAGE_SIZE_OPTIONS.map(n => <option key={n} value={n}>{n} / pág</option>)}
           </select>
 
-          {isAdmin && (
+          {isAdmin && !isImpersonating && (
             <button
               onClick={() => setSdrReassignOpen(true)}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 6, border: '1px solid #6C63FF40', backgroundColor: '#6C63FF15', color: '#6C63FF', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
@@ -516,7 +544,7 @@ export function ProspectsTable() {
       )}
 
       {/* Fixed bottom action bar (admin, selection active) — bulk delete */}
-      {isAdmin && selected.size > 0 && (
+      {isAdmin && !isImpersonating && selected.size > 0 && (
         <div style={{
           position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40,
           backgroundColor: '#0D0D14', borderTop: '1px solid #2A2A3A',

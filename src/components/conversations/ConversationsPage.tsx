@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/contexts/UserContext'
-import { useImpersonate } from '@/contexts/ImpersonateContext'
+import { useOrgId } from '@/lib/hooks/useOrgId'
 import { ProspectDrawer } from '@/components/prospects/ProspectDrawer'
 import { format } from 'date-fns'
 import { MessageSquare, Search, X, RefreshCw } from 'lucide-react'
@@ -17,9 +17,11 @@ const S: Record<string, React.CSSProperties> = {
   card: { backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, padding: '16px 18px', cursor: 'pointer', transition: 'border-color 0.15s' },
 }
 
+const CONV_SELECT = '*,author:users!author_id(id,full_name,email,role,area_id,is_active,created_at),prospect:prospects!prospect_id(id,name,company,title,outreach_status,lead_temperature,area_id,assigned_to,linkedin_url,email,icp_score,custom1,custom2,custom3,source,created_at,updated_at,market,search_combo,scrape_date,industry,company_size,flag_tomorrow,created_by,area:areas(*),assigned_user:users!assigned_to(id,full_name,email,role,area_id,is_active,created_at))'
+
 export function ConversationsPage() {
   const { user, isAdmin } = useUser()
-  const { isImpersonating, impersonateOrgId } = useImpersonate()
+  const { isImpersonating, impersonateOrgId } = useOrgId()
 
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [total, setTotal] = useState(0)
@@ -53,38 +55,34 @@ export function ConversationsPage() {
   }, [isAdmin])
 
   const fetchConversations = useCallback(async () => {
-    if (!user) return
+    if (!user && !isImpersonating) return
     setLoading(true)
     try {
-      let query = createClient()
-        .from('conversations')
-        .select(`
-          *,
-          author:users!author_id(id, full_name, email, role, area_id, is_active, created_at),
-          prospect:prospects!prospect_id(
-            id, name, company, title, outreach_status, lead_temperature,
-            area_id, assigned_to, linkedin_url, email, icp_score,
-            custom1, custom2, custom3, source, created_at, updated_at,
-            market, search_combo, scrape_date, industry, company_size,
-            flag_tomorrow, created_by,
-            area:areas(*),
-            assigned_user:users!assigned_to(id, full_name, email, role, area_id, is_active, created_at)
-          )
-        `, { count: 'exact' })
-        .order('created_at', { ascending: false })
+      let results: Conversation[] = []
 
       if (isImpersonating && impersonateOrgId) {
-        query = query.eq('organization_id', impersonateOrgId)
+        const params = new URLSearchParams({ impersonate_org_id: impersonateOrgId, select: CONV_SELECT, limit: '1000' })
+        const res = await fetch(`/api/crm/conversations?${params}`)
+        const json = await res.json()
+        results = (json.data ?? []) as unknown as Conversation[]
       } else {
+        let query = createClient()
+          .from('conversations')
+          .select(CONV_SELECT, { count: 'exact' })
+          .order('created_at', { ascending: false })
+
         if (filterSdr) query = query.eq('author_id', filterSdr)
+        if (filterFrom) query = query.gte('created_at', filterFrom)
+        if (filterTo) query = query.lte('created_at', filterTo + 'T23:59:59')
+
+        const { data, count } = await query
+        results = (data ?? []) as unknown as Conversation[]
+        setTotal(count ?? results.length)
       }
-      if (filterFrom) query = query.gte('created_at', filterFrom)
-      if (filterTo) query = query.lte('created_at', filterTo + 'T23:59:59')
 
-      const { data, count } = await query
-      let results = (data ?? []) as unknown as Conversation[]
-
-      // Client-side filters that require joined data
+      // Client-side filters
+      if (filterFrom) results = results.filter(c => c.created_at >= filterFrom)
+      if (filterTo) results = results.filter(c => c.created_at <= filterTo + 'T23:59:59')
       if (search.trim()) {
         const q = search.toLowerCase()
         results = results.filter(c =>
@@ -92,12 +90,11 @@ export function ConversationsPage() {
           c.reason.toLowerCase().includes(q)
         )
       }
-      if (filterArea) {
-        results = results.filter(c => (c.prospect as { area_id?: string })?.area_id === filterArea)
-      }
+      if (filterArea) results = results.filter(c => (c.prospect as { area_id?: string })?.area_id === filterArea)
+      if (isImpersonating && filterSdr) results = results.filter(c => (c.author as { id?: string })?.id === filterSdr)
 
       setConversations(results)
-      setTotal(count ?? results.length)
+      if (isImpersonating) setTotal(results.length)
     } finally {
       setLoading(false)
     }

@@ -5,7 +5,7 @@ import { DndContext, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/
 import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
 import { useUser } from '@/contexts/UserContext'
-import { useImpersonate } from '@/contexts/ImpersonateContext'
+import { useOrgId } from '@/lib/hooks/useOrgId'
 import { useTranslations } from 'next-intl'
 import { KanbanColumn } from './KanbanColumn'
 import { ProspectCard } from './ProspectCard'
@@ -17,9 +17,11 @@ import { Button } from '@/components/ui/button'
 import type { Prospect, OutreachStatus, Area } from '@/lib/types'
 import { OUTREACH_STATUSES } from '@/lib/types'
 
+const PROSPECT_SELECT = '*, area:areas(*), assigned_user:users!assigned_to(id, full_name, email, role, area_id, is_active, created_at)'
+
 export function KanbanBoard() {
-  const { user, isAdmin } = useUser()
-  const { isImpersonating, impersonateOrgId } = useImpersonate()
+  const { user } = useUser()
+  const { isImpersonating, impersonateOrgId, isAdmin } = useOrgId()
   const t = useTranslations()
 
   const [prospects, setProspects] = useState<Prospect[]>([])
@@ -31,48 +33,51 @@ export function KanbanBoard() {
   const [formOpen, setFormOpen] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  // Load areas (admin only needs this for the selector)
   useEffect(() => {
     if (!isAdmin) return
     createClient()
       .from('areas')
       .select('*')
       .order('name')
-      .then(({ data }) => {
-        if (data) setAreas(data as Area[])
-      })
+      .then(({ data }) => { if (data) setAreas(data as Area[]) })
   }, [isAdmin])
 
-  // Determine which area to show
   const effectiveAreaId = isAdmin ? selectedAreaId : user?.area_id ?? null
 
   const fetchProspects = useCallback(async () => {
-    if (!effectiveAreaId && !isAdmin && !isImpersonating) return
+    if (!effectiveAreaId && !isAdmin) return
     setLoading(true)
     try {
-      const supabase = createClient()
-
-      let query = supabase
-        .from('prospects')
-        .select('*, area:areas(*), assigned_user:users!assigned_to(id, full_name, email, role, area_id, is_active, created_at)')
-        .order('created_at', { ascending: false })
+      let data: Prospect[] = []
 
       if (isImpersonating && impersonateOrgId) {
-        query = query.eq('organization_id', impersonateOrgId)
-      } else if (effectiveAreaId) {
-        query = query.eq('area_id', effectiveAreaId)
+        const res = await fetch(
+          `/api/crm/prospects?impersonate_org_id=${impersonateOrgId}&select=${encodeURIComponent(PROSPECT_SELECT)}&limit=1000`
+        )
+        const json = await res.json()
+        data = (json.data ?? []) as Prospect[]
+      } else {
+        const supabase = createClient()
+        let query = supabase
+          .from('prospects')
+          .select(PROSPECT_SELECT)
+          .order('created_at', { ascending: false })
+
+        if (effectiveAreaId) query = query.eq('area_id', effectiveAreaId)
+
+        const { data: rows } = await query
+        data = (rows ?? []) as unknown as Prospect[]
       }
 
-      const { data } = await query
-      if (data) setProspects(data as unknown as Prospect[])
+      setProspects(data)
     } finally {
       setLoading(false)
     }
   }, [effectiveAreaId, isAdmin, isImpersonating, impersonateOrgId])
 
   useEffect(() => {
-    if (user) fetchProspects()
-  }, [user, fetchProspects])
+    if (user || isImpersonating) fetchProspects()
+  }, [user, isImpersonating, fetchProspects])
 
   function handleDragStart({ active }: DragStartEvent) {
     setDraggingId(active.id as string)
@@ -87,11 +92,7 @@ export function KanbanBoard() {
     if (!prospect || prospect.outreach_status === newStatus) return
 
     const prevStatus = prospect.outreach_status
-
-    // Optimistic update
-    setProspects(prev =>
-      prev.map(p => p.id === prospect.id ? { ...p, outreach_status: newStatus } : p)
-    )
+    setProspects(prev => prev.map(p => p.id === prospect.id ? { ...p, outreach_status: newStatus } : p))
 
     const supabase = createClient()
     const { error } = await supabase
@@ -100,10 +101,7 @@ export function KanbanBoard() {
       .eq('id', prospect.id)
 
     if (error) {
-      // Revert
-      setProspects(prev =>
-        prev.map(p => p.id === prospect.id ? { ...p, outreach_status: prevStatus } : p)
-      )
+      setProspects(prev => prev.map(p => p.id === prospect.id ? { ...p, outreach_status: prevStatus } : p))
       return
     }
 
@@ -138,6 +136,13 @@ export function KanbanBoard() {
   const draggingProspect = draggingId ? prospects.find(p => p.id === draggingId) : null
   const currentArea = areas.find(a => a.id === effectiveAreaId) ?? user?.area
 
+  // When impersonating and area filter is selected, filter in memory
+  const visibleProspects = isImpersonating && selectedAreaId
+    ? prospects.filter(p => p.area_id === selectedAreaId)
+    : isImpersonating
+    ? prospects
+    : prospects
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* Kanban Header */}
@@ -152,21 +157,16 @@ export function KanbanBoard() {
           backgroundColor: '#13131A',
         }}
       >
-        {/* Area selector (admin) or badge (SDR) */}
         {isAdmin && areas.length > 0 ? (
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button
               onClick={() => setSelectedAreaId(null)}
               style={{
-                padding: '4px 10px',
-                borderRadius: 6,
-                border: '1px solid',
+                padding: '4px 10px', borderRadius: 6, border: '1px solid',
                 borderColor: selectedAreaId === null ? '#6C63FF' : '#2A2A3A',
                 backgroundColor: selectedAreaId === null ? '#6C63FF20' : 'transparent',
                 color: selectedAreaId === null ? '#6C63FF' : '#8B8BA0',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
               }}
             >
               {t('areas.all')}
@@ -174,17 +174,13 @@ export function KanbanBoard() {
             {areas.map(area => (
               <button
                 key={area.id}
-                onClick={() => setSelectedAreaId(area.id)}
+                onClick={() => setSelectedAreaId(isImpersonating ? area.id : area.id)}
                 style={{
-                  padding: '4px 10px',
-                  borderRadius: 6,
-                  border: '1px solid',
+                  padding: '4px 10px', borderRadius: 6, border: '1px solid',
                   borderColor: selectedAreaId === area.id ? '#6C63FF' : '#2A2A3A',
                   backgroundColor: selectedAreaId === area.id ? '#6C63FF20' : 'transparent',
                   color: selectedAreaId === area.id ? '#6C63FF' : '#8B8BA0',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: area.is_active ? 'pointer' : 'not-allowed',
+                  fontSize: 12, fontWeight: 600, cursor: area.is_active ? 'pointer' : 'not-allowed',
                   opacity: area.is_active ? 1 : 0.4,
                 }}
                 disabled={!area.is_active}
@@ -203,14 +199,9 @@ export function KanbanBoard() {
           onClick={fetchProspects}
           disabled={loading}
           style={{
-            padding: '6px 8px',
-            borderRadius: 6,
-            border: '1px solid #2A2A3A',
-            backgroundColor: 'transparent',
-            color: '#8B8BA0',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
+            padding: '6px 8px', borderRadius: 6, border: '1px solid #2A2A3A',
+            backgroundColor: 'transparent', color: '#8B8BA0', cursor: 'pointer',
+            display: 'flex', alignItems: 'center',
           }}
         >
           <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
@@ -228,28 +219,14 @@ export function KanbanBoard() {
       </div>
 
       {/* Columns */}
-      <div
-        style={{
-          flex: 1,
-          overflowX: 'auto',
-          overflowY: 'hidden',
-          padding: '16px 16px 0',
-        }}
-      >
+      <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden', padding: '16px 16px 0' }}>
         <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div
-            style={{
-              display: 'flex',
-              gap: 12,
-              height: '100%',
-              minWidth: 'max-content',
-            }}
-          >
+          <div style={{ display: 'flex', gap: 12, height: '100%', minWidth: 'max-content' }}>
             {OUTREACH_STATUSES.map(status => (
               <KanbanColumn
                 key={status}
                 status={status}
-                prospects={prospects.filter(p => p.outreach_status === status)}
+                prospects={visibleProspects.filter(p => p.outreach_status === status)}
                 onCardClick={handleCardClick}
               />
             ))}
@@ -267,7 +244,6 @@ export function KanbanBoard() {
         </DndContext>
       </div>
 
-      {/* Drawers & Modals */}
       {activeProspect && (
         <ProspectDrawer
           prospect={activeProspect}
