@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/contexts/UserContext'
+import { useImpersonate } from '@/contexts/ImpersonateContext'
 import { ProspectDrawer } from '@/components/prospects/ProspectDrawer'
 import { format } from 'date-fns'
 import { MessageSquare, Search, X, RefreshCw } from 'lucide-react'
@@ -18,6 +19,7 @@ const S: Record<string, React.CSSProperties> = {
 
 export function ConversationsPage() {
   const { user, isAdmin } = useUser()
+  const { isImpersonating, impersonateOrgId } = useImpersonate()
 
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [total, setTotal] = useState(0)
@@ -71,7 +73,11 @@ export function ConversationsPage() {
         `, { count: 'exact' })
         .order('created_at', { ascending: false })
 
-      if (filterSdr) query = query.eq('author_id', filterSdr)
+      if (isImpersonating && impersonateOrgId) {
+        query = query.eq('organization_id', impersonateOrgId)
+      } else {
+        if (filterSdr) query = query.eq('author_id', filterSdr)
+      }
       if (filterFrom) query = query.gte('created_at', filterFrom)
       if (filterTo) query = query.lte('created_at', filterTo + 'T23:59:59')
 
@@ -95,7 +101,7 @@ export function ConversationsPage() {
     } finally {
       setLoading(false)
     }
-  }, [user, filterSdr, filterFrom, filterTo, search, filterArea])
+  }, [user, filterSdr, filterFrom, filterTo, search, filterArea, isImpersonating, impersonateOrgId])
 
   useEffect(() => { fetchConversations() }, [fetchConversations])
 
