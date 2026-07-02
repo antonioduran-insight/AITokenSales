@@ -123,31 +123,31 @@ export default function HistoryPage() {
   return (
     <div style={S.page}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Historial de Runs</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Run History</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 12, color: '#52526A' }}>{runs.length} runs</span>
           {clearAllConfirm ? (
             <>
-              <span style={{ fontSize: 11, color: '#8B8BA0' }}>Escribí <b>DELETE</b>:</span>
+              <span style={{ fontSize: 11, color: '#8B8BA0' }}>Type <b>DELETE</b>:</span>
               <input autoFocus value={clearAllInput} onChange={e => setClearAllInput(e.target.value)} placeholder="DELETE"
                 style={{ width: 80, padding: '4px 8px', fontSize: 11, borderRadius: 6, backgroundColor: '#1C1C27', border: '1px solid #EF444430', color: '#F0F0F5', outline: 'none' }} />
               <button onClick={handleClearAll} disabled={clearAllInput !== 'DELETE'}
                 style={{ fontSize: 11, backgroundColor: '#EF4444', color: '#FFF', padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', opacity: clearAllInput !== 'DELETE' ? 0.3 : 1 }}>
-                Borrar todo
+                Delete all
               </button>
-              <button onClick={() => { setClearAllConfirm(false); setClearAllInput(''); }} style={{ fontSize: 11, color: '#52526A', background: 'none', border: 'none', cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={() => { setClearAllConfirm(false); setClearAllInput(''); }} style={{ fontSize: 11, color: '#52526A', background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
             </>
           ) : (
             <button onClick={() => runs.length > 0 && setClearAllConfirm(true)} disabled={runs.length === 0}
               style={{ fontSize: 11, color: '#52526A', border: '1px solid #2A2A3A', padding: '5px 10px', borderRadius: 6, background: 'transparent', cursor: 'pointer', opacity: runs.length === 0 ? 0.3 : 1 }}>
-              Limpiar historial
+              Clear History
             </button>
           )}
         </div>
       </div>
 
-      {loading && <p style={{ color: '#52526A', textAlign: 'center', padding: 40 }}>Cargando...</p>}
-      {!loading && runs.length === 0 && <p style={{ color: '#52526A', textAlign: 'center', padding: 40 }}>Sin runs todavía.</p>}
+      {loading && <p style={{ color: '#52526A', textAlign: 'center', padding: 40 }}>Loading...</p>}
+      {!loading && runs.length === 0 && <p style={{ color: '#52526A', textAlign: 'center', padding: 40 }}>No runs yet.</p>}
 
       {runs.map(run => {
         const isExpanded = expandedId === run.id;
@@ -174,8 +174,8 @@ export default function HistoryPage() {
                 <StatusBadge status={run.status} />
                 {isDel ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={e => e.stopPropagation()}>
-                    <span style={{ fontSize: 11, color: '#8B8BA0' }}>¿Borrar?</span>
-                    <button onClick={() => handleDelete(run.id)} style={{ fontSize: 11, backgroundColor: '#EF4444', color: '#FFF', padding: '3px 8px', borderRadius: 5, border: 'none', cursor: 'pointer' }}>Sí</button>
+                    <span style={{ fontSize: 11, color: '#8B8BA0' }}>Delete?</span>
+                    <button onClick={() => handleDelete(run.id)} style={{ fontSize: 11, backgroundColor: '#EF4444', color: '#FFF', padding: '3px 8px', borderRadius: 5, border: 'none', cursor: 'pointer' }}>Yes</button>
                     <button onClick={() => setDeleteConfirmId(null)} style={{ fontSize: 11, color: '#52526A', background: 'none', border: 'none', cursor: 'pointer' }}>No</button>
                   </div>
                 ) : (
@@ -204,13 +204,13 @@ export default function HistoryPage() {
                 </div>
 
                 {leadsLoad ? (
-                  <p style={{ fontSize: 12, color: '#52526A' }}>Cargando leads...</p>
+                  <p style={{ fontSize: 12, color: '#52526A' }}>Loading leads...</p>
                 ) : leads.length > 0 ? (
                   <div style={{ border: '1px solid #2A2A3A', borderRadius: 8, overflow: 'auto', marginBottom: 12 }}>
                     <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
                       <thead>
                         <tr style={{ borderBottom: '1px solid #2A2A3A' }}>
-                          {['Nombre', 'Empresa', 'Título', 'ICP', 'Temp'].map(h => (
+                          {['Name', 'Company', 'Title', 'ICP', 'Temp'].map(h => (
                             <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 10, color: '#52526A', fontWeight: 600 }}>{h}</th>
                           ))}
                         </tr>
@@ -227,9 +227,9 @@ export default function HistoryPage() {
                         ))}
                       </tbody>
                     </table>
-                    {leads.length > 15 && <p style={{ padding: '6px 12px', fontSize: 11, color: '#52526A', textAlign: 'center', borderTop: '1px solid #2A2A3A', margin: 0 }}>... y {leads.length - 15} más</p>}
+                    {leads.length > 15 && <p style={{ padding: '6px 12px', fontSize: 11, color: '#52526A', textAlign: 'center', borderTop: '1px solid #2A2A3A', margin: 0 }}>... and {leads.length - 15} more</p>}
                   </div>
-                ) : <p style={{ fontSize: 12, color: '#52526A' }}>Sin leads para este run.</p>}
+                ) : <p style={{ fontSize: 12, color: '#52526A' }}>No leads for this run.</p>}
 
                 {/* Actions */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -238,7 +238,7 @@ export default function HistoryPage() {
                       <button
                         onClick={() => showImport ? setImportOpen(null) : openImport(run.id)}
                         style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, backgroundColor: showImport ? '#2A2A3A' : '#6C63FF', color: '#FFF', padding: '7px 14px', borderRadius: 7, border: 'none', cursor: 'pointer' }}>
-                        <DatabaseZap size={13} />{showImport ? 'Cancelar' : 'Incluir en CRM'}
+                        <DatabaseZap size={13} />{showImport ? 'Cancel' : 'Add to CRM'}
                       </button>
                     )}
                     <button onClick={() => setExpandedId(null)} style={{ fontSize: 12, color: '#52526A', border: '1px solid #2A2A3A', padding: '7px 14px', borderRadius: 7, background: 'transparent', cursor: 'pointer' }}>Cerrar</button>
@@ -250,18 +250,18 @@ export default function HistoryPage() {
                       <p style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', margin: 0, letterSpacing: '0.06em' }}>Importar a CRM</p>
                       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                         <div style={{ flex: 1, minWidth: 180 }}>
-                          <label style={{ fontSize: 11, color: '#8B8BA0', display: 'block', marginBottom: 4 }}>Área *</label>
+                          <label style={{ fontSize: 11, color: '#8B8BA0', display: 'block', marginBottom: 4 }}>Area *</label>
                           <select value={imp.area_id} onChange={e => setImportField(run.id, 'area_id', e.target.value)} style={{ ...SELECT, width: '100%' }}>
-                            <option value="">Seleccioná...</option>
+                            <option value="">Select...</option>
                             {areas.filter(a => a.is_active).map(a => (
                               <option key={a.id} value={a.id}>{a.label_en}</option>
                             ))}
                           </select>
                         </div>
                         <div style={{ flex: 1, minWidth: 180 }}>
-                          <label style={{ fontSize: 11, color: '#8B8BA0', display: 'block', marginBottom: 4 }}>Asignar a SDR (opcional)</label>
+                          <label style={{ fontSize: 11, color: '#8B8BA0', display: 'block', marginBottom: 4 }}>Assign to SDR (optional)</label>
                           <select value={imp.assigned_to} onChange={e => setImportField(run.id, 'assigned_to', e.target.value)} style={{ ...SELECT, width: '100%' }}>
-                            <option value="">Sin asignar</option>
+                            <option value="">Unassigned</option>
                             {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
                           </select>
                         </div>
@@ -281,9 +281,9 @@ export default function HistoryPage() {
                     <div style={{ backgroundColor: '#14532D20', border: '1px solid #16A34A40', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
                       <CheckCircle2 size={16} color="#22C55E" />
                       <div style={{ fontSize: 13 }}>
-                        <span style={{ color: '#22C55E', fontWeight: 600 }}>Importados: {imp.result.imported}</span>
-                        <span style={{ color: '#52526A', marginLeft: 12 }}>Duplicados: {imp.result.duplicates}</span>
-                        {imp.result.no_name > 0 && <span style={{ color: '#52526A', marginLeft: 12 }}>Sin nombre: {imp.result.no_name}</span>}
+                        <span style={{ color: '#22C55E', fontWeight: 600 }}>Imported: {imp.result.imported}</span>
+                        <span style={{ color: '#52526A', marginLeft: 12 }}>Duplicates: {imp.result.duplicates}</span>
+                        {imp.result.no_name > 0 && <span style={{ color: '#52526A', marginLeft: 12 }}>No name: {imp.result.no_name}</span>}
                       </div>
                     </div>
                   )}

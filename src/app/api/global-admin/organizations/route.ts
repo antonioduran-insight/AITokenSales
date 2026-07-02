@@ -42,5 +42,18 @@ export async function GET() {
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  return NextResponse.json(data ?? [])
+
+  // Fetch active SDR counts per org
+  const orgIds = (data ?? []).map((o: { id: string }) => o.id)
+  const { data: sdrRows } = orgIds.length > 0
+    ? await admin.from('users').select('organization_id').in('organization_id', orgIds).eq('role', 'sdr').eq('is_active', true)
+    : { data: [] }
+
+  const sdrCountMap: Record<string, number> = {}
+  sdrRows?.forEach((u: { organization_id: string }) => {
+    sdrCountMap[u.organization_id] = (sdrCountMap[u.organization_id] ?? 0) + 1
+  })
+
+  const enriched = (data ?? []).map((o: { id: string }) => ({ ...o, sdr_count: sdrCountMap[o.id] ?? 0 }))
+  return NextResponse.json(enriched)
 }

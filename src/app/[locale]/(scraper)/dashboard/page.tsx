@@ -68,7 +68,7 @@ export default function ScraperDashboard() {
             <p style={{ fontSize: 11, color: '#52526A', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeRun.combos.join(', ')}</p>
           </div>
           <StatusBadge status={activeRun.status} />
-          <Link href="/history" style={{ fontSize: 11, color: '#6C63FF', whiteSpace: 'nowrap' }}>Ver logs →</Link>
+          <Link href="/history" style={{ fontSize: 11, color: '#6C63FF', whiteSpace: 'nowrap' }}>View logs →</Link>
         </div>
       )}
 
@@ -104,7 +104,7 @@ export default function ScraperDashboard() {
               </div>
             )}
             <div style={{ display: 'flex', gap: 8 }}>
-              <Link href={`/leads?run_id=${latestRun.id}`} style={{ fontSize: 12, backgroundColor: '#6C63FF', color: '#FFF', padding: '6px 14px', borderRadius: 7, textDecoration: 'none', fontWeight: 600 }}>Ver leads</Link>
+              <Link href={`/leads?run_id=${latestRun.id}`} style={{ fontSize: 12, backgroundColor: '#6C63FF', color: '#FFF', padding: '6px 14px', borderRadius: 7, textDecoration: 'none', fontWeight: 600 }}>View Leads</Link>
               <Link href="/history" style={{ fontSize: 12, backgroundColor: '#2A2A3A', color: '#8B8BA0', padding: '6px 14px', borderRadius: 7, textDecoration: 'none' }}>History</Link>
             </div>
           </div>
@@ -123,19 +123,19 @@ export default function ScraperDashboard() {
                   <p style={{ fontSize: 11, color: '#52526A', margin: '2px 0 0' }}>{new Date(run.created_at).toLocaleDateString()} · {run.total_leads} leads</p>
                 </div>
                 <StatusBadge status={run.status} />
-                <Link href={`/leads?run_id=${run.id}`} style={{ fontSize: 11, color: '#6C63FF' }}>Ver →</Link>
+                <Link href={`/leads?run_id=${run.id}`} style={{ fontSize: 11, color: '#6C63FF' }}>View →</Link>
               </div>
             ))}
           </div>
         </section>
       )}
 
-      {loading && <p style={{ color: '#52526A', fontSize: 13, textAlign: 'center', padding: 40 }}>Cargando...</p>}
+      {loading && <p style={{ color: '#52526A', fontSize: 13, textAlign: 'center', padding: 40 }}>Loading...</p>}
       {!loading && runs.length === 0 && (
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
-          <p style={{ color: '#52526A', marginBottom: 16 }}>No hay runs todavía.</p>
+          <p style={{ color: '#52526A', marginBottom: 16 }}>No runs yet.</p>
           <Link href="/run" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, backgroundColor: '#6C63FF', color: '#FFF', padding: '10px 20px', borderRadius: 8, textDecoration: 'none', fontWeight: 600, fontSize: 14 }}>
-            <Play size={14} /> Iniciar primer run
+            <Play size={14} /> Start first run
           </Link>
         </div>
       )}

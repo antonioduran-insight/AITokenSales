@@ -167,9 +167,15 @@ export default function OrganizationsPage() {
                         {org.plan}
                       </span>
                     </td>
-                    <td style={{ ...tdStyle, color: '#8B8BA0' }}>?/{org.max_seats}</td>
                     <td style={{ ...tdStyle, color: '#8B8BA0' }}>
-                      {org.max_leads_per_month != null ? org.max_leads_per_month.toLocaleString() : '∞'}
+                      {org.plan === 'ultra' || !org.max_seats || org.max_seats >= 999999
+                        ? '∞'
+                        : `${(org as { sdr_count?: number }).sdr_count ?? 0}/${org.max_seats}`}
+                    </td>
+                    <td style={{ ...tdStyle, color: '#8B8BA0' }}>
+                      {org.plan === 'ultra' || !org.max_leads_per_month || org.max_leads_per_month >= 999999
+                        ? '∞'
+                        : org.max_leads_per_month.toLocaleString()}
                     </td>
                     <td style={{ ...tdStyle, color: '#8B8BA0' }}>{org.vendor ?? '—'}</td>
                     <td style={{ ...tdStyle, color: mrr > 0 ? '#22C55E' : '#52526A', fontWeight: 600 }}>

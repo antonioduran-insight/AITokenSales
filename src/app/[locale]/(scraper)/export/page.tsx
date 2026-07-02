@@ -56,7 +56,7 @@ function ExportContent() {
         <label style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 8 }}>Seleccionar run</label>
         <select value={selectedRunId} onChange={e => setSelectedRunId(e.target.value)}
           style={{ width: '100%', padding: '8px 12px', borderRadius: 8, backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', color: '#F0F0F5', fontSize: 13, outline: 'none', marginBottom: 16 }}>
-          <option value="">Seleccioná un run...</option>
+          <option value="">Select a run...</option>
           {runs.map(r => (
             <option key={r.id} value={r.id}>{r.market} — {new Date(r.created_at).toLocaleDateString()} · {r.total_leads} leads</option>
           ))}
@@ -85,7 +85,7 @@ function ExportContent() {
             <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #2A2A3A' }}>
-                  {['Nombre', 'Empresa', 'Título', 'ICP', 'Temp', 'Custom 1'].map(h => (
+                  {['Name', 'Company', 'Title', 'ICP', 'Temp', 'Custom 1'].map(h => (
                     <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 10, color: '#52526A', fontWeight: 600 }}>{h}</th>
                   ))}
                 </tr>
@@ -101,7 +101,7 @@ function ExportContent() {
                     <td style={{ padding: '7px 14px', color: '#52526A', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>{lead.custom1 || '—'}</td>
                   </tr>
                 ))}
-                {leads.length > 30 && <tr><td colSpan={6} style={{ padding: '6px 14px', textAlign: 'center', fontSize: 11, color: '#52526A', borderTop: '1px solid #2A2A3A' }}>... y {leads.length - 30} más en el CSV</td></tr>}
+                {leads.length > 30 && <tr><td colSpan={6} style={{ padding: '6px 14px', textAlign: 'center', fontSize: 11, color: '#52526A', borderTop: '1px solid #2A2A3A' }}>... and {leads.length - 30} more in the CSV</td></tr>}
               </tbody>
             </table>
           </div>
@@ -123,7 +123,7 @@ function ExportContent() {
 
 export default function ExportPage() {
   return (
-    <Suspense fallback={<p style={{ color: '#52526A', padding: 40 }}>Cargando...</p>}>
+    <Suspense fallback={<p style={{ color: '#52526A', padding: 40 }}>Loading...</p>}>
       <ExportContent />
     </Suspense>
   );

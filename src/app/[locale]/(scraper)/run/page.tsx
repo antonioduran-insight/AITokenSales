@@ -174,7 +174,7 @@ export default function RunPage() {
   /* FORM */
   if (step === 'form') return (
     <div style={S.page}>
-      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>Nuevo Pipeline</h1>
+      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>New Pipeline</h1>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         <div>
           <span style={S.sectionLabel}>Search Combos</span>
@@ -206,7 +206,7 @@ export default function RunPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <input type="number" min={10} max={200} step={10} value={limit} onChange={e => setLimit(Number(e.target.value))}
               style={{ width: 90, padding: '8px 12px', borderRadius: 8, backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', color: '#F0F0F5', fontSize: 13, outline: 'none' }} />
-            <span style={{ fontSize: 13, color: '#52526A' }}>leads por combo</span>
+            <span style={{ fontSize: 13, color: '#52526A' }}>leads per combo</span>
           </div>
         </div>
 
@@ -257,15 +257,15 @@ export default function RunPage() {
         <div>
           {cancelConfirm ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 12, color: '#8B8BA0' }}>¿Cancelar este run?</span>
+              <span style={{ fontSize: 12, color: '#8B8BA0' }}>Cancel this run?</span>
               <button onClick={handleCancel} disabled={cancelling} style={{ fontSize: 12, color: '#EF4444', border: '1px solid #EF444430', padding: '5px 12px', borderRadius: 6, cursor: 'pointer', backgroundColor: 'transparent' }}>
-                {cancelling ? 'Cancelando...' : 'Sí, cancelar'}
+                {cancelling ? 'Cancelling...' : 'Yes, cancel'}
               </button>
-              <button onClick={() => setCancelConfirm(false)} style={{ fontSize: 12, color: '#52526A', background: 'none', border: 'none', cursor: 'pointer' }}>Seguir</button>
+              <button onClick={() => setCancelConfirm(false)} style={{ fontSize: 12, color: '#52526A', background: 'none', border: 'none', cursor: 'pointer' }}>Keep going</button>
             </div>
           ) : (
             <button onClick={() => setCancelConfirm(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#52526A', background: 'none', border: 'none', cursor: 'pointer' }}>
-              <XCircle size={13} /> Cancelar
+              <XCircle size={13} /> Cancel
             </button>
           )}
         </div>
@@ -280,8 +280,8 @@ export default function RunPage() {
         <AlertCircle size={36} color="#EF4444" />
       </div>
       <div style={{ textAlign: 'center' }}>
-        <p style={{ fontSize: 20, fontWeight: 600, margin: '0 0 6px' }}>{runStatus === 'cancelled' ? 'Run cancelado' : 'Algo salió mal'}</p>
-        <p style={{ fontSize: 13, color: '#52526A', margin: 0 }}>{runStatus === 'cancelled' ? 'El pipeline fue cancelado.' : 'Revisá los logs para más detalles.'}</p>
+        <p style={{ fontSize: 20, fontWeight: 600, margin: '0 0 6px' }}>{runStatus === 'cancelled' ? 'Run cancelled' : 'Something went wrong'}</p>
+        <p style={{ fontSize: 13, color: '#52526A', margin: 0 }}>{runStatus === 'cancelled' ? 'The pipeline was cancelled.' : 'Check the logs for more details.'}</p>
       </div>
       <div style={{ display: 'flex', gap: 12 }}>
         <button onClick={resetToForm} style={{ display: 'flex', alignItems: 'center', gap: 6, backgroundColor: '#6C63FF', color: '#FFF', padding: '10px 20px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
@@ -321,7 +321,7 @@ export default function RunPage() {
           <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #2A2A3A' }}>
-                {['Nombre', 'Empresa', 'Título', 'ICP', 'Temp', 'Mensaje'].map(h => (
+                {['Name', 'Company', 'Title', 'ICP', 'Temp', 'Message'].map(h => (
                   <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, color: '#52526A', fontWeight: 600 }}>{h}</th>
                 ))}
               </tr>
@@ -342,15 +342,15 @@ export default function RunPage() {
         </div>
       )}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-        <Link href={`/leads?run_id=${runId}`} style={{ backgroundColor: '#6C63FF', color: '#FFF', padding: '9px 18px', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>Ver todos los leads →</Link>
+        <Link href={`/leads?run_id=${runId}`} style={{ backgroundColor: '#6C63FF', color: '#FFF', padding: '9px 18px', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>View all leads →</Link>
         {!crmResult && (
           <button onClick={() => setShowCrmForm(f => !f)}
             style={{ display: 'flex', alignItems: 'center', gap: 6, backgroundColor: showCrmForm ? '#2A2A3A' : '#22C55E20', border: `1px solid ${showCrmForm ? '#2A2A3A' : '#22C55E40'}`, color: showCrmForm ? '#8B8BA0' : '#22C55E', padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-            <DatabaseZap size={14} />{showCrmForm ? 'Cancelar' : 'Incluir en CRM'}
+            <DatabaseZap size={14} />{showCrmForm ? 'Cancel' : 'Add to CRM'}
           </button>
         )}
         <button onClick={resetToForm} style={{ fontSize: 13, color: '#52526A', background: 'none', border: 'none', cursor: 'pointer', padding: '9px 10px' }}>
-          <ChevronLeft size={13} style={{ display: 'inline', marginRight: 4 }} />Nuevo run
+          <ChevronLeft size={13} style={{ display: 'inline', marginRight: 4 }} />New run
         </button>
       </div>
 
@@ -358,9 +358,9 @@ export default function RunPage() {
       {crmResult && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, backgroundColor: '#14532D20', border: '1px solid #16A34A40', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
           <CheckCircle2 size={16} color="#22C55E" />
-          <span style={{ fontSize: 13, color: '#22C55E', fontWeight: 600 }}>Importados: {crmResult.imported}</span>
-          <span style={{ fontSize: 13, color: '#52526A' }}>Duplicados: {crmResult.duplicates}</span>
-          {crmResult.no_name > 0 && <span style={{ fontSize: 13, color: '#52526A' }}>Sin nombre: {crmResult.no_name}</span>}
+          <span style={{ fontSize: 13, color: '#22C55E', fontWeight: 600 }}>Imported: {crmResult.imported}</span>
+          <span style={{ fontSize: 13, color: '#52526A' }}>Duplicates: {crmResult.duplicates}</span>
+          {crmResult.no_name > 0 && <span style={{ fontSize: 13, color: '#52526A' }}>No name: {crmResult.no_name}</span>}
         </div>
       )}
 
@@ -370,10 +370,10 @@ export default function RunPage() {
           <p style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', margin: 0, letterSpacing: '0.06em' }}>Importar al CRM</p>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 180 }}>
-              <label style={{ fontSize: 11, color: '#8B8BA0', display: 'block', marginBottom: 4 }}>Área *</label>
+              <label style={{ fontSize: 11, color: '#8B8BA0', display: 'block', marginBottom: 4 }}>Area *</label>
               <select value={crmAreaId} onChange={e => setCrmAreaId(e.target.value)}
                 style={{ width: '100%', padding: '7px 10px', borderRadius: 7, backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', color: '#F0F0F5', fontSize: 12, outline: 'none' }}>
-                <option value="">Seleccioná...</option>
+                <option value="">Select...</option>
                 {areas.filter(a => a.is_active).map(a => <option key={a.id} value={a.id}>{a.label_en}</option>)}
               </select>
             </div>
@@ -381,7 +381,7 @@ export default function RunPage() {
               <label style={{ fontSize: 11, color: '#8B8BA0', display: 'block', marginBottom: 4 }}>Asignar a SDR (opcional)</label>
               <select value={crmSdrId} onChange={e => setCrmSdrId(e.target.value)}
                 style={{ width: '100%', padding: '7px 10px', borderRadius: 7, backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', color: '#F0F0F5', fontSize: 12, outline: 'none' }}>
-                <option value="">Sin asignar</option>
+                <option value="">Unassigned</option>
                 {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
               </select>
             </div>
