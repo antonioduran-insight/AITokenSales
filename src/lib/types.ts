@@ -11,7 +11,7 @@ export type LeadTemperature = 'Cold' | 'Warm' | 'Hot'
 
 export type SearchCombo = 'A' | 'B' | 'C' | 'D' | 'E' | 'F'
 
-export type UserRole = 'admin' | 'sdr'
+export type UserRole = 'admin_global' | 'admin' | 'sdr' | 'support'
 
 export type AreaName = 'taiwan' | 'latam' | 'vietnam' | 'europe'
 
@@ -139,3 +139,60 @@ export const OUTREACH_STATUSES: OutreachStatus[] = [
 export const LEAD_TEMPERATURES: LeadTemperature[] = ['Cold', 'Warm', 'Hot']
 export const SEARCH_COMBOS: SearchCombo[] = ['A', 'B', 'C', 'D', 'E', 'F']
 export const AREA_NAMES: AreaName[] = ['taiwan', 'latam', 'vietnam', 'europe']
+
+export interface Organization {
+  id: string
+  name: string
+  slug: string
+  plan: 'basic' | 'premium' | 'enterprise' | 'ultra'
+  is_active: boolean
+  logo_url: string | null
+  max_seats: number
+  max_leads_per_month: number | null
+  custom_price: number | null
+  vendor: string | null
+  default_language: string
+  internal_notes: string | null
+  billing_day: number
+  created_at: string
+  updated_at: string
+}
+
+export interface Vendor {
+  id: string
+  name: string
+  email: string | null
+  commission_pct: number
+  is_active: boolean
+  created_at: string
+}
+
+export interface SupportTicket {
+  id: string
+  organization_id: string
+  created_by: string
+  subject: string
+  description: string
+  priority: 'low' | 'medium' | 'high' | 'urgent'
+  status: 'open' | 'in_progress' | 'resolved' | 'closed'
+  assigned_to: string | null
+  created_at: string
+  updated_at: string
+  organization?: Organization
+}
+
+export interface SupportTicketMessage {
+  id: string
+  ticket_id: string
+  author_id: string
+  content: string
+  created_at: string
+  author?: User
+}
+
+export const PLAN_PRICES: Record<string, number> = {
+  basic: 550,
+  premium: 2300,
+  enterprise: 0,
+  ultra: 0,
+}

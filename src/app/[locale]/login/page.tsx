@@ -9,6 +9,23 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LanguageSwitcher } from '@/components/layout/LanguageSwitcher'
 
+async function getRoleRedirect(locale: string): Promise<string> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return `/${locale}/login`
+
+  const { data: profile } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  const role = profile?.role
+  if (role === 'admin_global') return `/${locale}/global-admin/organizations`
+  if (role === 'support') return `/${locale}/global-admin/support`
+  return `/${locale}/kanban`
+}
+
 export default function LoginPage() {
   const t = useTranslations('auth')
   const locale = useLocale()
@@ -20,8 +37,11 @@ export default function LoginPage() {
 
   // Redirect if already authenticated
   useEffect(() => {
-    createClient().auth.getSession().then(({ data: { session } }) => {
-      if (session) router.replace(`/${locale}/kanban`)
+    createClient().auth.getSession().then(async ({ data: { session } }) => {
+      if (session) {
+        const dest = await getRoleRedirect(locale)
+        router.replace(dest)
+      }
     })
   }, [locale, router])
 
@@ -39,7 +59,8 @@ export default function LoginPage() {
       return
     }
 
-    router.push(`/${locale}/kanban`)
+    const dest = await getRoleRedirect(locale)
+    router.push(dest)
     router.refresh()
   }
 
