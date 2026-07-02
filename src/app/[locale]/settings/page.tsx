@@ -430,9 +430,9 @@ function SupportTab({ orgPlan }: { orgPlan: string }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{ width: 44, height: 44, borderRadius: '50%', backgroundColor: '#6C63FF20', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>👤</div>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#F0F0F5' }}>Synera Team</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#F0F0F5' }}>AITokenKing</div>
               <div style={{ fontSize: 12, color: '#52526A' }}>Your dedicated account manager</div>
-              <a href="mailto:support@syneratechnologies.com" style={{ fontSize: 12, color: '#6C63FF', textDecoration: 'none' }}>support@syneratechnologies.com</a>
+              <div style={{ fontSize: 12, color: '#52526A' }}>Contact details coming soon</div>
             </div>
           </div>
         ) : (
@@ -453,7 +453,7 @@ function SupportTab({ orgPlan }: { orgPlan: string }) {
                 <p style={{ fontSize: 12, color: '#8B8BA0', margin: 0 }}>Add Account Management ($149/mo)</p>
               </div>
               <button style={{ ...S.btn, padding: '7px 16px', fontSize: 12 }}
-                onClick={() => alert('Contact support@syneratechnologies.com to add Account Management')}>
+                onClick={() => alert('Contact your account manager to add Account Management')}>
                 Upgrade
               </button>
             </div>
@@ -626,7 +626,7 @@ function PlanTab() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <p style={{ ...S.sectionTitle, marginBottom: 0 }}>Leads This Period</p>
           {leadsAtLimit && (
-            <button onClick={() => alert('Contact support@syneratechnologies.com to purchase additional leads')} style={{ ...S.btn, padding: '6px 14px', fontSize: 12 }}>Buy More Leads</button>
+            <button onClick={() => alert('Contact your account manager to purchase additional leads')} style={{ ...S.btn, padding: '6px 14px', fontSize: 12 }}>Buy More Leads</button>
           )}
         </div>
 
@@ -679,7 +679,7 @@ function PlanTab() {
               Contact us to add more seats to your plan. We&apos;ll get back to you within one business day.
             </p>
             <div style={{ display: 'flex', gap: 10 }}>
-              <a href="mailto:support@syneratechnologies.com?subject=Add+more+seats" style={{ ...S.btn, flex: 1, textAlign: 'center', textDecoration: 'none' }}>
+              <a href="mailto:placeholder@aitokenking.com?subject=Add+more+seats" style={{ ...S.btn, flex: 1, textAlign: 'center', textDecoration: 'none' }}>
                 Contact Us
               </a>
               <button onClick={() => setShowBuySeats(false)} style={{ ...S.btnGhost, flex: 1 }}>Close</button>
