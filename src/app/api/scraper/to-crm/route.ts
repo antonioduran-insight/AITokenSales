@@ -114,5 +114,18 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Increment monthly lead counter
+  if (imported > 0 && caller.organization_id) {
+    const now = new Date()
+    const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    await admin.rpc('increment_monthly_leads', {
+      p_org_id: caller.organization_id,
+      p_year_month: yearMonth,
+      p_count: imported,
+    }).catch(() => {
+      // RPC or table not yet available — non-fatal
+    })
+  }
+
   return NextResponse.json({ imported, duplicates, no_name })
 }
