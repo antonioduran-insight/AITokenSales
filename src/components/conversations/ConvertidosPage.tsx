@@ -78,17 +78,13 @@ export function ConvertidosPage() {
       const { data } = await query
       if (!data) { setLoading(false); return }
 
-      // Fetch conversation counts
+      // Fetch conversation counts via API (uses service role, bypasses RLS)
       const ids = data.map(p => p.id)
-      const { data: convData } = await supabase
-        .from('conversations')
-        .select('prospect_id')
-        .in('prospect_id', ids)
-
-      const countMap: Record<string, number> = {}
-      convData?.forEach(c => {
-        countMap[c.prospect_id] = (countMap[c.prospect_id] ?? 0) + 1
-      })
+      let countMap: Record<string, number> = {}
+      if (ids.length > 0) {
+        const res = await fetch(`/api/conversations/counts?ids=${ids.join(',')}`)
+        if (res.ok) countMap = await res.json()
+      }
 
       let results = data.map(p => ({ ...p, chatCount: countMap[p.id] ?? 0 })) as unknown as ClosedProspect[]
 
@@ -252,7 +248,7 @@ export function ConvertidosPage() {
 
                   {/* Action buttons */}
                   <div style={{ display: 'flex', gap: 8 }}>
-                    {hasChat && (
+                    {(hasChat || isAdmin) && (
                       <button
                         onClick={() => setViewTarget(p)}
                         style={{
