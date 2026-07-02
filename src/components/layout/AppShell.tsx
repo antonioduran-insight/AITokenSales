@@ -10,6 +10,7 @@ import { Suspense } from 'react'
 interface Props {
   children: React.ReactNode
   initialUser: UserWithArea | null
+  orgPlan: string
 }
 
 function ImpersonateBanner() {
@@ -55,7 +56,7 @@ function ImpersonateBanner() {
   )
 }
 
-export function AppShell({ children, initialUser }: Props) {
+export function AppShell({ children, initialUser, orgPlan }: Props) {
   const pathname = usePathname()
   const isLoginPage = /\/login$/.test(pathname)
   const isGlobalAdminPage = pathname.includes('/global-admin')
@@ -64,7 +65,7 @@ export function AppShell({ children, initialUser }: Props) {
   if (isGlobalAdminPage) return <>{children}</>
 
   return (
-    <UserProvider value={{ user: initialUser, isAdmin: initialUser?.role === 'admin' }}>
+    <UserProvider value={{ user: initialUser, isAdmin: initialUser?.role === 'admin', orgPlan }}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', backgroundColor: '#0A0A0F' }}>
         <Suspense fallback={null}>
           <ImpersonateBanner />

@@ -10,9 +10,10 @@ export interface UserWithArea extends User {
 interface UserContextValue {
   user: UserWithArea | null
   isAdmin: boolean
+  orgPlan: string  // 'basic' | 'premium' | 'enterprise' | 'ultra' | ''
 }
 
-const UserContext = createContext<UserContextValue>({ user: null, isAdmin: false })
+const UserContext = createContext<UserContextValue>({ user: null, isAdmin: false, orgPlan: '' })
 
 export function UserProvider({
   value,

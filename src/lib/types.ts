@@ -43,6 +43,7 @@ export interface User {
   email: string
   role: UserRole
   area_id: string | null
+  organization_id: string | null
   is_active: boolean
   created_at: string
   // Joined
@@ -153,9 +154,29 @@ export interface Organization {
   vendor: string | null
   default_language: string
   internal_notes: string | null
+  domain_blacklist: string | null
   billing_day: number
   created_at: string
   updated_at: string
+}
+
+export interface PipelineStage {
+  id: string
+  organization_id: string
+  name: string
+  color: string
+  position: number
+  is_default: boolean
+  created_at: string
+}
+
+export interface OrganizationAddon {
+  id: string
+  organization_id: string
+  addon_type: 'account_management' | 'multi_workspace' | 'extended_data_retention' | 'sso' | 'linkedin_auto_messaging'
+  is_active: boolean
+  price_monthly: number | null
+  activated_at: string
 }
 
 export interface Vendor {

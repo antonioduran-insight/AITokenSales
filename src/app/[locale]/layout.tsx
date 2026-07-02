@@ -20,8 +20,8 @@ export default async function LocaleLayout({
 
   const messages = await getMessages()
 
-  // Fetch user profile server-side — no RLS issues, available immediately
   let userProfile: UserWithArea | null = null
+  let orgPlan = ''
   try {
     const supabase = await createClient()
     const { data: { user: authUser } } = await supabase.auth.getUser()
@@ -33,6 +33,17 @@ export default async function LocaleLayout({
         .eq('id', authUser.id)
         .maybeSingle()
       userProfile = data as UserWithArea | null
+
+      if (userProfile?.role === 'admin_global') {
+        orgPlan = 'ultra'
+      } else if (userProfile?.organization_id) {
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('plan')
+          .eq('id', userProfile.organization_id)
+          .single()
+        orgPlan = orgData?.plan ?? 'basic'
+      }
     }
   } catch (e) {
     console.log('[layout] catch error:', e)
@@ -40,7 +51,7 @@ export default async function LocaleLayout({
 
   return (
     <NextIntlClientProvider messages={messages}>
-      <AppShell initialUser={userProfile}>{children}</AppShell>
+      <AppShell initialUser={userProfile} orgPlan={orgPlan}>{children}</AppShell>
     </NextIntlClientProvider>
   )
 }

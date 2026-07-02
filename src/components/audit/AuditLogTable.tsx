@@ -4,9 +4,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { ChevronLeft, ChevronRight, Download, RefreshCw } from 'lucide-react'
+import { PremiumFeature } from '@/components/ui/PremiumFeature'
 import { format } from 'date-fns'
 import type { AuditLog, AuditEventType } from '@/lib/types'
 import { useOrgId } from '@/lib/hooks/useOrgId'
+import { useUser } from '@/contexts/UserContext'
 
 const PAGE_SIZE = 40
 
@@ -56,6 +58,7 @@ export function AuditLogTable() {
   const t = useTranslations('audit')
   const tc = useTranslations('common')
   const { isImpersonating, impersonateOrgId } = useOrgId()
+  const { orgPlan } = useUser()
 
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [total, setTotal] = useState(0)
@@ -127,6 +130,7 @@ export function AuditLogTable() {
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
   return (
+    <PremiumFeature plan={orgPlan} requiredPlan="premium" featureName="Audit Log is available from Premium plan">
     <div style={S.page}>
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -238,5 +242,6 @@ export function AuditLogTable() {
         </div>
       )}
     </div>
+    </PremiumFeature>
   )
 }
