@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
 import { useUser } from '@/contexts/UserContext'
+import { useOrgId } from '@/lib/hooks/useOrgId'
 import { format } from 'date-fns'
 import { Trophy, Search, X, RefreshCw, MessageSquare, AlertTriangle, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -31,10 +32,13 @@ const S: Record<string, React.CSSProperties> = {
   label: { fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.05em', display: 'block', marginBottom: 6 },
 }
 
+const CLOSED_SELECT = 'id, name, company, assigned_to, created_at, area:areas(label_en), assigned_user:users!assigned_to(id, full_name)'
+
 export function ConvertidosPage() {
   const t = useTranslations('convertidos')
   const tc = useTranslations('common')
-  const { user, isAdmin } = useUser()
+  const { user } = useUser()
+  const { isImpersonating, impersonateOrgId, isAdmin } = useOrgId()
 
   const [prospects, setProspects] = useState<ClosedProspect[]>([])
   const [loading, setLoading] = useState(true)
@@ -60,35 +64,47 @@ export function ConvertidosPage() {
   }, [isAdmin])
 
   const fetchProspects = useCallback(async () => {
-    if (!user) return
+    if (!user && !isImpersonating) return
     setLoading(true)
     try {
-      const supabase = createClient()
+      let rawData: ClosedProspect[] = []
 
-      let query = supabase
-        .from('prospects')
-        .select('id, name, company, assigned_to, created_at, area:areas(label_en), assigned_user:users!assigned_to(id, full_name)')
-        .eq('outreach_status', 'closed')
-        .order('created_at', { ascending: false })
+      if (isImpersonating && impersonateOrgId) {
+        const params = new URLSearchParams({
+          impersonate_org_id: impersonateOrgId,
+          select: CLOSED_SELECT,
+          status: 'closed',
+          limit: '1000',
+        })
+        const res = await fetch(`/api/crm/prospects?${params}`)
+        const json = await res.json()
+        rawData = (json.data ?? []) as ClosedProspect[]
+        if (filterSdr) rawData = rawData.filter(p => p.assigned_to === filterSdr)
+      } else {
+        const supabase = createClient()
+        let query = supabase
+          .from('prospects')
+          .select(CLOSED_SELECT)
+          .eq('outreach_status', 'closed')
+          .order('created_at', { ascending: false })
 
-      // SDRs only see their own closed leads
-      if (!isAdmin) query = query.eq('assigned_to', user.id)
-      else if (filterSdr) query = query.eq('assigned_to', filterSdr)
+        if (!isAdmin && user) query = query.eq('assigned_to', user.id)
+        else if (filterSdr) query = query.eq('assigned_to', filterSdr)
 
-      const { data } = await query
-      if (!data) { setLoading(false); return }
+        const { data } = await query
+        rawData = (data ?? []) as unknown as ClosedProspect[]
+      }
 
-      // Fetch conversation counts via API (uses service role, bypasses RLS)
-      const ids = data.map(p => p.id)
+      // Fetch conversation counts via service-role API (bypasses RLS)
+      const ids = rawData.map(p => p.id)
       let countMap: Record<string, number> = {}
       if (ids.length > 0) {
         const res = await fetch(`/api/conversations/counts?ids=${ids.join(',')}`)
         if (res.ok) countMap = await res.json()
       }
 
-      let results = data.map(p => ({ ...p, chatCount: countMap[p.id] ?? 0 })) as unknown as ClosedProspect[]
+      let results = rawData.map(p => ({ ...p, chatCount: countMap[p.id] ?? 0 }))
 
-      // Client-side search
       if (search.trim()) {
         const q = search.toLowerCase()
         results = results.filter(p => p.name.toLowerCase().includes(q) || (p.company ?? '').toLowerCase().includes(q))
@@ -98,7 +114,7 @@ export function ConvertidosPage() {
     } finally {
       setLoading(false)
     }
-  }, [user, isAdmin, filterSdr, search])
+  }, [user, isAdmin, isImpersonating, impersonateOrgId, filterSdr, search])
 
   useEffect(() => { fetchProspects() }, [fetchProspects])
 
@@ -261,20 +277,22 @@ export function ConvertidosPage() {
                         {t('viewChats')}
                       </button>
                     )}
-                    <button
-                      onClick={() => setUploadTarget(p)}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                        padding: '8px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                        border: 'none',
-                        backgroundColor: hasChat ? '#2A2A3A' : '#6C63FF',
-                        color: hasChat ? '#8B8BA0' : '#FFF',
-                        flex: hasChat ? 'none' : 1,
-                      }}
-                    >
-                      <MessageSquare size={13} />
-                      {hasChat ? t('addAnotherChat') : t('uploadChat')}
-                    </button>
+                    {!isImpersonating && (
+                      <button
+                        onClick={() => setUploadTarget(p)}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          padding: '8px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                          border: 'none',
+                          backgroundColor: hasChat ? '#2A2A3A' : '#6C63FF',
+                          color: hasChat ? '#8B8BA0' : '#FFF',
+                          flex: hasChat ? 'none' : 1,
+                        }}
+                      >
+                        <MessageSquare size={13} />
+                        {hasChat ? t('addAnotherChat') : t('uploadChat')}
+                      </button>
+                    )}
                   </div>
                 </div>
               )

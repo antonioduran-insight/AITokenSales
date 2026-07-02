@@ -21,6 +21,9 @@ export async function GET(
   const offset = parseInt(searchParams.get('offset') || '0')
   const orderCol = searchParams.get('order') || 'created_at'
   const orderAsc = searchParams.get('order_dir') === 'asc'
+  // Extra filters
+  const statusFilter = searchParams.get('status')           // outreach_status for prospects
+  const prospectIdFilter = searchParams.get('prospect_id')  // for conversations/notes
 
   if (impersonateOrgId) {
     // Verify caller is admin_global
@@ -39,10 +42,42 @@ export async function GET(
     }
 
     const adminClient = createAdminClient()
-    const { data, error, count } = await adminClient
+
+    // conversations and notes may not have organization_id on all rows —
+    // filter via prospect_id list from org when no explicit prospect_id given
+    if ((table === 'conversations' || table === 'notes') && !prospectIdFilter) {
+      const { data: orgProspects } = await adminClient
+        .from('prospects')
+        .select('id')
+        .eq('organization_id', impersonateOrgId)
+      const prospectIds = (orgProspects ?? []).map((p: { id: string }) => p.id)
+      if (prospectIds.length === 0) return NextResponse.json({ data: [], count: 0 })
+
+      const { data, error, count } = await adminClient
+        .from(table)
+        .select(select, { count: 'exact' })
+        .in('prospect_id', prospectIds)
+        .order(orderCol, { ascending: orderAsc })
+        .range(offset, offset + limit - 1)
+      return NextResponse.json({ data, error, count })
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query: any = adminClient
       .from(table)
       .select(select, { count: 'exact' })
-      .eq('organization_id', impersonateOrgId)
+
+    // org scope
+    if (prospectIdFilter) {
+      query = query.eq('prospect_id', prospectIdFilter)
+    } else {
+      query = query.eq('organization_id', impersonateOrgId)
+    }
+
+    // optional extra filters
+    if (statusFilter && table === 'prospects') query = query.eq('outreach_status', statusFilter)
+
+    const { data, error, count } = await query
       .order(orderCol, { ascending: orderAsc })
       .range(offset, offset + limit - 1)
 
