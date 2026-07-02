@@ -103,8 +103,8 @@ export function Sidebar({ user }: Props) {
           )
         })}
 
-        {/* Scraper section — admin only, hide when impersonating */}
-        {isAdmin && !isImpersonating && (
+        {/* Scraper section — admin + SDR (temporary), hide when impersonating */}
+        {(isAdmin || user?.role === 'sdr') && !isImpersonating && (
           <>
             <div style={{ margin: '10px 4px 6px', display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ flex: 1, height: 1, backgroundColor: '#2A2A3A' }} />
