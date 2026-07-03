@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       default_language: default_language ?? 'zh',
       internal_notes: internal_notes ?? null,
       is_active: true,
-      billing_day: 1,
+      billing_day: 10,
     })
     .select()
     .single()

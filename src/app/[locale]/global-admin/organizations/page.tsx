@@ -62,7 +62,7 @@ function EditModal({ org, onClose, onSaved }: {
     plan: org.plan,
     max_seats: org.max_seats ?? '',
     max_leads_per_month: org.max_leads_per_month ?? '',
-    billing_day: org.billing_day ?? 1,
+    billing_day: org.billing_day ?? 10,
     custom_price: org.custom_price ?? '',
     vendor: org.vendor ?? '',
     is_active: org.is_active,

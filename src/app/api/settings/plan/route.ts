@@ -57,7 +57,7 @@ export async function GET() {
 
   // Leads count for current billing period
   const now = new Date()
-  const billingDay = org.billing_day ?? 1
+  const billingDay = org.billing_day ?? 10
   let periodStart = new Date(now.getFullYear(), now.getMonth(), billingDay)
   if (periodStart > now) {
     periodStart = new Date(now.getFullYear(), now.getMonth() - 1, billingDay)
