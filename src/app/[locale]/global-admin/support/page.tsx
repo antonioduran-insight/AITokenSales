@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useLocale } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import type { SupportTicket, SupportTicketMessage } from '@/lib/types'
+import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
 
 const PRIORITY_COLORS: Record<string, string> = {
   urgent: '#EF4444',
@@ -19,7 +20,6 @@ const STATUS_COLORS: Record<string, string> = {
   closed: '#6B7280',
 }
 
-// Play a short beep using the Web Audio API (no external file needed)
 function playBeep(frequency = 880, duration = 150) {
   try {
     const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
@@ -51,14 +51,17 @@ function triggerAlert(priority: string) {
 export default function SupportPage() {
   const locale = useLocale()
   const router = useRouter()
+  const { colors, t } = useGlobalAdminTheme()
   const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null)
-  const [messages, setMessages] = useState<SupportTicketMessage[]>([])
-  const [msgLoading, setMsgLoading] = useState(false)
+  const [expandedTicketId, setExpandedTicketId] = useState<string | null>(null)
+  const [messages, setMessages] = useState<Record<string, SupportTicketMessage[]>>({})
+  const [msgLoading, setMsgLoading] = useState<string | null>(null)
   const [replyText, setReplyText] = useState('')
   const [sending, setSending] = useState(false)
   const [impersonating, setImpersonating] = useState<string | null>(null)
+  const [filterStatus, setFilterStatus] = useState('all')
+  const [filterOrg, setFilterOrg] = useState('all')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const seenIdsRef = useRef<Set<string>>(new Set())
   const initialLoadRef = useRef(true)
@@ -70,83 +73,73 @@ export default function SupportPage() {
     const incoming: SupportTicket[] = Array.isArray(data) ? data : []
 
     if (!initialLoadRef.current) {
-      // Check for new tickets since last poll
-      for (const t of incoming) {
-        if (!seenIdsRef.current.has(t.id) && (t.status === 'open' || t.status === 'in_progress')) {
-          triggerAlert(t.priority)
-          break // one alert per poll is enough
+      for (const ticket of incoming) {
+        if (!seenIdsRef.current.has(ticket.id) && (ticket.status === 'open' || ticket.status === 'in_progress')) {
+          triggerAlert(ticket.priority)
+          break
         }
       }
     }
 
-    // Seed seen IDs on first load
-    incoming.forEach(t => seenIdsRef.current.add(t.id))
+    incoming.forEach(ticket => seenIdsRef.current.add(ticket.id))
     initialLoadRef.current = false
 
     setTickets(incoming)
     if (!silent) setLoading(false)
   }, [])
 
-  useEffect(() => {
-    loadTickets()
-  }, [loadTickets])
-
-  // Poll every 30 seconds for new urgent/high tickets
+  useEffect(() => { loadTickets() }, [loadTickets])
   useEffect(() => {
     const interval = setInterval(() => loadTickets(true), 30000)
     return () => clearInterval(interval)
   }, [loadTickets])
 
-  async function openTicket(ticket: SupportTicket) {
-    setSelectedTicket(ticket)
-    setMsgLoading(true)
-    setMessages([])
-    const res = await fetch(`/api/global-admin/tickets/${ticket.id}/messages`)
-    const data = await res.json()
-    setMessages(Array.isArray(data) ? data : [])
-    setMsgLoading(false)
+  async function expandTicket(ticket: SupportTicket) {
+    if (expandedTicketId === ticket.id) {
+      setExpandedTicketId(null)
+      return
+    }
+    setExpandedTicketId(ticket.id)
+    if (!messages[ticket.id]) {
+      setMsgLoading(ticket.id)
+      const res = await fetch(`/api/global-admin/tickets/${ticket.id}/messages`)
+      const data = await res.json()
+      setMessages(prev => ({ ...prev, [ticket.id]: Array.isArray(data) ? data : [] }))
+      setMsgLoading(null)
+    }
   }
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    if (expandedTicketId) {
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+    }
+  }, [expandedTicketId, messages])
 
-  async function sendReply() {
-    if (!selectedTicket || !replyText.trim()) return
+  async function sendReply(ticketId: string) {
+    if (!replyText.trim()) return
     setSending(true)
-    const res = await fetch(`/api/global-admin/tickets/${selectedTicket.id}/messages`, {
+    const res = await fetch(`/api/global-admin/tickets/${ticketId}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: replyText }),
     })
     if (res.ok) {
       const msg = await res.json()
-      setMessages(prev => [...prev, msg])
+      setMessages(prev => ({ ...prev, [ticketId]: [...(prev[ticketId] ?? []), msg] }))
       setReplyText('')
     }
     setSending(false)
   }
 
-  async function markResolved() {
-    if (!selectedTicket) return
-    await fetch(`/api/global-admin/tickets/${selectedTicket.id}/status`, {
+  async function changeStatus(ticketId: string, status: string) {
+    const res = await fetch(`/api/global-admin/tickets/${ticketId}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'resolved' }),
+      body: JSON.stringify({ status }),
     })
-    setSelectedTicket(prev => prev ? { ...prev, status: 'resolved' } : null)
-    setTickets(prev => prev.map(t => t.id === selectedTicket.id ? { ...t, status: 'resolved' } : t))
-  }
-
-  async function markInProgress() {
-    if (!selectedTicket) return
-    await fetch(`/api/global-admin/tickets/${selectedTicket.id}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'in_progress' }),
-    })
-    setSelectedTicket(prev => prev ? { ...prev, status: 'in_progress' } : null)
-    setTickets(prev => prev.map(t => t.id === selectedTicket.id ? { ...t, status: 'in_progress' } : t))
+    if (res.ok) {
+      setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: status as SupportTicket['status'] } : t))
+    }
   }
 
   function handleViewWorkspace(ticket: SupportTicket) {
@@ -156,291 +149,273 @@ export default function SupportPage() {
     router.push(`/${locale}/kanban?impersonate_org_id=${ticket.organization_id}&impersonate_org_name=${encodeURIComponent(orgName)}`)
   }
 
+  const orgs = Array.from(new Set(tickets.map(t => t.organization?.name ?? t.organization_id).filter(Boolean)))
+  const filtered = tickets.filter(t => {
+    if (filterStatus !== 'all' && t.status !== filterStatus) return false
+    if (filterOrg !== 'all' && (t.organization?.name ?? t.organization_id) !== filterOrg) return false
+    return true
+  })
+
+  const openCount = tickets.filter(t => t.status === 'open' || t.status === 'in_progress').length
+
   const thStyle: React.CSSProperties = {
     padding: '10px 14px',
     textAlign: 'left',
     fontSize: 11,
     fontWeight: 600,
-    color: '#52526A',
+    color: colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
-    borderBottom: '1px solid #2A2A3A',
+    borderBottom: `1px solid ${colors.border}`,
     whiteSpace: 'nowrap',
   }
 
   const tdStyle: React.CSSProperties = {
     padding: '12px 14px',
     fontSize: 13,
-    color: '#F0F0F5',
-    borderBottom: '1px solid #1C1C27',
+    color: colors.textPrimary,
     verticalAlign: 'middle',
   }
 
-  const openCount = tickets.filter(t => t.status === 'open' || t.status === 'in_progress').length
+  const selectStyle: React.CSSProperties = {
+    backgroundColor: colors.surfaceRaised,
+    border: `1px solid ${colors.border}`,
+    color: colors.textPrimary,
+    borderRadius: 6,
+    padding: '6px 10px',
+    fontSize: 13,
+    cursor: 'pointer',
+  }
 
   return (
-    <div style={{ padding: 32, display: 'flex', gap: 24, height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
-      {/* Left: ticket list */}
-      <div style={{ flex: 1, overflow: 'auto', minWidth: 0 }}>
-        <style>{`
-          @keyframes urgentPulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
-            50% { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
-          }
-        `}</style>
+    <div>
+      <style>{`
+        @keyframes urgentPulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+          50% { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+        }
+      `}</style>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#F0F0F5', margin: 0 }}>
-            Support
-            {openCount > 0 && (
-              <span style={{ marginLeft: 10, fontSize: 13, backgroundColor: '#EF444420', color: '#EF4444', border: '1px solid #EF444440', borderRadius: 10, padding: '2px 10px', fontWeight: 600 }}>
-                {openCount} open
-              </span>
-            )}
-          </h1>
-          <button
-            onClick={() => loadTickets()}
-            style={{ backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', color: '#8B8BA0', borderRadius: 7, padding: '7px 14px', fontSize: 12, cursor: 'pointer' }}
-          >
-            Refresh
-          </button>
-        </div>
-
-        {loading && <div style={{ color: '#8B8BA0', textAlign: 'center', padding: 40 }}>Loading…</div>}
-
-        {!loading && tickets.length === 0 && (
-          <div style={{ color: '#52526A', textAlign: 'center', padding: 60, fontSize: 15 }}>
-            No support tickets.
-          </div>
-        )}
-
-        {!loading && tickets.length > 0 && (
-          <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  {['Organization', 'Subject', 'Priority', 'Status', 'Created', 'Last Reply', 'Actions'].map(col => (
-                    <th key={col} style={thStyle}>{col}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {tickets.map(ticket => (
-                  <tr
-                    key={ticket.id}
-                    style={{
-                      animation: ticket.priority === 'urgent' && ticket.status === 'open'
-                        ? 'urgentPulse 2s infinite'
-                        : 'none',
-                      cursor: 'default',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#1C1C27')}
-                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
-                  >
-                    <td style={{ ...tdStyle, fontWeight: 600 }}>
-                      {ticket.organization?.name ?? ticket.organization_id}
-                    </td>
-                    <td style={{ ...tdStyle, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {ticket.subject}
-                    </td>
-                    <td style={tdStyle}>
-                      <span style={{
-                        backgroundColor: (PRIORITY_COLORS[ticket.priority] ?? '#6B7280') + '22',
-                        color: PRIORITY_COLORS[ticket.priority] ?? '#6B7280',
-                        border: `1px solid ${PRIORITY_COLORS[ticket.priority] ?? '#6B7280'}44`,
-                        borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
-                      }}>
-                        {ticket.priority}
-                      </span>
-                    </td>
-                    <td style={tdStyle}>
-                      <span style={{
-                        backgroundColor: (STATUS_COLORS[ticket.status] ?? '#6B7280') + '22',
-                        color: STATUS_COLORS[ticket.status] ?? '#6B7280',
-                        border: `1px solid ${STATUS_COLORS[ticket.status] ?? '#6B7280'}44`,
-                        borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600, textTransform: 'capitalize',
-                      }}>
-                        {ticket.status.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td style={{ ...tdStyle, color: '#8B8BA0' }}>
-                      {new Date(ticket.created_at).toLocaleDateString()}
-                    </td>
-                    <td style={{ ...tdStyle, color: '#8B8BA0' }}>
-                      {ticket.updated_at !== ticket.created_at
-                        ? new Date(ticket.updated_at).toLocaleDateString()
-                        : '—'}
-                    </td>
-                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
-                      <button
-                        onClick={() => openTicket(ticket)}
-                        style={{
-                          backgroundColor: '#6C63FF22', color: '#A78BFA',
-                          border: '1px solid #6C63FF44', borderRadius: 5,
-                          padding: '4px 10px', fontSize: 12, cursor: 'pointer',
-                        }}
-                      >
-                        Reply
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: colors.textPrimary, margin: 0 }}>
+          {t('support')}
+          {openCount > 0 && (
+            <span style={{ marginLeft: 10, fontSize: 13, backgroundColor: '#EF444420', color: '#EF4444', border: '1px solid #EF444440', borderRadius: 10, padding: '2px 10px', fontWeight: 600 }}>
+              {openCount} {t('openTickets')}
+            </span>
+          )}
+        </h1>
+        <button onClick={() => loadTickets()} style={{ backgroundColor: colors.surfaceRaised, border: `1px solid ${colors.border}`, color: colors.textSecondary, borderRadius: 7, padding: '7px 14px', fontSize: 12, cursor: 'pointer' }}>
+          Refresh
+        </button>
       </div>
 
-      {/* Right: reply panel */}
-      {selectedTicket && (
-        <div style={{
-          width: 400,
-          backgroundColor: '#13131A',
-          border: '1px solid #2A2A3A',
-          borderRadius: 10,
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          flexShrink: 0,
-        }}>
-          {/* Header */}
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid #2A2A3A' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#F0F0F5', flex: 1, marginRight: 8 }}>
-                {selectedTicket.subject}
-              </div>
-              <button
-                onClick={() => setSelectedTicket(null)}
-                style={{ backgroundColor: 'transparent', border: 'none', color: '#52526A', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}
-              >
-                ×
-              </button>
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: '#52526A' }}>
-                {selectedTicket.organization?.name ?? selectedTicket.organization_id}
-              </span>
-              <span style={{
-                backgroundColor: (PRIORITY_COLORS[selectedTicket.priority] ?? '#6B7280') + '22',
-                color: PRIORITY_COLORS[selectedTicket.priority] ?? '#6B7280',
-                border: `1px solid ${PRIORITY_COLORS[selectedTicket.priority] ?? '#6B7280'}44`,
-                borderRadius: 3, padding: '1px 6px', fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
-              }}>
-                {selectedTicket.priority}
-              </span>
-            </div>
-            <div style={{ fontSize: 13, color: '#8B8BA0', lineHeight: 1.5 }}>
-              {selectedTicket.description}
-            </div>
-          </div>
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={selectStyle}>
+          <option value="all">{t('allStatus')}</option>
+          <option value="open">Open</option>
+          <option value="in_progress">In Progress</option>
+          <option value="resolved">Resolved</option>
+          <option value="closed">Closed</option>
+        </select>
+        <select value={filterOrg} onChange={e => setFilterOrg(e.target.value)} style={selectStyle}>
+          <option value="all">{t('allVendors').replace('Vendors', 'Orgs')}</option>
+          {orgs.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      </div>
 
-          {/* Messages */}
-          <div style={{ flex: 1, overflow: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {msgLoading && <div style={{ color: '#52526A', textAlign: 'center', padding: 20 }}>Loading…</div>}
-            {messages.map(msg => (
-              <div key={msg.id} style={{
-                backgroundColor: '#1C1C27',
-                border: '1px solid #2A2A3A',
-                borderRadius: 8,
-                padding: 12,
-              }}>
-                <div style={{ fontSize: 11, color: '#52526A', marginBottom: 4 }}>
-                  {msg.author?.full_name ?? 'Unknown'} · {new Date(msg.created_at).toLocaleString()}
-                </div>
-                <div style={{ fontSize: 13, color: '#F0F0F5', lineHeight: 1.5 }}>{msg.content}</div>
-              </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
+      {loading && <div style={{ color: colors.textSecondary, textAlign: 'center', padding: 40 }}>{t('loading')}</div>}
 
-          {/* Reply area */}
-          <div style={{ padding: 14, borderTop: '1px solid #2A2A3A', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <textarea
-              value={replyText}
-              onChange={e => setReplyText(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendReply() }}
-              rows={3}
-              placeholder="Type a reply… (⌘↵ to send)"
-              style={{
-                backgroundColor: '#1C1C27',
-                border: '1px solid #2A2A3A',
-                color: '#F0F0F5',
-                borderRadius: 6,
-                padding: '8px 10px',
-                fontSize: 13,
-                resize: 'none',
-                outline: 'none',
-              }}
-            />
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={sendReply}
-                disabled={sending || !replyText.trim()}
-                style={{
-                  flex: 1,
-                  backgroundColor: '#6C63FF',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 6,
-                  padding: '8px',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  opacity: sending || !replyText.trim() ? 0.5 : 1,
-                }}
-              >
-                {sending ? 'Sending…' : 'Send'}
-              </button>
-              {selectedTicket.status === 'open' && (
-                <button
-                  onClick={markInProgress}
-                  style={{
-                    backgroundColor: '#8B5CF622',
-                    color: '#8B5CF6',
-                    border: '1px solid #8B5CF644',
-                    borderRadius: 6,
-                    padding: '8px 10px',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                  }}
-                >
-                  In Progress
-                </button>
-              )}
-              <button
-                onClick={markResolved}
-                disabled={selectedTicket.status === 'resolved' || selectedTicket.status === 'closed'}
-                style={{
-                  backgroundColor: '#22C55E22',
-                  color: '#22C55E',
-                  border: '1px solid #22C55E44',
-                  borderRadius: 6,
-                  padding: '8px 10px',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  opacity: selectedTicket.status === 'resolved' || selectedTicket.status === 'closed' ? 0.5 : 1,
-                }}
-              >
-                ✓ Resolved
-              </button>
-              <button
-                onClick={() => handleViewWorkspace(selectedTicket)}
-                disabled={impersonating === selectedTicket.id}
-                style={{
-                  backgroundColor: '#F59E0B22',
-                  color: '#F59E0B',
-                  border: '1px solid #F59E0B44',
-                  borderRadius: 6,
-                  padding: '8px 10px',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  opacity: impersonating === selectedTicket.id ? 0.5 : 1,
-                }}
-              >
-                View WS
-              </button>
-            </div>
-          </div>
+      {!loading && filtered.length === 0 && (
+        <div style={{ color: colors.textMuted, textAlign: 'center', padding: 60, fontSize: 15 }}>{t('noTickets')}</div>
+      )}
+
+      {!loading && filtered.length > 0 && (
+        <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {[t('organization'), t('subject'), t('priority'), t('status'), t('created'), t('lastReply'), t('actions')].map(col => (
+                  <th key={col} style={thStyle}>{col}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(ticket => {
+                const isExpanded = expandedTicketId === ticket.id
+                const ticketMsgs = messages[ticket.id] ?? []
+                return (
+                  <>
+                    <tr
+                      key={ticket.id}
+                      style={{
+                        animation: ticket.priority === 'urgent' && ticket.status === 'open' ? 'urgentPulse 2s infinite' : 'none',
+                        cursor: 'pointer',
+                        backgroundColor: isExpanded ? colors.surfaceRaised : 'transparent',
+                      }}
+                      onClick={() => expandTicket(ticket)}
+                      onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.backgroundColor = colors.surfaceRaised }}
+                      onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'transparent' }}
+                    >
+                      <td style={{ ...tdStyle, fontWeight: 600, borderBottom: isExpanded ? 'none' : `1px solid ${colors.surfaceRaised}` }}>
+                        {ticket.organization?.name ?? ticket.organization_id}
+                      </td>
+                      <td style={{ ...tdStyle, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', borderBottom: isExpanded ? 'none' : `1px solid ${colors.surfaceRaised}` }}>
+                        {ticket.subject}
+                      </td>
+                      <td style={{ ...tdStyle, borderBottom: isExpanded ? 'none' : `1px solid ${colors.surfaceRaised}` }}>
+                        <span style={{
+                          backgroundColor: (PRIORITY_COLORS[ticket.priority] ?? '#6B7280') + '22',
+                          color: PRIORITY_COLORS[ticket.priority] ?? '#6B7280',
+                          border: `1px solid ${PRIORITY_COLORS[ticket.priority] ?? '#6B7280'}44`,
+                          borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
+                        }}>
+                          {ticket.priority}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, borderBottom: isExpanded ? 'none' : `1px solid ${colors.surfaceRaised}` }}>
+                        <span style={{
+                          backgroundColor: (STATUS_COLORS[ticket.status] ?? '#6B7280') + '22',
+                          color: STATUS_COLORS[ticket.status] ?? '#6B7280',
+                          border: `1px solid ${STATUS_COLORS[ticket.status] ?? '#6B7280'}44`,
+                          borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600,
+                        }}>
+                          {ticket.status.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, color: colors.textSecondary, borderBottom: isExpanded ? 'none' : `1px solid ${colors.surfaceRaised}` }}>
+                        {new Date(ticket.created_at).toLocaleDateString()}
+                      </td>
+                      <td style={{ ...tdStyle, color: colors.textSecondary, borderBottom: isExpanded ? 'none' : `1px solid ${colors.surfaceRaised}` }}>
+                        {ticket.updated_at !== ticket.created_at ? new Date(ticket.updated_at).toLocaleDateString() : '—'}
+                      </td>
+                      <td style={{ ...tdStyle, whiteSpace: 'nowrap', borderBottom: isExpanded ? 'none' : `1px solid ${colors.surfaceRaised}` }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            onClick={() => expandTicket(ticket)}
+                            style={{
+                              backgroundColor: `${colors.accent}22`, color: '#A78BFA',
+                              border: `1px solid ${colors.accent}44`, borderRadius: 5,
+                              padding: '4px 10px', fontSize: 12, cursor: 'pointer',
+                            }}
+                          >
+                            {isExpanded ? '▲' : t('reply')}
+                          </button>
+                          <button
+                            onClick={() => handleViewWorkspace(ticket)}
+                            disabled={impersonating === ticket.id}
+                            style={{
+                              backgroundColor: '#F59E0B22', color: '#F59E0B',
+                              border: '1px solid #F59E0B44', borderRadius: 5,
+                              padding: '4px 10px', fontSize: 12, cursor: 'pointer',
+                              opacity: impersonating === ticket.id ? 0.5 : 1,
+                            }}
+                          >
+                            {t('viewWorkspace')}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* Expanded row */}
+                    {isExpanded && (
+                      <tr key={`${ticket.id}-expanded`}>
+                        <td colSpan={7} style={{ padding: 0, borderBottom: `1px solid ${colors.border}` }}>
+                          <div style={{ backgroundColor: colors.surfaceRaised, padding: '16px 20px' }}>
+                            {/* Description */}
+                            <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 14, lineHeight: 1.5 }}>
+                              <strong style={{ color: colors.textPrimary }}>Description:</strong> {ticket.description}
+                            </div>
+
+                            {/* Status change + View workspace */}
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
+                              <span style={{ fontSize: 12, color: colors.textSecondary }}>{t('changeStatus')}:</span>
+                              {(['open', 'in_progress', 'resolved', 'closed'] as const).map(s => (
+                                <button
+                                  key={s}
+                                  onClick={() => changeStatus(ticket.id, s)}
+                                  style={{
+                                    backgroundColor: ticket.status === s ? `${STATUS_COLORS[s]}22` : 'transparent',
+                                    color: STATUS_COLORS[s],
+                                    border: `1px solid ${STATUS_COLORS[s]}${ticket.status === s ? '66' : '33'}`,
+                                    borderRadius: 5, padding: '3px 10px', fontSize: 11, cursor: 'pointer',
+                                    fontWeight: ticket.status === s ? 700 : 400,
+                                  }}
+                                >
+                                  {s.replace('_', ' ')}
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Messages thread */}
+                            {msgLoading === ticket.id
+                              ? <div style={{ color: colors.textMuted, padding: 20, textAlign: 'center' }}>{t('loading')}</div>
+                              : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12, maxHeight: 300, overflowY: 'auto' }}>
+                                  {ticketMsgs.length === 0
+                                    ? <div style={{ color: colors.textMuted, fontSize: 13 }}>No messages yet.</div>
+                                    : ticketMsgs.map(msg => (
+                                      <div key={msg.id} style={{
+                                        backgroundColor: colors.surface,
+                                        border: `1px solid ${colors.border}`,
+                                        borderRadius: 8, padding: '10px 14px',
+                                      }}>
+                                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>
+                                          {msg.author?.full_name ?? 'Unknown'} · {new Date(msg.created_at).toLocaleString()}
+                                        </div>
+                                        <div style={{ fontSize: 13, color: colors.textPrimary, lineHeight: 1.5 }}>{msg.content}</div>
+                                      </div>
+                                    ))
+                                  }
+                                  <div ref={messagesEndRef} />
+                                </div>
+                              )
+                            }
+
+                            {/* Reply box */}
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <textarea
+                                value={replyText}
+                                onChange={e => setReplyText(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendReply(ticket.id) }}
+                                rows={2}
+                                placeholder="Type a reply… (⌘↵ to send)"
+                                style={{
+                                  flex: 1,
+                                  backgroundColor: colors.surface,
+                                  border: `1px solid ${colors.border}`,
+                                  color: colors.textPrimary,
+                                  borderRadius: 6,
+                                  padding: '8px 10px',
+                                  fontSize: 13,
+                                  resize: 'none',
+                                  outline: 'none',
+                                }}
+                              />
+                              <button
+                                onClick={() => sendReply(ticket.id)}
+                                disabled={sending || !replyText.trim()}
+                                style={{
+                                  backgroundColor: colors.accent, color: '#fff',
+                                  border: 'none', borderRadius: 6, padding: '8px 16px',
+                                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                                  opacity: sending || !replyText.trim() ? 0.5 : 1,
+                                  alignSelf: 'flex-end',
+                                }}
+                              >
+                                {sending ? '…' : t('sendReply')}
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

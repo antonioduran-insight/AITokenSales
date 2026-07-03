@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
   const {
     name, slug, plan, logo_url, admin_name, admin_email, admin_password,
     max_seats, max_leads_per_month, custom_price, vendor,
-    default_language, markets, internal_notes,
+    default_language, markets, internal_notes, addons,
   } = body
 
   if (!name || !slug || !plan || !admin_name || !admin_email || !admin_password) {
@@ -121,6 +121,18 @@ export async function POST(req: NextRequest) {
     if (marketRows.length > 0) {
       await admin.from('organization_markets').insert(marketRows)
     }
+  }
+
+  // 5. Insert addons if selected
+  if (Array.isArray(addons) && addons.length > 0) {
+    const addonRows = addons.map((addonType: string) => ({
+      organization_id: org.id,
+      addon_type: addonType,
+      is_active: true,
+      price_monthly: null,
+      activated_at: new Date().toISOString(),
+    }))
+    await admin.from('organization_addons').insert(addonRows)
   }
 
   return NextResponse.json({ ok: true, org_id: org.id })

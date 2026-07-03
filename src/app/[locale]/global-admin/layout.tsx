@@ -1,39 +1,29 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { GlobalAdminSidebar } from '@/components/global-admin/GlobalAdminSidebar'
+import { GlobalAdminNavbar } from '@/components/global-admin/GlobalAdminNavbar'
+import { GlobalAdminThemeProvider } from '@/contexts/GlobalAdminThemeContext'
 
-export default async function GlobalAdminLayout({
-  children,
-  params,
-}: {
+export default async function GlobalAdminLayout({ children, params }: {
   children: React.ReactNode
   params: Promise<{ locale: string }>
 }) {
   const { locale } = await params
-
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect(`/${locale}/login`)
 
-  if (!user) {
-    redirect(`/${locale}/login`)
-  }
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin_global') {
-    redirect(`/${locale}/kanban`)
-  }
+  const { data: userData } = await supabase
+    .from('users').select('role').eq('id', user.id).single()
+  if (userData?.role !== 'admin_global') redirect(`/${locale}/kanban`)
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', backgroundColor: '#0A0A0F' }}>
-      <GlobalAdminSidebar />
-      <main style={{ flex: 1, overflow: 'auto', backgroundColor: '#0A0A0F' }}>
-        {children}
-      </main>
-    </div>
+    <GlobalAdminThemeProvider>
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <GlobalAdminNavbar />
+        <main style={{ flex: 1, padding: 24 }}>
+          {children}
+        </main>
+      </div>
+    </GlobalAdminThemeProvider>
   )
 }

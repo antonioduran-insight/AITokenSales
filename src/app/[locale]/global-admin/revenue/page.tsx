@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import type { Organization } from '@/lib/types'
 import { PLAN_PRICES } from '@/lib/types'
+import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
 
 function calcMRR(org: Organization): number {
   if (!org.is_active) return 0
@@ -19,6 +20,7 @@ const PLAN_COLORS: Record<string, string> = {
 }
 
 export default function RevenuePage() {
+  const { colors, t } = useGlobalAdminTheme()
   const [orgs, setOrgs] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -35,10 +37,8 @@ export default function RevenuePage() {
   const ultraClients = orgs.filter(o => o.plan === 'ultra').length
   const payingClients = activeOrgs.filter(o => o.plan !== 'ultra').length
 
-  // MRR table sorted by MRR desc
   const mrrTable = [...orgs].sort((a, b) => calcMRR(b) - calcMRR(a))
 
-  // Revenue by plan
   const plans = ['basic', 'premium', 'enterprise'] as const
   const planStats = plans.map(p => {
     const planOrgs = orgs.filter(o => o.plan === p)
@@ -46,22 +46,22 @@ export default function RevenuePage() {
     return { plan: p, count: planOrgs.length, mrr }
   })
 
-  // Revenue by vendor
-  const vendorMap = new Map<string, { count: number; mrr: number }>()
+  // Revenue by vendor with commission pct from vendor name lookup
+  const vendorMap = new Map<string, { count: number; mrr: number; commissionPct: number }>()
   orgs.forEach(o => {
     const v = o.vendor ?? 'direct'
-    const existing = vendorMap.get(v) ?? { count: 0, mrr: 0 }
-    vendorMap.set(v, { count: existing.count + 1, mrr: existing.mrr + calcMRR(o) })
+    const existing = vendorMap.get(v) ?? { count: 0, mrr: 0, commissionPct: 30 }
+    vendorMap.set(v, { count: existing.count + 1, mrr: existing.mrr + calcMRR(o), commissionPct: existing.commissionPct })
   })
   const vendorStats = Array.from(vendorMap.entries()).map(([name, stats]) => ({
     name,
     ...stats,
-    commission: name === 'direct' ? 0 : Math.round(stats.mrr * 0.3),
+    commission: name === 'direct' ? 0 : Math.round(stats.mrr * (stats.commissionPct / 100)),
   })).sort((a, b) => b.mrr - a.mrr)
 
   const cardStyle: React.CSSProperties = {
-    backgroundColor: '#13131A',
-    border: '1px solid #2A2A3A',
+    backgroundColor: colors.surface,
+    border: `1px solid ${colors.border}`,
     borderRadius: 10,
     padding: '20px 24px',
     flex: 1,
@@ -72,142 +72,159 @@ export default function RevenuePage() {
     textAlign: 'left',
     fontSize: 11,
     fontWeight: 600,
-    color: '#52526A',
+    color: colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
-    borderBottom: '1px solid #2A2A3A',
+    borderBottom: `1px solid ${colors.border}`,
   }
 
   const tdStyle: React.CSSProperties = {
     padding: '11px 14px',
     fontSize: 13,
-    color: '#F0F0F5',
-    borderBottom: '1px solid #1C1C27',
+    color: colors.textPrimary,
+    borderBottom: `1px solid ${colors.surfaceRaised}`,
   }
 
   if (loading) {
-    return <div style={{ color: '#8B8BA0', padding: 60, textAlign: 'center' }}>Loading…</div>
+    return <div style={{ color: colors.textSecondary, padding: 60, textAlign: 'center' }}>{t('loading')}</div>
   }
 
   return (
-    <div style={{ padding: 32 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, color: '#F0F0F5', marginBottom: 28 }}>Revenue</h1>
+    <div>
+      <h1 style={{ fontSize: 22, fontWeight: 700, color: colors.textPrimary, marginBottom: 24 }}>{t('revenue')}</h1>
 
       {/* Stats cards */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 32, flexWrap: 'wrap' }}>
         <div style={cardStyle}>
-          <div style={{ fontSize: 12, color: '#52526A', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>MRR Total</div>
-          <div style={{ fontSize: 32, fontWeight: 700, color: '#22C55E' }}>${totalMRR.toLocaleString()}</div>
+          <div style={{ fontSize: 12, color: colors.textMuted, textTransform: 'uppercase', fontWeight: 600, marginBottom: 8, letterSpacing: '0.05em' }}>{t('mrrTotal')}</div>
+          <div style={{ fontSize: 32, fontWeight: 700, color: colors.success }}>${totalMRR.toLocaleString()}</div>
         </div>
         <div style={cardStyle}>
-          <div style={{ fontSize: 12, color: '#52526A', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>Active Clients</div>
-          <div style={{ fontSize: 32, fontWeight: 700, color: '#F0F0F5' }}>{activeClients}</div>
+          <div style={{ fontSize: 12, color: colors.textMuted, textTransform: 'uppercase', fontWeight: 600, marginBottom: 8, letterSpacing: '0.05em' }}>{t('activeClients')}</div>
+          <div style={{ fontSize: 32, fontWeight: 700, color: colors.textPrimary }}>{activeClients}</div>
         </div>
         <div style={cardStyle}>
-          <div style={{ fontSize: 12, color: '#52526A', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>Ultra Clients</div>
-          <div style={{ fontSize: 32, fontWeight: 700, color: '#EF4444' }}>{ultraClients}</div>
+          <div style={{ fontSize: 12, color: colors.textMuted, textTransform: 'uppercase', fontWeight: 600, marginBottom: 8, letterSpacing: '0.05em' }}>{t('ultraClients')}</div>
+          <div style={{ fontSize: 32, fontWeight: 700, color: colors.textMuted }}>{ultraClients}</div>
         </div>
         <div style={cardStyle}>
-          <div style={{ fontSize: 12, color: '#52526A', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>Paying Clients</div>
+          <div style={{ fontSize: 12, color: colors.textMuted, textTransform: 'uppercase', fontWeight: 600, marginBottom: 8, letterSpacing: '0.05em' }}>{t('payingClients')}</div>
           <div style={{ fontSize: 32, fontWeight: 700, color: '#A78BFA' }}>{payingClients}</div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 32 }}>
-        {/* Revenue by plan */}
-        <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, padding: 20 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#F0F0F5', marginBottom: 16 }}>Revenue by Plan</div>
-          {planStats.map(({ plan, count, mrr }) => (
-            <div key={plan} style={{ marginBottom: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
-                <span style={{ color: PLAN_COLORS[plan], fontWeight: 600, textTransform: 'capitalize' }}>{plan}</span>
-                <span style={{ color: '#8B8BA0' }}>{count} orgs · <span style={{ color: '#22C55E', fontWeight: 600 }}>${mrr.toLocaleString()}</span></span>
-              </div>
-              <div style={{ height: 6, backgroundColor: '#2A2A3A', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%',
-                  width: totalMRR > 0 ? `${Math.round((mrr / totalMRR) * 100)}%` : '0%',
-                  backgroundColor: PLAN_COLORS[plan],
-                  borderRadius: 3,
-                }} />
-              </div>
-            </div>
-          ))}
+      {payingClients === 0 ? (
+        <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 60, textAlign: 'center', color: colors.textMuted, fontSize: 14 }}>
+          No paying clients yet.
         </div>
-
-        {/* Revenue by vendor */}
-        <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, padding: 20 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#F0F0F5', marginBottom: 16 }}>Revenue by Vendor</div>
-          {vendorStats.length === 0 && <div style={{ color: '#52526A', fontSize: 13 }}>No data</div>}
-          {vendorStats.map(({ name, count, mrr, commission }) => (
-            <div key={name} style={{ marginBottom: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
-                <span style={{ color: '#F0F0F5', fontWeight: 600 }}>{name}</span>
-                <span style={{ color: '#8B8BA0' }}>
-                  {count} orgs ·{' '}
-                  <span style={{ color: '#22C55E', fontWeight: 600 }}>${mrr.toLocaleString()}</span>
-                  {commission > 0 && <span style={{ color: '#F59E0B' }}> · ${commission.toLocaleString()} comm.</span>}
-                </span>
-              </div>
-              <div style={{ height: 6, backgroundColor: '#2A2A3A', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%',
-                  width: totalMRR > 0 ? `${Math.round((mrr / totalMRR) * 100)}%` : '0%',
-                  backgroundColor: '#6C63FF',
-                  borderRadius: 3,
-                }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* MRR Table */}
-      <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, overflow: 'hidden' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #2A2A3A', fontSize: 14, fontWeight: 600, color: '#F0F0F5' }}>
-          MRR by Organization
-        </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              {['Organization', 'Plan', 'MRR', 'Vendor', 'Created'].map(col => (
-                <th key={col} style={thStyle}>{col}</th>
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
+            {/* Revenue by plan */}
+            <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 20 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: colors.textPrimary, marginBottom: 16 }}>{t('revenueByPlan')}</div>
+              {planStats.map(({ plan, count, mrr }) => (
+                <div key={plan} style={{ marginBottom: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
+                    <span style={{ color: PLAN_COLORS[plan], fontWeight: 600, textTransform: 'capitalize' }}>{plan}</span>
+                    <span style={{ color: colors.textSecondary }}>{count} orgs · <span style={{ color: colors.success, fontWeight: 600 }}>${mrr.toLocaleString()}</span></span>
+                  </div>
+                  <div style={{ height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: totalMRR > 0 ? `${Math.round((mrr / totalMRR) * 100)}%` : '0%',
+                      backgroundColor: PLAN_COLORS[plan],
+                      borderRadius: 3,
+                    }} />
+                  </div>
+                </div>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {mrrTable.map(org => {
-              const mrr = calcMRR(org)
-              return (
-                <tr key={org.id}>
-                  <td style={{ ...tdStyle, fontWeight: 600 }}>{org.name}</td>
-                  <td style={tdStyle}>
-                    <span style={{
-                      backgroundColor: (PLAN_COLORS[org.plan] ?? '#6C63FF') + '22',
-                      color: PLAN_COLORS[org.plan] ?? '#6C63FF',
-                      borderRadius: 4,
-                      padding: '2px 8px',
-                      fontSize: 11,
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                    }}>
-                      {org.plan}
-                    </span>
-                  </td>
-                  <td style={{ ...tdStyle, color: mrr > 0 ? '#22C55E' : '#52526A', fontWeight: 600 }}>
-                    {mrr > 0 ? `$${mrr.toLocaleString()}` : '—'}
-                  </td>
-                  <td style={{ ...tdStyle, color: '#8B8BA0' }}>{org.vendor ?? '—'}</td>
-                  <td style={{ ...tdStyle, color: '#8B8BA0' }}>{new Date(org.created_at).toLocaleDateString()}</td>
+            </div>
+
+            {/* Revenue by vendor */}
+            <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 20 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: colors.textPrimary, marginBottom: 16 }}>{t('revenueByVendor')}</div>
+              {vendorStats.length === 0
+                ? <div style={{ color: colors.textMuted, fontSize: 13 }}>No data</div>
+                : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        {[t('vendor'), 'Orgs', t('mrr'), t('commissionPct'), t('commission')].map(col => (
+                          <th key={col} style={{ ...thStyle, padding: '8px 10px', fontSize: 10 }}>{col}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vendorStats.map(({ name, count, mrr, commission }) => (
+                        <tr key={name}>
+                          <td style={{ ...tdStyle, fontWeight: 600, padding: '10px' }}>{name}</td>
+                          <td style={{ ...tdStyle, color: colors.textSecondary, padding: '10px' }}>{count}</td>
+                          <td style={{ ...tdStyle, color: colors.success, fontWeight: 600, padding: '10px' }}>${mrr.toLocaleString()}</td>
+                          <td style={{ ...tdStyle, color: colors.textSecondary, padding: '10px' }}>{name === 'direct' ? '—' : '30%'}</td>
+                          <td style={{ ...tdStyle, color: commission > 0 ? colors.warning : colors.textMuted, padding: '10px' }}>
+                            {commission > 0 ? `$${commission.toLocaleString()}` : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )
+              }
+            </div>
+          </div>
+
+          {/* MRR Table */}
+          <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: `1px solid ${colors.border}`, fontSize: 14, fontWeight: 600, color: colors.textPrimary }}>
+              {t('mrrByOrg')}
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  {[t('organization'), t('plan'), t('mrr'), t('vendor'), t('created')].map(col => (
+                    <th key={col} style={thStyle}>{col}</th>
+                  ))}
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
-        {mrrTable.length === 0 && (
-          <div style={{ padding: 40, textAlign: 'center', color: '#52526A', fontSize: 14 }}>No organizations</div>
-        )}
-      </div>
+              </thead>
+              <tbody>
+                {mrrTable.map(org => {
+                  const mrr = calcMRR(org)
+                  return (
+                    <tr key={org.id}
+                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = colors.surfaceRaised)}
+                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <td style={{ ...tdStyle, fontWeight: 600 }}>{org.name}</td>
+                      <td style={tdStyle}>
+                        <span style={{
+                          backgroundColor: (PLAN_COLORS[org.plan] ?? colors.accent) + '22',
+                          color: PLAN_COLORS[org.plan] ?? colors.accent,
+                          borderRadius: 4,
+                          padding: '2px 8px',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                        }}>
+                          {org.plan}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, color: mrr > 0 ? colors.success : colors.textMuted, fontWeight: 600 }}>
+                        {mrr > 0 ? `$${mrr.toLocaleString()}` : '—'}
+                      </td>
+                      <td style={{ ...tdStyle, color: colors.textSecondary }}>{org.vendor ?? '—'}</td>
+                      <td style={{ ...tdStyle, color: colors.textSecondary }}>{new Date(org.created_at).toLocaleDateString()}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            {mrrTable.length === 0 && (
+              <div style={{ padding: 40, textAlign: 'center', color: colors.textMuted, fontSize: 14 }}>No organizations</div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
