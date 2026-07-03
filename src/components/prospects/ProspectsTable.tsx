@@ -219,7 +219,7 @@ export function ProspectsTable() {
       setSdrReassignTo('')
       setSdrReassignCount(null)
       setSdrReassignLimit('')
-      setReassignToast(`${data.reassigned} lead${data.reassigned !== 1 ? 's' : ''} reasignado${data.reassigned !== 1 ? 's' : ''} a ${data.sdr_name}`)
+      setReassignToast(`${data.reassigned} lead${data.reassigned !== 1 ? 's' : ''} reassigned to ${data.sdr_name}`)
       setTimeout(() => setReassignToast(null), 3500)
       fetchProspects()
     } finally {
@@ -301,8 +301,8 @@ export function ProspectsTable() {
           {/* SDR filter (admin only) */}
           {isAdmin && (
             <select value={filterSdr} onChange={e => setFilterSdr(e.target.value)} style={S.select}>
-              <option value="">Todos los SDR</option>
-              <option value="unassigned">Sin asignar</option>
+              <option value="">All SDRs</option>
+              <option value="unassigned">Unassigned</option>
               {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
             </select>
           )}
@@ -332,7 +332,7 @@ export function ProspectsTable() {
             onChange={e => setPageSize(Number(e.target.value))}
             style={{ ...S.select, fontSize: 12 }}
           >
-            {PAGE_SIZE_OPTIONS.map(n => <option key={n} value={n}>{n} / pág</option>)}
+            {PAGE_SIZE_OPTIONS.map(n => <option key={n} value={n}>Show {n}</option>)}
           </select>
 
           {isAdmin && !isImpersonating && (
@@ -340,7 +340,7 @@ export function ProspectsTable() {
               onClick={() => setSdrReassignOpen(true)}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 6, border: '1px solid #6C63FF40', backgroundColor: '#6C63FF15', color: '#6C63FF', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
             >
-              <Users size={13} /> Reasignar SDR
+              <Users size={13} /> Reassign SDR
             </button>
           )}
 
@@ -381,20 +381,19 @@ export function ProspectsTable() {
               <th style={S.th}>{t('prospect.market')}</th>
               <th style={S.th}>{t('prospect.custom1')}</th>
               <th style={S.th}>{t('prospect.custom2')}</th>
-              <th style={S.th}>{t('prospect.custom3')}</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={isAdmin ? 15 : 13} style={{ ...S.td, textAlign: 'center', color: '#52526A', padding: 40 }}>
+                <td colSpan={isAdmin ? 14 : 12} style={{ ...S.td, textAlign: 'center', color: '#52526A', padding: 40 }}>
                   {t('common.loading')}
                 </td>
               </tr>
             )}
             {!loading && prospects.length === 0 && (
               <tr>
-                <td colSpan={isAdmin ? 15 : 13} style={{ ...S.td, textAlign: 'center', color: '#52526A', padding: 40 }}>
+                <td colSpan={isAdmin ? 14 : 12} style={{ ...S.td, textAlign: 'center', color: '#52526A', padding: 40 }}>
                   {t('common.noData')}
                 </td>
               </tr>
@@ -463,9 +462,6 @@ export function ProspectsTable() {
                 <td style={{ ...S.td, color: '#8B8BA0', fontSize: 12 }} title={p.custom2 ?? undefined}>
                   {truncate(p.custom2)}
                 </td>
-                <td style={{ ...S.td, color: '#8B8BA0', fontSize: 12 }} title={p.custom3 ?? undefined}>
-                  {truncate(p.custom3)}
-                </td>
               </tr>
             ))}
           </tbody>
@@ -517,10 +513,10 @@ export function ProspectsTable() {
               <div style={{ width: 36, height: 36, borderRadius: '50%', backgroundColor: '#EF444420', border: '1px solid #EF444440', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Trash2 size={16} color="#EF4444" />
               </div>
-              <h2 style={{ fontSize: 16, fontWeight: 700, color: '#EF4444' }}>Eliminar leads</h2>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: '#EF4444' }}>Delete leads</h2>
             </div>
             <p style={{ fontSize: 13, color: '#8B8BA0', lineHeight: 1.6, marginBottom: 20 }}>
-              ¿Eliminás permanentemente <strong style={{ color: '#F0F0F5' }}>{selected.size} lead{selected.size > 1 ? 's' : ''}</strong>? Esta acción no se puede deshacer.
+              Permanently delete <strong style={{ color: '#F0F0F5' }}>{selected.size} lead{selected.size > 1 ? 's' : ''}</strong>? This action cannot be undone.
             </p>
             {deleteError && (
               <div style={{ padding: '10px 14px', backgroundColor: '#EF444415', border: '1px solid #EF444440', borderRadius: 8, marginBottom: 16, fontSize: 12, color: '#EF4444' }}>
@@ -536,7 +532,7 @@ export function ProspectsTable() {
                 disabled={deleting}
                 style={{ flex: 1, backgroundColor: '#EF4444', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
               >
-                <Trash2 size={13} /> {deleting ? 'Eliminando...' : `Eliminar ${selected.size}`}
+                <Trash2 size={13} /> {deleting ? 'Deleting...' : `Delete ${selected.size}`}
               </Button>
             </div>
           </div>
@@ -551,7 +547,7 @@ export function ProspectsTable() {
           padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 12,
         }}>
           <span style={{ fontSize: 13, color: '#F0F0F5', fontWeight: 600 }}>
-            {selected.size} lead{selected.size > 1 ? 's' : ''} seleccionado{selected.size > 1 ? 's' : ''}
+            {selected.size} lead{selected.size > 1 ? 's' : ''} selected
           </span>
 
           <div style={{ width: 1, height: 20, backgroundColor: '#2A2A3A' }} />
@@ -560,7 +556,7 @@ export function ProspectsTable() {
             onClick={() => setConfirmDelete(true)}
             style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 14px', borderRadius: 5, border: '1px solid #EF444440', backgroundColor: '#EF444410', color: '#EF4444', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
           >
-            <Trash2 size={12} /> Eliminar ({selected.size})
+            <Trash2 size={12} /> Delete ({selected.size})
           </button>
 
           <button
@@ -597,19 +593,19 @@ export function ProspectsTable() {
               <div style={{ width: 36, height: 36, borderRadius: '50%', backgroundColor: '#6C63FF20', border: '1px solid #6C63FF40', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Users size={16} color="#6C63FF" />
               </div>
-              <h2 style={{ fontSize: 16, fontWeight: 700, color: '#F0F0F5' }}>Reasignar leads entre SDRs</h2>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: '#F0F0F5' }}>Reassign leads between SDRs</h2>
             </div>
 
             {/* FROM → TO selects */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>De</label>
+                <label style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>From</label>
                 <select
                   value={sdrReassignFrom}
                   onChange={e => { setSdrReassignFrom(e.target.value); setSdrReassignTo(''); setSdrReassignLimit('') }}
                   style={{ ...S.select, width: '100%' }}
                 >
-                  <option value="">Seleccionar SDR...</option>
+                  <option value="">Select SDR...</option>
                   {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
                 </select>
               </div>
@@ -619,14 +615,14 @@ export function ProspectsTable() {
               </div>
 
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>A</label>
+                <label style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>To</label>
                 <select
                   value={sdrReassignTo}
                   onChange={e => setSdrReassignTo(e.target.value)}
                   disabled={!sdrReassignFrom}
                   style={{ ...S.select, width: '100%', opacity: sdrReassignFrom ? 1 : 0.5 }}
                 >
-                  <option value="">Seleccionar SDR...</option>
+                  <option value="">Select SDR...</option>
                   {sdrsForReassignTo.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
                 </select>
               </div>
@@ -636,7 +632,7 @@ export function ProspectsTable() {
             {sdrReassignFrom && sdrReassignCount !== null && (
               <div style={{ marginBottom: 16 }}>
                 <label style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
-                  Cantidad a reasignar
+                  Leads to reassign
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <input
@@ -645,10 +641,10 @@ export function ProspectsTable() {
                     max={sdrReassignCount}
                     value={sdrReassignLimit}
                     onChange={e => setSdrReassignLimit(e.target.value)}
-                    placeholder={`Todos (${sdrReassignCount})`}
+                    placeholder={`All (${sdrReassignCount})`}
                     style={{ ...S.input, padding: '7px 10px', width: 140, fontFamily: 'JetBrains Mono, monospace' }}
                   />
-                  <span style={{ fontSize: 12, color: '#52526A' }}>de {sdrReassignCount} disponibles</span>
+                  <span style={{ fontSize: 12, color: '#52526A' }}>of {sdrReassignCount} available</span>
                 </div>
               </div>
             )}
@@ -662,8 +658,8 @@ export function ProspectsTable() {
                     : sdrReassignCount
                   const toSdr = sdrs.find(s => s.id === sdrReassignTo)
                   return <>
-                    <strong style={{ color: '#6C63FF' }}>{n}</strong> lead{n !== 1 ? 's' : ''} serán reasignados
-                    {toSdr && <> a <strong style={{ color: '#F0F0F5' }}>{toSdr.full_name}</strong></>}
+                    <strong style={{ color: '#6C63FF' }}>{n}</strong> lead{n !== 1 ? 's' : ''} will be reassigned
+                    {toSdr && <> to <strong style={{ color: '#F0F0F5' }}>{toSdr.full_name}</strong></>}
                   </>
                 })()}
               </div>
@@ -681,7 +677,7 @@ export function ProspectsTable() {
                 disabled={!sdrReassignFrom || !sdrReassignTo || sdrReassigning || sdrReassignCount === 0 || (sdrReassignLimit !== '' && Number(sdrReassignLimit) <= 0)}
                 style={{ flex: 1, backgroundColor: '#6C63FF', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
               >
-                {sdrReassigning ? 'Reasignando...' : 'Confirmar reasignación'}
+                {sdrReassigning ? 'Reassigning...' : 'Confirm reassignment'}
               </Button>
             </div>
           </div>

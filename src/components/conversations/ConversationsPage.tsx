@@ -124,7 +124,7 @@ export function ConversationsPage() {
             <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#52526A' }} />
             <input
               style={S.input}
-              placeholder="Buscar por prospecto o razón…"
+              placeholder="Search by prospect or reason…"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -133,7 +133,7 @@ export function ConversationsPage() {
           {/* Area filter (admin) */}
           {isAdmin && (
             <select value={filterArea} onChange={e => setFilterArea(e.target.value)} style={S.select}>
-              <option value="">Todas las áreas</option>
+              <option value="">All Areas</option>
               {areas.map(a => <option key={a.id} value={a.id}>{a.label_en}</option>)}
             </select>
           )}
@@ -141,7 +141,7 @@ export function ConversationsPage() {
           {/* SDR filter (admin) */}
           {isAdmin && (
             <select value={filterSdr} onChange={e => setFilterSdr(e.target.value)} style={S.select}>
-              <option value="">Todos los SDR</option>
+              <option value="">All SDRs</option>
               {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
             </select>
           )}
@@ -164,7 +164,7 @@ export function ConversationsPage() {
 
           {hasFilters && (
             <button onClick={clearFilters} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 6, border: '1px solid #2A2A3A', backgroundColor: 'transparent', color: '#8B8BA0', cursor: 'pointer', fontSize: 12 }}>
-              <X size={12} /> Limpiar
+              <X size={12} /> Clear
             </button>
           )}
 
@@ -179,13 +179,13 @@ export function ConversationsPage() {
       {/* List */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {loading && (
-          <div style={{ textAlign: 'center', color: '#52526A', padding: 40 }}>Cargando…</div>
+          <div style={{ textAlign: 'center', color: '#52526A', padding: 40 }}>Loading…</div>
         )}
         {!loading && conversations.length === 0 && (
-          <div style={{ textAlign: 'center', color: '#52526A', padding: 40 }}>Sin conversaciones</div>
+          <div style={{ textAlign: 'center', color: '#52526A', padding: 40 }}>No conversations</div>
         )}
         {!loading && conversations.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
             {conversations.map(c => {
               const prospect = c.prospect as (Prospect & { area?: Area; assigned_user?: User }) | undefined
               const author = c.author as User | undefined
@@ -240,7 +240,7 @@ export function ConversationsPage() {
                       onClick={e => { e.stopPropagation(); setViewFull(c) }}
                       style={{ marginTop: 8, fontSize: 12, color: '#6C63FF', background: 'none', border: '1px solid #6C63FF30', borderRadius: 5, cursor: 'pointer', padding: '3px 10px' }}
                     >
-                      Ver completo
+                      View full
                     </button>
                   )}
                 </div>

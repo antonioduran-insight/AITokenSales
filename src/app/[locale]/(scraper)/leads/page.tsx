@@ -12,7 +12,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button onClick={async () => { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
       style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#6C63FF', background: 'none', border: 'none', cursor: 'pointer' }}>
-      {copied ? <><Check size={11} /> Copiado</> : <><Copy size={11} /> Copiar</>}
+      {copied ? <><Check size={11} /> Copied</> : <><Copy size={11} /> Copy</>}
     </button>
   );
 }
@@ -48,18 +48,18 @@ function LeadsContent() {
 
   return (
     <div style={{ padding: '24px', color: '#F0F0F5', maxWidth: 1100 }}>
-      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>Leads del Scraper</h1>
+      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>Scraper Leads</h1>
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={filterRun} onChange={e => setFilterRun(e.target.value)} style={selectStyle}>
-          <option value="">Todos los runs</option>
+          <option value="">All Runs</option>
           {runs.map(r => (
             <option key={r.id} value={r.id}>{r.market} — {new Date(r.created_at).toLocaleDateString()} ({r.total_leads} leads)</option>
           ))}
         </select>
         <select value={filterTemp} onChange={e => setFilterTemp(e.target.value)} style={selectStyle}>
-          <option value="">Todos los temp.</option>
+          <option value="">All Temps</option>
           <option value="HOT">🔥 HOT</option>
           <option value="WARM">🌡 WARM</option>
           <option value="COLD">❄️ COLD</option>
@@ -72,13 +72,13 @@ function LeadsContent() {
         <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #2A2A3A' }}>
-              {['Nombre', 'Empresa', 'Título', 'ICP', 'Temp', ''].map(h => (
+              {['Name', 'Company', 'Title', 'ICP', 'Temp', ''].map(h => (
                 <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, color: '#52526A', fontWeight: 600 }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: '#52526A' }}>Cargando...</td></tr>}
+            {loading && <tr><td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: '#52526A' }}>Loading...</td></tr>}
             {!loading && leads.length === 0 && <tr><td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: '#52526A' }}>Sin leads.</td></tr>}
             {leads.map((lead, i) => (
               <tr key={lead.id} onClick={() => setSelectedLead(lead)} style={{ borderTop: i > 0 ? '1px solid #2A2A3A' : undefined, cursor: 'pointer' }}
@@ -114,15 +114,15 @@ function LeadsContent() {
             </div>
 
             <div style={{ borderTop: '1px solid #2A2A3A', paddingTop: 16, marginBottom: 16 }}>
-              <p style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Info</p>
+              <p style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Details</p>
               {[
-                { label: 'Empresa',    value: selectedLead.company },
-                { label: 'Título',     value: selectedLead.title },
-                { label: 'Industria',  value: selectedLead.industry },
-                { label: 'Tamaño',     value: selectedLead.company_size },
-                { label: 'Ubicación',  value: selectedLead.location },
-                { label: 'Email',      value: selectedLead.email },
-                { label: 'Combo',      value: selectedLead.search_combo },
+                { label: 'Company',   value: selectedLead.company },
+                { label: 'Title',     value: selectedLead.title },
+                { label: 'Industry',  value: selectedLead.industry },
+                { label: 'Size',      value: selectedLead.company_size },
+                { label: 'Location',  value: selectedLead.location },
+                { label: 'Email',     value: selectedLead.email },
+                { label: 'Combo',     value: selectedLead.search_combo },
               ].map(({ label, value }) => value ? (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ fontSize: 13, color: '#52526A' }}>{label}</span>
@@ -138,10 +138,10 @@ function LeadsContent() {
             </div>
 
             <div>
-              <p style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Mensajes</p>
+              <p style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Messages</p>
               {[
-                { label: 'Solicitud de conexión', value: selectedLead.custom1 },
-                { label: 'Mensaje de valor',       value: selectedLead.custom2 },
+                { label: 'Connection request', value: selectedLead.custom1 },
+                { label: 'Value message',     value: selectedLead.custom2 },
               ].map(({ label, value }) => value ? (
                 <div key={label} style={{ marginBottom: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -163,7 +163,7 @@ function LeadsContent() {
 
 export default function LeadsPage() {
   return (
-    <Suspense fallback={<p style={{ color: '#52526A', padding: 40 }}>Cargando...</p>}>
+    <Suspense fallback={<p style={{ color: '#52526A', padding: 40 }}>Loading...</p>}>
       <LeadsContent />
     </Suspense>
   );

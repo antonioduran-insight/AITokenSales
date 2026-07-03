@@ -41,7 +41,7 @@ export function ProspectCard({ prospect, onClick, isDragOverlay = false }: Props
           backgroundColor: '#13131A',
           border: '1px solid #2A2A3A',
           borderRadius: 8,
-          padding: '10px 12px',
+          padding: '14px',
           marginBottom: 8,
           transition: 'border-color 0.15s',
           boxShadow: isDragOverlay ? '0 8px 24px rgba(0,0,0,0.5)' : undefined,
@@ -51,7 +51,7 @@ export function ProspectCard({ prospect, onClick, isDragOverlay = false }: Props
       >
         {/* Top row: name + flag */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#F0F0F5', lineHeight: 1.3, flex: 1 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: '#F0F0F5', lineHeight: 1.3, flex: 1 }}>
             {prospect.name}
           </span>
           {prospect.flag_tomorrow && (
