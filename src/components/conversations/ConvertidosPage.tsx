@@ -178,7 +178,7 @@ export function ConvertidosPage() {
               {withoutChat} {t('noChat')}
             </div>
             <div style={{ padding: '6px 14px', borderRadius: 6, backgroundColor: '#22C55E15', border: '1px solid #22C55E30', fontSize: 12, color: '#22C55E', fontWeight: 600 }}>
-              {withChat} con {t('chats')}
+              {withChat} with {t('chats')}
             </div>
           </div>
         )}

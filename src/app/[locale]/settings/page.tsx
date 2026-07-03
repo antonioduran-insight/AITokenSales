@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, Suspense } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { useUser } from '@/contexts/UserContext'
@@ -64,6 +65,9 @@ function OrgTab() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [logoError, setLogoError] = useState<string | null>(null)
+  const logoInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetch('/api/settings/organization')
@@ -92,6 +96,27 @@ function OrgTab() {
     setSaving(false)
   }
 
+  async function handleLogoUpload(file: File) {
+    if (!org) return
+    setUploadingLogo(true)
+    setLogoError(null)
+    try {
+      const supabase = createClient()
+      const ext = file.name.split('.').pop() ?? 'png'
+      const path = `${org.id}/logo.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('logos')
+        .upload(path, file, { upsert: true, contentType: file.type })
+      if (upErr) { setLogoError(upErr.message); return }
+      const { data: urlData } = supabase.storage.from('logos').getPublicUrl(path)
+      setLogoUrl(urlData.publicUrl + `?t=${Date.now()}`)
+    } catch (e) {
+      setLogoError(e instanceof Error ? e.message : 'Upload failed')
+    } finally {
+      setUploadingLogo(false)
+    }
+  }
+
   if (!org) return <div style={{ color: '#52526A', padding: 40, textAlign: 'center' }}>Loading…</div>
 
   return (
@@ -115,17 +140,32 @@ function OrgTab() {
             </select>
           </div>
           <div>
-            <label style={S.label}>Logo URL</label>
-            <input value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder="https://…" style={S.input} />
+            <label style={S.label}>Logo</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {logoUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logoUrl} alt="Logo" style={{ height: 44, maxWidth: 120, objectFit: 'contain', borderRadius: 6, border: '1px solid #2A2A3A', backgroundColor: '#1C1C27' }} />
+              )}
+              <div>
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp"
+                  style={{ display: 'none' }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f) }}
+                />
+                <button
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={uploadingLogo}
+                  style={{ ...S.btnGhost, fontSize: 12, padding: '6px 14px' }}
+                >
+                  {uploadingLogo ? 'Uploading…' : logoUrl ? 'Change Logo' : 'Upload Logo'}
+                </button>
+                {logoError && <p style={{ fontSize: 12, color: '#EF4444', margin: '4px 0 0' }}>{logoError}</p>}
+              </div>
+            </div>
           </div>
         </div>
-
-        {logoUrl && (
-          <div style={{ marginBottom: 16 }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoUrl} alt="Logo preview" style={{ height: 48, objectFit: 'contain', borderRadius: 6, border: '1px solid #2A2A3A' }} />
-          </div>
-        )}
       </div>
 
       <div style={S.card}>

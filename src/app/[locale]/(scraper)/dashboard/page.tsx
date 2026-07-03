@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Link } from '@/i18n/navigation';
 import { scraperApi, type Run, type RunStatus } from '@/lib/scraper-api';
 import { StatusBadge } from '@/components/scraper/StatusBadge';
-import { Play, Flame, Thermometer, Snowflake, Activity } from 'lucide-react';
+import { Play, Activity } from 'lucide-react';
 
 const ACTIVE_STATUSES = new Set<RunStatus>(['pending', 'running', 'scoring', 'drafting']);
 
@@ -32,7 +32,6 @@ export default function ScraperDashboard() {
   }, []);
 
   const latestRun = runs[0] ?? null;
-  const totalHot = runs.reduce((s, r) => s + (r.hot_count || 0), 0);
   const totalLeads = runs.reduce((s, r) => s + (r.total_leads || 0), 0);
   const activeRun = runs.find(r => ACTIVE_STATUSES.has(r.status));
 
@@ -43,10 +42,9 @@ export default function ScraperDashboard() {
       </div>
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 24 }}>
         {[
           { label: 'Total Runs', value: runs.length, icon: <Activity size={16} color="#6C63FF" /> },
-          { label: 'HOT Leads',  value: totalHot,    icon: <Flame size={16} color="#EF4444" />, color: '#EF4444' },
           { label: 'Total Leads', value: totalLeads, icon: <Activity size={16} color="#22C55E" /> },
         ].map(s => (
           <div key={s.label} style={S.card}>
@@ -68,7 +66,7 @@ export default function ScraperDashboard() {
             <p style={{ fontSize: 11, color: '#52526A', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeRun.combos.join(', ')}</p>
           </div>
           <StatusBadge status={activeRun.status} />
-          <Link href="/history" style={{ fontSize: 11, color: '#6C63FF', whiteSpace: 'nowrap' }}>Ver logs →</Link>
+          <Link href="/history" style={{ fontSize: 11, color: '#6C63FF', whiteSpace: 'nowrap' }}>View logs →</Link>
         </div>
       )}
 
@@ -88,23 +86,11 @@ export default function ScraperDashboard() {
             </div>
             {latestRun.total_leads > 0 && (
               <div style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#52526A', marginBottom: 6 }}>
-                  <span>{latestRun.total_leads} total leads</span>
-                  <div style={{ display: 'flex', gap: 12 }}>
-                    <span style={{ color: '#EF4444' }}>🔥 HOT {latestRun.hot_count}</span>
-                    <span style={{ color: '#F59E0B' }}>🌡 WARM {latestRun.warm_count}</span>
-                    <span style={{ color: '#60A5FA' }}>❄️ COLD {latestRun.cold_count}</span>
-                  </div>
-                </div>
-                <div style={{ height: 6, borderRadius: 3, backgroundColor: '#2A2A3A', overflow: 'hidden', display: 'flex' }}>
-                  <div style={{ backgroundColor: '#EF4444', height: '100%', width: `${(latestRun.hot_count  / latestRun.total_leads) * 100}%`, transition: 'width .5s' }} />
-                  <div style={{ backgroundColor: '#F59E0B', height: '100%', width: `${(latestRun.warm_count / latestRun.total_leads) * 100}%`, transition: 'width .5s' }} />
-                  <div style={{ backgroundColor: '#60A5FA', height: '100%', width: `${(latestRun.cold_count / latestRun.total_leads) * 100}%`, transition: 'width .5s' }} />
-                </div>
+                <div style={{ fontSize: 12, color: '#52526A' }}>{latestRun.total_leads} total leads</div>
               </div>
             )}
             <div style={{ display: 'flex', gap: 8 }}>
-              <Link href={`/leads?run_id=${latestRun.id}`} style={{ fontSize: 12, backgroundColor: '#6C63FF', color: '#FFF', padding: '6px 14px', borderRadius: 7, textDecoration: 'none', fontWeight: 600 }}>Ver leads</Link>
+              <Link href={`/leads?run_id=${latestRun.id}`} style={{ fontSize: 12, backgroundColor: '#6C63FF', color: '#FFF', padding: '6px 14px', borderRadius: 7, textDecoration: 'none', fontWeight: 600 }}>View Leads</Link>
               <Link href="/history" style={{ fontSize: 12, backgroundColor: '#2A2A3A', color: '#8B8BA0', padding: '6px 14px', borderRadius: 7, textDecoration: 'none' }}>History</Link>
             </div>
           </div>
@@ -123,19 +109,19 @@ export default function ScraperDashboard() {
                   <p style={{ fontSize: 11, color: '#52526A', margin: '2px 0 0' }}>{new Date(run.created_at).toLocaleDateString()} · {run.total_leads} leads</p>
                 </div>
                 <StatusBadge status={run.status} />
-                <Link href={`/leads?run_id=${run.id}`} style={{ fontSize: 11, color: '#6C63FF' }}>Ver →</Link>
+                <Link href={`/leads?run_id=${run.id}`} style={{ fontSize: 11, color: '#6C63FF' }}>→</Link>
               </div>
             ))}
           </div>
         </section>
       )}
 
-      {loading && <p style={{ color: '#52526A', fontSize: 13, textAlign: 'center', padding: 40 }}>Cargando...</p>}
+      {loading && <p style={{ color: '#52526A', fontSize: 13, textAlign: 'center', padding: 40 }}>Loading...</p>}
       {!loading && runs.length === 0 && (
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
-          <p style={{ color: '#52526A', marginBottom: 16 }}>No hay runs todavía.</p>
+          <p style={{ color: '#52526A', marginBottom: 16 }}>No runs yet.</p>
           <Link href="/run" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, backgroundColor: '#6C63FF', color: '#FFF', padding: '10px 20px', borderRadius: 8, textDecoration: 'none', fontWeight: 600, fontSize: 14 }}>
-            <Play size={14} /> Iniciar primer run
+            <Play size={14} /> Start first run
           </Link>
         </div>
       )}

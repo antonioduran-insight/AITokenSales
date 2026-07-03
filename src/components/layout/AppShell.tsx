@@ -90,7 +90,9 @@ export function AppShell({ children, initialUser, orgPlan }: Props) {
               <LanguageSwitcher />
             </header>
             <main style={{ flex: 1, overflow: 'auto', backgroundColor: '#0A0A0F' }}>
-              {children}
+              <div style={{ maxWidth: 1400, margin: '0 auto', width: '100%' }}>
+                {children}
+              </div>
             </main>
           </div>
         </div>
