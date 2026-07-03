@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react'
 import { useLocale } from 'next-intl'
 import type { Vendor } from '@/lib/types'
 
-const PLAN_DEFAULTS: Record<string, { max_seats: number; max_leads_per_month: number | null }> = {
-  basic: { max_seats: 3, max_leads_per_month: 500 },
-  premium: { max_seats: 10, max_leads_per_month: 2000 },
-  enterprise: { max_seats: 50, max_leads_per_month: null },
-  ultra: { max_seats: 999999, max_leads_per_month: 999999 },
+const MAX_INT = 2147483647
+
+const PLAN_DEFAULTS: Record<string, { max_seats: number; max_leads_per_month: number }> = {
+  basic:      { max_seats: 3,        max_leads_per_month: 500 },
+  premium:    { max_seats: 10,       max_leads_per_month: 2000 },
+  enterprise: { max_seats: 50,       max_leads_per_month: MAX_INT },
+  ultra:      { max_seats: MAX_INT,  max_leads_per_month: MAX_INT },
 }
 
 const MARKETS = ['Taiwan', 'LATAM', 'Vietnam', 'Europe', 'Global']
@@ -43,7 +45,7 @@ export default function NewOrganizationPage() {
   const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState(generatePassword())
   const [maxSeats, setMaxSeats] = useState(3)
-  const [maxLeads, setMaxLeads] = useState<number | null>(500)
+  const [maxLeads, setMaxLeads] = useState<number>(500)
   const [customPrice, setCustomPrice] = useState<number | null>(null)
   const [vendor, setVendor] = useState('direct')
   const [defaultLanguage, setDefaultLanguage] = useState('zh')
@@ -67,7 +69,7 @@ export default function NewOrganizationPage() {
     const defaults = PLAN_DEFAULTS[plan]
     setMaxSeats(defaults.max_seats)
     setMaxLeads(defaults.max_leads_per_month)
-  }, [plan])
+  }, [plan])  // eslint-disable-line react-hooks/exhaustive-deps
 
   function toggleMarket(market: string) {
     setMarkets(prev =>
@@ -359,8 +361,8 @@ export default function NewOrganizationPage() {
             <label style={labelStyle}>Max Leads/month (blank = unlimited)</label>
             <input
               type="number"
-              value={maxLeads ?? ''}
-              onChange={e => setMaxLeads(e.target.value ? Number(e.target.value) : null)}
+              value={maxLeads}
+              onChange={e => setMaxLeads(Number(e.target.value))}
               placeholder="Unlimited"
               style={inputStyle}
             />

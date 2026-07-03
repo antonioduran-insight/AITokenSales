@@ -21,6 +21,15 @@ const PLAN_COLORS: Record<string, string> = {
   ultra: '#EF4444',
 }
 
+const MAX_INT = 2147483647
+
+const PLAN_DEFAULTS: Record<string, { max_seats: number; max_leads_per_month: number }> = {
+  basic:      { max_seats: 3,        max_leads_per_month: 500 },
+  premium:    { max_seats: 10,       max_leads_per_month: 2000 },
+  enterprise: { max_seats: 50,       max_leads_per_month: MAX_INT },
+  ultra:      { max_seats: MAX_INT,  max_leads_per_month: MAX_INT },
+}
+
 const S: Record<string, React.CSSProperties> = {
   label:  { fontSize: 12, fontWeight: 600, color: '#8B8BA0', marginBottom: 5, display: 'block' },
   input:  { width: '100%', backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 7, color: '#F0F0F5', padding: '8px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box' },
@@ -62,14 +71,15 @@ function EditModal({ org, onClose, onSaved }: {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const MAX_INT = 2147483647
-
   function set<K extends keyof EditState>(key: K, value: EditState[K]) {
     setForm(prev => {
       const next = { ...prev, [key]: value }
-      if (key === 'plan' && value === 'ultra') {
-        next.max_seats = MAX_INT
-        next.max_leads_per_month = MAX_INT
+      if (key === 'plan') {
+        const defaults = PLAN_DEFAULTS[value as string]
+        if (defaults) {
+          next.max_seats = defaults.max_seats
+          next.max_leads_per_month = defaults.max_leads_per_month
+        }
       }
       return next
     })
