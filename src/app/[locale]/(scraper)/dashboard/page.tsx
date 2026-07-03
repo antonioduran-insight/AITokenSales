@@ -52,7 +52,7 @@ export default function ScraperDashboard() {
               <span style={S.label}>{s.label}</span>
               {s.icon}
             </div>
-            <p style={{ fontSize: 28, fontWeight: 700, fontFamily: 'monospace', margin: 0, color: s.color ?? '#F0F0F5' }}>{s.value}</p>
+            <p style={{ fontSize: 28, fontWeight: 700, fontFamily: 'monospace', margin: 0, color: '#F0F0F5' }}>{s.value}</p>
           </div>
         ))}
       </div>
