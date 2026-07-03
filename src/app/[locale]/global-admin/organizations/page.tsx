@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
+import { X } from 'lucide-react'
 import type { Organization } from '@/lib/types'
 import { PLAN_PRICES } from '@/lib/types'
 
@@ -20,6 +21,162 @@ const PLAN_COLORS: Record<string, string> = {
   ultra: '#EF4444',
 }
 
+const S: Record<string, React.CSSProperties> = {
+  label:  { fontSize: 12, fontWeight: 600, color: '#8B8BA0', marginBottom: 5, display: 'block' },
+  input:  { width: '100%', backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 7, color: '#F0F0F5', padding: '8px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box' },
+  select: { width: '100%', backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 7, color: '#F0F0F5', padding: '8px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box' },
+  btn:    { backgroundColor: '#6C63FF', color: '#fff', border: 'none', borderRadius: 7, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  btnGhost: { backgroundColor: 'transparent', color: '#8B8BA0', border: '1px solid #2A2A3A', borderRadius: 7, padding: '9px 20px', fontSize: 13, cursor: 'pointer' },
+  row:    { marginBottom: 14 },
+  grid2:  { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 },
+}
+
+interface EditState {
+  name: string
+  plan: string
+  max_seats: number | ''
+  max_leads_per_month: number | ''
+  billing_day: number | ''
+  custom_price: number | ''
+  vendor: string
+  is_active: boolean
+  internal_notes: string
+}
+
+function EditModal({ org, onClose, onSaved }: {
+  org: Organization
+  onClose: () => void
+  onSaved: (updated: Organization) => void
+}) {
+  const [form, setForm] = useState<EditState>({
+    name: org.name,
+    plan: org.plan,
+    max_seats: org.max_seats ?? '',
+    max_leads_per_month: org.max_leads_per_month ?? '',
+    billing_day: org.billing_day ?? 1,
+    custom_price: org.custom_price ?? '',
+    vendor: org.vendor ?? '',
+    is_active: org.is_active,
+    internal_notes: org.internal_notes ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function set<K extends keyof EditState>(key: K, value: EditState[K]) {
+    setForm(prev => ({ ...prev, [key]: value }))
+  }
+
+  async function save() {
+    setSaving(true); setError(null)
+    const res = await fetch('/api/global-admin/organizations', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: org.id,
+        name: form.name.trim(),
+        plan: form.plan,
+        max_seats: form.max_seats === '' ? null : Number(form.max_seats),
+        max_leads_per_month: form.max_leads_per_month === '' ? null : Number(form.max_leads_per_month),
+        billing_day: form.billing_day === '' ? 1 : Number(form.billing_day),
+        custom_price: form.custom_price === '' ? null : Number(form.custom_price),
+        vendor: form.vendor.trim() || null,
+        is_active: form.is_active,
+        internal_notes: form.internal_notes.trim() || null,
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setError(data.error); setSaving(false); return }
+    onSaved(data as Organization)
+    onClose()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}>
+      <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 28, width: 560, maxWidth: '94vw', maxHeight: '90vh', overflowY: 'auto' }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
+          <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: '#F0F0F5' }}>Edit Organization</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52526A' }}><X size={17} /></button>
+        </div>
+
+        {/* Name */}
+        <div style={S.row}>
+          <label style={S.label}>Name</label>
+          <input value={form.name} onChange={e => set('name', e.target.value)} style={S.input} />
+        </div>
+
+        {/* Plan + Status */}
+        <div style={S.grid2}>
+          <div>
+            <label style={S.label}>Plan</label>
+            <select value={form.plan} onChange={e => set('plan', e.target.value)} style={S.select}>
+              <option value="basic">Basic</option>
+              <option value="premium">Premium</option>
+              <option value="enterprise">Enterprise</option>
+              <option value="ultra">Ultra</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+            <label style={{ ...S.label, marginBottom: 10 }}>Status</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: form.is_active ? '#22C55E' : '#52526A' }}>
+              <input type="checkbox" checked={form.is_active} onChange={e => set('is_active', e.target.checked)}
+                style={{ width: 16, height: 16, accentColor: '#6C63FF', cursor: 'pointer' }} />
+              {form.is_active ? 'Active' : 'Inactive'}
+            </label>
+          </div>
+        </div>
+
+        {/* Seats + Leads */}
+        <div style={S.grid2}>
+          <div>
+            <label style={S.label}>Max Seats</label>
+            <input type="number" min={1} value={form.max_seats} onChange={e => set('max_seats', e.target.value === '' ? '' : Number(e.target.value))} style={S.input} placeholder="e.g. 5" />
+          </div>
+          <div>
+            <label style={S.label}>Max Leads / Month</label>
+            <input type="number" min={0} value={form.max_leads_per_month} onChange={e => set('max_leads_per_month', e.target.value === '' ? '' : Number(e.target.value))} style={S.input} placeholder="blank = unlimited" />
+          </div>
+        </div>
+
+        {/* Billing day + Custom price */}
+        <div style={S.grid2}>
+          <div>
+            <label style={S.label}>Billing Day</label>
+            <input type="number" min={1} max={28} value={form.billing_day} onChange={e => set('billing_day', e.target.value === '' ? '' : Number(e.target.value))} style={S.input} />
+          </div>
+          <div>
+            <label style={S.label}>Custom Price ($/mo) — Enterprise only</label>
+            <input type="number" min={0} value={form.custom_price} onChange={e => set('custom_price', e.target.value === '' ? '' : Number(e.target.value))} style={S.input} placeholder="e.g. 4000" />
+          </div>
+        </div>
+
+        {/* Vendor */}
+        <div style={S.row}>
+          <label style={S.label}>Vendor</label>
+          <input value={form.vendor} onChange={e => set('vendor', e.target.value)} style={S.input} placeholder="e.g. Partner Name" />
+        </div>
+
+        {/* Internal notes */}
+        <div style={S.row}>
+          <label style={S.label}>Internal Notes</label>
+          <textarea value={form.internal_notes} onChange={e => set('internal_notes', e.target.value)} rows={3}
+            style={{ ...S.input, resize: 'vertical' }} placeholder="Internal notes (not visible to org)" />
+        </div>
+
+        {error && <p style={{ color: '#EF4444', fontSize: 12, marginBottom: 12 }}>{error}</p>}
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={save} disabled={saving} style={{ ...S.btn, flex: 1, opacity: saving ? 0.6 : 1 }}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+          <button onClick={onClose} style={{ ...S.btnGhost, flex: 1 }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function OrganizationsPage() {
   const router = useRouter()
   const locale = useLocale()
@@ -30,6 +187,7 @@ export default function OrganizationsPage() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterVendor, setFilterVendor] = useState('all')
   const [impersonating, setImpersonating] = useState<string | null>(null)
+  const [editingOrg, setEditingOrg] = useState<Organization | null>(null)
 
   useEffect(() => {
     fetch('/api/global-admin/organizations')
@@ -51,6 +209,10 @@ export default function OrganizationsPage() {
   function handleImpersonate(org: Organization) {
     setImpersonating(org.id)
     router.push(`/${locale}/kanban?impersonate_org_id=${org.id}&impersonate_org_name=${encodeURIComponent(org.name)}`)
+  }
+
+  function handleSaved(updated: Organization) {
+    setOrgs(prev => prev.map(o => o.id === updated.id ? updated : o))
   }
 
   const selectStyle: React.CSSProperties = {
@@ -208,7 +370,7 @@ export default function OrganizationsPage() {
                           {impersonating === org.id ? '…' : 'Impersonate'}
                         </button>
                         <button
-                          onClick={() => alert('Edit coming soon')}
+                          onClick={() => setEditingOrg(org)}
                           style={{
                             backgroundColor: '#1C1C27',
                             color: '#8B8BA0',
@@ -229,6 +391,14 @@ export default function OrganizationsPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {editingOrg && (
+        <EditModal
+          org={editingOrg}
+          onClose={() => setEditingOrg(null)}
+          onSaved={handleSaved}
+        />
       )}
     </div>
   )
