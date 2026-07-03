@@ -24,9 +24,9 @@ const PLAN_COLORS: Record<string, string> = {
 const MAX_INT = 2147483647
 
 const PLAN_DEFAULTS: Record<string, { max_seats: number; max_leads_per_month: number }> = {
-  basic:      { max_seats: 3,        max_leads_per_month: 500 },
-  premium:    { max_seats: 10,       max_leads_per_month: 2000 },
-  enterprise: { max_seats: 50,       max_leads_per_month: MAX_INT },
+  basic:      { max_seats: 3,        max_leads_per_month: 1000 },
+  premium:    { max_seats: 10,       max_leads_per_month: 3000 },
+  enterprise: { max_seats: 15,       max_leads_per_month: 10000 },
   ultra:      { max_seats: MAX_INT,  max_leads_per_month: MAX_INT },
 }
 
