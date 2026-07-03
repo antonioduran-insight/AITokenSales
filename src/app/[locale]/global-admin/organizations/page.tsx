@@ -62,8 +62,17 @@ function EditModal({ org, onClose, onSaved }: {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const MAX_INT = 2147483647
+
   function set<K extends keyof EditState>(key: K, value: EditState[K]) {
-    setForm(prev => ({ ...prev, [key]: value }))
+    setForm(prev => {
+      const next = { ...prev, [key]: value }
+      if (key === 'plan' && value === 'ultra') {
+        next.max_seats = MAX_INT
+        next.max_leads_per_month = MAX_INT
+      }
+      return next
+    })
   }
 
   async function save() {
