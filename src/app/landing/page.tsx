@@ -28,48 +28,48 @@ const S: Record<string, React.CSSProperties> = {
 
 const STEPS = [
   {
-    num: '01', label: '啟動抓取器', duration: 5500,
+    num: '01', label: '啟動抓取器', duration: 20000,
     title: '啟動 LinkedIn 智能抓取器',
     narration: '選擇目標受眾組合與市場。每個 Combo 對應不同的 LinkedIn 搜尋條件，精準定位科技、SaaS、金融等行業的決策者。',
   },
   {
-    num: '02', label: '實時抓取中', duration: 6000,
+    num: '02', label: '實時抓取中', duration: 20000,
     title: 'AI 正在抓取潛在客戶數據...',
     narration: '系統自動從 LinkedIn 提取並驗證潛在客戶的職位、公司、聯絡方式，即時去重並過濾無效資料。',
   },
   {
-    num: '03', label: 'ICP 評分', duration: 5500,
+    num: '03', label: 'ICP 評分', duration: 20000,
     title: 'AI 生成 ICP 契合度評分',
     narration: 'AI 根據公司規模、行業、職位層級及 LinkedIn 活躍度，為每位潛在客戶打分，標記 HOT / WARM / COLD 溫度。',
   },
   {
-    num: '04', label: '生成個性化消息', duration: 7000,
+    num: '04', label: '生成個性化消息', duration: 25000,
     title: '為每位潛在客戶生成個性化消息',
     narration: '針對每位潛在客戶，AI 自動撰寫個性化的 LinkedIn 連結請求，融入其公司動態與職位背景，避免千篇一律的模板感。',
   },
   {
-    num: '05', label: '導入 CRM', duration: 4500,
+    num: '05', label: '導入 CRM', duration: 18000,
     title: '一鍵導入 CRM，自動去重',
     narration: '將抓取結果導入 CRM，系統自動偵測重複資料。每位潛在客戶進入對應 SDR 的看板，準備開始觸達。',
   },
   {
-    num: '06', label: '發送連結請求', duration: 5000,
+    num: '06', label: '發送連結請求', duration: 20000,
     title: '在 LinkedIn 發送個性化連結請求',
     narration: '直接從 CRM 複製消息並在 LinkedIn 發送。消息引用對方公司的具體資訊，讓對方感受到是真誠的個人訊息，而非群發。',
   },
   {
-    num: '07', label: '收到回覆！', duration: 5500,
+    num: '07', label: '收到回覆！', duration: 20000,
     title: '🎉 對方接受連結並回覆了！',
     narration: '個性化的連結請求引起了對方的興趣。她主動回覆，表示對我們分享的內容感興趣，希望了解更多。',
   },
   {
-    num: '08', label: '約定通話', duration: 5500,
+    num: '08', label: '約定通話', duration: 25000,
     title: '成功約定視頻通話',
     narration: '整個流程從抓取到約定通話只需數天。關鍵在於：我們從未提銷售，只是建立連結、分享價值，讓對方主動想了解更多。',
   },
 ]
 
-function useTypewriter(text: string, active: boolean, speed = 28) {
+function useTypewriter(text: string, active: boolean, speed = 45) {
   const [displayed, setDisplayed] = useState('')
   const idx = useRef(0)
   useEffect(() => {
