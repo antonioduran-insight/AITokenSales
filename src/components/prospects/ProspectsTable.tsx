@@ -90,14 +90,14 @@ export function ProspectsTable() {
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   useEffect(() => {
-    createClient().from('areas').select('*').eq('is_active', true).then(({ data }) => {
-      if (data) setAreas(data as Area[])
+    const supabase = createClient()
+    Promise.all([
+      supabase.from('areas').select('*').eq('is_active', true),
+      isAdmin ? supabase.from('users').select('*').eq('role', 'sdr').eq('is_active', true) : Promise.resolve({ data: null }),
+    ]).then(([areasRes, sdrsRes]) => {
+      if (areasRes.data) setAreas(areasRes.data as Area[])
+      if (sdrsRes.data) setSdrs(sdrsRes.data as User[])
     })
-    if (isAdmin) {
-      createClient().from('users').select('*').eq('role', 'sdr').eq('is_active', true).then(({ data }) => {
-        if (data) setSdrs(data as User[])
-      })
-    }
   }, [isAdmin])
 
   const fetchProspects = useCallback(async () => {

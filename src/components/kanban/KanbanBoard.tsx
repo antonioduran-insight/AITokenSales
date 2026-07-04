@@ -41,62 +41,90 @@ export function KanbanBoard() {
   const [loading, setLoading] = useState(true)
   const [stageMap, setStageMap] = useState<Map<number, PipelineStage>>(new Map())
 
-  // Admin: fetch all areas for filter
-  useEffect(() => {
-    if (!isAdmin) return
-    createClient()
-      .from('areas')
-      .select('*')
-      .order('name')
-      .then(({ data }) => { if (data) setAreas(data as Area[]) })
-  }, [isAdmin])
-
-  // SDR: fetch their assigned areas from user_areas
-  useEffect(() => {
-    if (!user || user.role !== 'sdr') return
-    createClient()
-      .from('user_areas')
-      .select('area:areas(*)')
-      .eq('user_id', user.id)
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          const areaList = data.map(ua => (ua as unknown as { area: Area }).area).filter(Boolean)
-          setSdrAreas(areaList)
-        } else if (user.area_id) {
-          createClient()
-            .from('areas')
-            .select('*')
-            .eq('id', user.area_id)
-            .then(({ data: aData }) => { if (aData) setSdrAreas(aData as Area[]) })
-        }
-      })
-  }, [user])
-
-  // Fetch pipeline stages for custom column labels/colors
-  useEffect(() => {
-    if (isImpersonating) return
-    createClient()
-      .from('pipeline_stages')
-      .select('name, color, position')
-      .order('position')
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          const map = new Map<number, PipelineStage>()
-          data.forEach(s => map.set(s.position, s as PipelineStage))
-          setStageMap(map)
-        }
-      })
-  }, [isImpersonating])
-
   const isSdr = user?.role === 'sdr'
   const sdrAreaIds = sdrAreas.map(a => a.id)
 
+  // Single init effect: fetch meta (areas, stages) and prospects in parallel.
+  // Avoids the cascade where sdrAreas state change would trigger a second prospects fetch.
+  useEffect(() => {
+    if (!user && !isImpersonating) return
+
+    const supabase = createClient()
+    setLoading(true)
+
+    async function init() {
+      // Phase 1 — all meta queries in parallel
+      const [areasRes, sdrAreasRes, stagesRes] = await Promise.all([
+        isAdmin
+          ? supabase.from('areas').select('*').order('name')
+          : Promise.resolve({ data: null }),
+        user?.role === 'sdr'
+          ? supabase.from('user_areas').select('area:areas(*)').eq('user_id', user.id)
+          : Promise.resolve({ data: null }),
+        !isImpersonating
+          ? supabase.from('pipeline_stages').select('name, color, position').order('position')
+          : Promise.resolve({ data: null }),
+      ])
+
+      if (areasRes.data) setAreas(areasRes.data as Area[])
+
+      // Resolve SDR areas locally so prospects query doesn't need a re-render
+      let resolvedSdrAreas: Area[] = []
+      if (sdrAreasRes.data && sdrAreasRes.data.length > 0) {
+        resolvedSdrAreas = sdrAreasRes.data
+          .map(ua => (ua as unknown as { area: Area }).area)
+          .filter(Boolean)
+        setSdrAreas(resolvedSdrAreas)
+      } else if (user?.role === 'sdr' && user.area_id) {
+        const { data: aData } = await supabase.from('areas').select('*').eq('id', user.area_id)
+        if (aData) { resolvedSdrAreas = aData as Area[]; setSdrAreas(aData as Area[]) }
+      }
+
+      if (stagesRes.data && stagesRes.data.length > 0) {
+        const map = new Map<number, PipelineStage>()
+        stagesRes.data.forEach(s => map.set(s.position, s as PipelineStage))
+        setStageMap(map)
+      }
+
+      // Phase 2 — prospects (uses resolved SDR areas, no extra round-trip)
+      try {
+        let data: Prospect[] = []
+        if (isImpersonating && impersonateOrgId) {
+          const res = await fetch(
+            `/api/crm/prospects?impersonate_org_id=${impersonateOrgId}&select=${encodeURIComponent(PROSPECT_SELECT)}&limit=1000`
+          )
+          const json = await res.json()
+          data = (json.data ?? []) as Prospect[]
+        } else {
+          let query = supabase
+            .from('prospects')
+            .select(PROSPECT_SELECT)
+            .order('created_at', { ascending: false })
+          if (user?.role === 'sdr') {
+            const ids = resolvedSdrAreas.map(a => a.id)
+            if (ids.length === 1) query = query.eq('area_id', ids[0])
+            else if (ids.length > 1) query = query.in('area_id', ids)
+            else if (user.area_id) query = query.eq('area_id', user.area_id)
+          }
+          const { data: rows } = await query
+          data = (rows ?? []) as unknown as Prospect[]
+        }
+        setProspects(data)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    init()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, isAdmin, isImpersonating, impersonateOrgId])
+
+  // fetchProspects used for manual refresh and area filter changes
   const fetchProspects = useCallback(async () => {
     if (!isAdmin && !isSdr && !isImpersonating) return
     setLoading(true)
     try {
       let data: Prospect[] = []
-
       if (isImpersonating && impersonateOrgId) {
         const res = await fetch(
           `/api/crm/prospects?impersonate_org_id=${impersonateOrgId}&select=${encodeURIComponent(PROSPECT_SELECT)}&limit=1000`
@@ -109,33 +137,27 @@ export function KanbanBoard() {
           .from('prospects')
           .select(PROSPECT_SELECT)
           .order('created_at', { ascending: false })
-
         if (isAdmin) {
           if (selectedAreaId) query = query.eq('area_id', selectedAreaId)
         } else if (isSdr) {
           const filterIds = selectedAreaId ? [selectedAreaId] : sdrAreaIds
-          if (filterIds.length === 1) {
-            query = query.eq('area_id', filterIds[0])
-          } else if (filterIds.length > 1) {
-            query = query.in('area_id', filterIds)
-          } else if (user?.area_id) {
-            query = query.eq('area_id', user.area_id)
-          }
+          if (filterIds.length === 1) query = query.eq('area_id', filterIds[0])
+          else if (filterIds.length > 1) query = query.in('area_id', filterIds)
+          else if (user?.area_id) query = query.eq('area_id', user.area_id)
         }
-
         const { data: rows } = await query
         data = (rows ?? []) as unknown as Prospect[]
       }
-
       setProspects(data)
     } finally {
       setLoading(false)
     }
   }, [selectedAreaId, isAdmin, isSdr, isImpersonating, impersonateOrgId, user, sdrAreaIds])
 
+  // Re-fetch when area filter changes (not on initial load — init handles that)
   useEffect(() => {
-    if (user || isImpersonating) fetchProspects()
-  }, [user, isImpersonating, fetchProspects])
+    if (selectedAreaId !== null) fetchProspects()
+  }, [selectedAreaId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleDragStart({ active }: DragStartEvent) {
     setDraggingId(active.id as string)
