@@ -641,7 +641,7 @@ export default function LandingPage() {
             </button>
           </div>
           <div style={{ marginTop: 48, display: 'flex', justifyContent: 'center', gap: 40, flexWrap: 'wrap' }}>
-            {[['10K+', 'Leads managed'], ['99.9%', 'Import accuracy'], ['4 markets', 'Taiwan · LATAM · VN · EU'], ['< 2min', 'Avg time to import']].map(([stat, label]) => (
+            {[['10K+', 'Leads managed'], ['99.9%', 'Import accuracy'], ['4 markets', 'Asia · Europe · LATAM · Custom'], ['< 2min', 'Avg time to import']].map(([stat, label]) => (
               <div key={label} style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 28, fontWeight: 800, color: '#F0F0F5' }}>{stat}</div>
                 <div style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 2 }}>{label}</div>
