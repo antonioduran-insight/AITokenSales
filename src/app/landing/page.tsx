@@ -874,7 +874,10 @@ export default function LandingPage() {
           <div style={{ ...S.section, paddingTop: 70, paddingBottom: 70, textAlign: 'center' }}>
             <h2 style={{ fontSize: 42, fontWeight: 800, letterSpacing: '-1.5px', margin: '0 0 16px' }}>Ready to scale your outreach?</h2>
             <p style={{ fontSize: 17, color: TEXT_SECONDARY, maxWidth: 480, margin: '0 auto 36px' }}>Get your team set up in minutes. Import your first leads the same day.</p>
-            <a href="/en/login" style={{ ...S.btnPrimary, padding: '16px 40px', fontSize: 16, borderRadius: 10, boxShadow: `0 4px 32px ${ACCENT}50` }}>Get started for free</a>
+            <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <a href="/en/login" style={{ ...S.btnPrimary, padding: '16px 40px', fontSize: 16, borderRadius: 10, boxShadow: `0 4px 32px ${ACCENT}50` }}>Get started for free</a>
+              <button onClick={() => setShowDemo(true)} style={{ ...S.btnSecondary, padding: '16px 40px', fontSize: 16, borderRadius: 10, border: `1px solid ${ACCENT}60`, color: '#A78BFA' }}>▶ Watch demo 中文</button>
+            </div>
           </div>
         </div>
 
