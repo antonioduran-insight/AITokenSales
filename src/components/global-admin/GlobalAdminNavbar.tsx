@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { useEffect, useState } from 'react'
@@ -41,21 +42,21 @@ export function GlobalAdminNavbar() {
       gap: 8, position: 'sticky', top: 0, zIndex: 100,
       transition: 'background-color 0.2s',
     }}>
-      <a href={`/${locale}/global-admin/organizations`} style={{
+      <Link href={`/${locale}/global-admin/organizations`} style={{
         fontSize: 16, fontWeight: 700, color: colors.textPrimary,
         textDecoration: 'none', marginRight: 24, flexShrink: 0,
       }}>
         AIToken<span style={{ color: colors.accent }}>Sales</span>
         <span style={{ fontSize: 10, color: colors.textMuted, marginLeft: 6,
           fontWeight: 400, letterSpacing: '0.05em' }}>GLOBAL ADMIN</span>
-      </a>
+      </Link>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}>
         {navItems.map(item => {
           const fullHref = `/${locale}${item.href}`
           const isActive = pathname === fullHref || pathname.startsWith(fullHref + '/')
           return (
-            <a key={item.href} href={fullHref} style={{
+            <Link key={item.href} href={fullHref} style={{
               display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px',
               borderRadius: 6, fontSize: 14, fontWeight: isActive ? 600 : 400,
               color: isActive ? colors.accent : colors.textSecondary,
@@ -70,7 +71,7 @@ export function GlobalAdminNavbar() {
                   {item.badge}
                 </span>
               )}
-            </a>
+            </Link>
           )
         })}
       </div>
