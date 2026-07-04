@@ -53,17 +53,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(`/${locale}/login`, request.url))
   }
 
-  // Fetch profile to expose role + org_id to client components via cookies
-  const { data: userData } = await supabase
-    .from('users')
-    .select('role, organization_id')
-    .eq('id', user.id)
-    .single()
-
   const intlResponse = intlMiddleware(request)
+
+  // Fetch profile to expose role + org_id via cookies — race against 900ms
+  // to avoid MIDDLEWARE_INVOCATION_TIMEOUT on slow Supabase responses
+  const userData = await Promise.race([
+    supabase
+      .from('users')
+      .select('role, organization_id')
+      .eq('id', user.id)
+      .single()
+      .then(r => r.data),
+    new Promise<null>(resolve => setTimeout(() => resolve(null), 900)),
+  ])
+
   if (userData) {
-    intlResponse.cookies.set('user_role',   userData.role ?? '',              { path: '/', sameSite: 'lax' })
-    intlResponse.cookies.set('user_org_id', userData.organization_id ?? '',  { path: '/', sameSite: 'lax' })
+    intlResponse.cookies.set('user_role',   userData.role ?? '',             { path: '/', sameSite: 'lax' })
+    intlResponse.cookies.set('user_org_id', userData.organization_id ?? '', { path: '/', sameSite: 'lax' })
   }
   return intlResponse
 }
