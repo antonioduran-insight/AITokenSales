@@ -34,12 +34,12 @@ const PLAN_DEFAULTS: Record<string, { max_seats: number; max_leads_per_month: nu
 }
 
 const formatSeats = (org: EnrichedOrg) => {
-  if (!org.max_seats || org.max_seats >= MAX_INT) return '∞'
+  if (org.max_seats == null || org.max_seats >= MAX_INT) return '∞'
   return `${org.sdr_count ?? 0}/${org.max_seats}`
 }
 
 const formatLeads = (org: Organization) => {
-  if (!org.max_leads_per_month || org.max_leads_per_month >= MAX_INT) return '∞'
+  if (org.max_leads_per_month == null || org.max_leads_per_month >= MAX_INT) return '∞'
   return org.max_leads_per_month.toLocaleString()
 }
 

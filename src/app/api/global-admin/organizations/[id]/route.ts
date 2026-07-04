@@ -57,14 +57,16 @@ export async function GET(
     admin.from('support_tickets').select('id', { count: 'exact', head: true }).eq('organization_id', id).in('status', ['open', 'in_progress']),
   ])
 
-  // leads this month
+  // leads this month — use monthly_lead_counts (prospects has no organization_id column)
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-  const { count: leadsThisMonth } = await admin
-    .from('prospects')
-    .select('id', { count: 'exact', head: true })
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const { data: leadCountRow } = await admin
+    .from('monthly_lead_counts')
+    .select('count')
     .eq('organization_id', id)
-    .gte('created_at', monthStart)
+    .eq('year_month', yearMonth)
+    .single()
+  const leadsThisMonth = leadCountRow?.count ?? 0
 
   return NextResponse.json({
     ...org,
@@ -72,7 +74,7 @@ export async function GET(
     sdr_count: sdrsRes.count ?? 0,
     addons: addonsRes.data ?? [],
     open_tickets_count: ticketsRes.count ?? 0,
-    leads_this_month: leadsThisMonth ?? 0,
+    leads_this_month: leadsThisMonth,
   })
 }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, Fragment } from 'react'
 import { useLocale } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import type { SupportTicket, SupportTicketMessage } from '@/lib/types'
@@ -93,6 +93,10 @@ export default function SupportPage() {
     const interval = setInterval(() => loadTickets(true), 30000)
     return () => clearInterval(interval)
   }, [loadTickets])
+
+  useEffect(() => {
+    setReplyText('')
+  }, [expandedTicketId])
 
   async function expandTicket(ticket: SupportTicket) {
     if (expandedTicketId === ticket.id) {
@@ -220,7 +224,7 @@ export default function SupportPage() {
           <option value="closed">Closed</option>
         </select>
         <select value={filterOrg} onChange={e => setFilterOrg(e.target.value)} style={selectStyle}>
-          <option value="all">{t('allVendors').replace('Vendors', 'Orgs')}</option>
+          <option value="all">{t('allOrgs')}</option>
           {orgs.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
       </div>
@@ -246,9 +250,8 @@ export default function SupportPage() {
                 const isExpanded = expandedTicketId === ticket.id
                 const ticketMsgs = messages[ticket.id] ?? []
                 return (
-                  <>
+                  <Fragment key={ticket.id}>
                     <tr
-                      key={ticket.id}
                       style={{
                         animation: ticket.priority === 'urgent' && ticket.status === 'open' ? 'urgentPulse 2s infinite' : 'none',
                         cursor: 'pointer',
@@ -411,7 +414,7 @@ export default function SupportPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 )
               })}
             </tbody>

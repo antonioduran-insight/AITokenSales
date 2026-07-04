@@ -79,7 +79,7 @@ function LeadsContent() {
           </thead>
           <tbody>
             {loading && <tr><td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: '#52526A' }}>Loading...</td></tr>}
-            {!loading && leads.length === 0 && <tr><td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: '#52526A' }}>Sin leads.</td></tr>}
+            {!loading && leads.length === 0 && <tr><td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: '#52526A' }}>No leads.</td></tr>}
             {leads.map((lead, i) => (
               <tr key={lead.id} onClick={() => setSelectedLead(lead)} style={{ borderTop: i > 0 ? '1px solid #2A2A3A' : undefined, cursor: 'pointer' }}
                 onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#1C1C27')}

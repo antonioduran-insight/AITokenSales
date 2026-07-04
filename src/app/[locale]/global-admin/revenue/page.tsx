@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { Organization } from '@/lib/types'
+import type { Organization, Vendor } from '@/lib/types'
 import { PLAN_PRICES } from '@/lib/types'
 import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
 
@@ -22,13 +22,22 @@ const PLAN_COLORS: Record<string, string> = {
 export default function RevenuePage() {
   const { colors, t } = useGlobalAdminTheme()
   const [orgs, setOrgs] = useState<Organization[]>([])
+  const [vendorCommissions, setVendorCommissions] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/global-admin/organizations')
-      .then(r => r.json())
-      .then(data => { setOrgs(Array.isArray(data) ? data : []); setLoading(false) })
-      .catch(() => setLoading(false))
+    Promise.all([
+      fetch('/api/global-admin/organizations').then(r => r.json()),
+      fetch('/api/global-admin/vendors').then(r => r.json()),
+    ]).then(([orgsData, vendorsData]) => {
+      setOrgs(Array.isArray(orgsData) ? orgsData : [])
+      if (Array.isArray(vendorsData)) {
+        const map: Record<string, number> = {}
+        vendorsData.forEach((v: Vendor) => { if (v.name) map[v.name] = v.commission_pct ?? 0 })
+        setVendorCommissions(map)
+      }
+      setLoading(false)
+    }).catch(() => setLoading(false))
   }, [])
 
   const activeOrgs = orgs.filter(o => o.is_active)
@@ -46,12 +55,13 @@ export default function RevenuePage() {
     return { plan: p, count: planOrgs.length, mrr }
   })
 
-  // Revenue by vendor with commission pct from vendor name lookup
+  // Revenue by vendor using real commission_pct from vendors table
   const vendorMap = new Map<string, { count: number; mrr: number; commissionPct: number }>()
   orgs.forEach(o => {
     const v = o.vendor ?? 'direct'
-    const existing = vendorMap.get(v) ?? { count: 0, mrr: 0, commissionPct: 30 }
-    vendorMap.set(v, { count: existing.count + 1, mrr: existing.mrr + calcMRR(o), commissionPct: existing.commissionPct })
+    const commissionPct = v === 'direct' ? 0 : (vendorCommissions[v] ?? 0)
+    const existing = vendorMap.get(v) ?? { count: 0, mrr: 0, commissionPct }
+    vendorMap.set(v, { count: existing.count + 1, mrr: existing.mrr + calcMRR(o), commissionPct })
   })
   const vendorStats = Array.from(vendorMap.entries()).map(([name, stats]) => ({
     name,
@@ -156,12 +166,12 @@ export default function RevenuePage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {vendorStats.map(({ name, count, mrr, commission }) => (
+                      {vendorStats.map(({ name, count, mrr, commission, commissionPct }) => (
                         <tr key={name}>
                           <td style={{ ...tdStyle, fontWeight: 600, padding: '10px' }}>{name}</td>
                           <td style={{ ...tdStyle, color: colors.textSecondary, padding: '10px' }}>{count}</td>
                           <td style={{ ...tdStyle, color: colors.success, fontWeight: 600, padding: '10px' }}>${mrr.toLocaleString()}</td>
-                          <td style={{ ...tdStyle, color: colors.textSecondary, padding: '10px' }}>{name === 'direct' ? '—' : '30%'}</td>
+                          <td style={{ ...tdStyle, color: colors.textSecondary, padding: '10px' }}>{name === 'direct' ? '—' : `${commissionPct}%`}</td>
                           <td style={{ ...tdStyle, color: commission > 0 ? colors.warning : colors.textMuted, padding: '10px' }}>
                             {commission > 0 ? `$${commission.toLocaleString()}` : '—'}
                           </td>

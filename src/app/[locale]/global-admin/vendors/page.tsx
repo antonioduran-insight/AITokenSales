@@ -181,7 +181,7 @@ export default function VendorsPage() {
                         opacity: toggling === vendor.id ? 0.5 : 1,
                       }}
                     >
-                      {toggling === vendor.id ? '…' : vendor.is_active ? t('deactivate') : t('active')}
+                      {toggling === vendor.id ? '…' : vendor.is_active ? t('deactivate') : t('activate')}
                     </button>
                   </td>
                 </tr>

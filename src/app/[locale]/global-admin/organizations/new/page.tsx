@@ -3,16 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useLocale } from 'next-intl'
 import type { Vendor } from '@/lib/types'
+import { ADDON_LIST, MAX_INT, PLAN_DEFAULTS } from '@/lib/types'
 import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
-
-const MAX_INT = 2147483647
-
-const PLAN_DEFAULTS: Record<string, { max_seats: number; max_leads_per_month: number }> = {
-  basic:      { max_seats: 3,        max_leads_per_month: 1000 },
-  premium:    { max_seats: 10,       max_leads_per_month: 3000 },
-  enterprise: { max_seats: 15,       max_leads_per_month: 10000 },
-  ultra:      { max_seats: MAX_INT,  max_leads_per_month: MAX_INT },
-}
 
 const PLAN_PREVIEW: Record<string, string> = {
   basic: '$550/mo · 3 seats · 1,000 leads/mo',
@@ -22,14 +14,6 @@ const PLAN_PREVIEW: Record<string, string> = {
 }
 
 const MARKETS = ['Taiwan', 'LATAM', 'Vietnam', 'Europe', 'Global']
-
-const ADDON_LIST = [
-  { type: 'account_management', label: 'Account Management', price: '$149/mo' },
-  { type: 'multi_workspace', label: 'Multi-workspace', price: '$300/mo' },
-  { type: 'extended_data_retention', label: 'Extended Data Retention', price: '$99/mo' },
-  { type: 'sso', label: 'SSO Integration', price: '$299 one-time' },
-  { type: 'linkedin_auto_messaging', label: 'LinkedIn Auto-messaging', price: 'TBD' },
-]
 
 function generateSlug(name: string): string {
   return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
@@ -81,11 +65,11 @@ export default function NewOrganizationPage() {
     setSlug(generateSlug(name))
   }, [name])
 
-  useEffect(() => {
-    const defaults = PLAN_DEFAULTS[plan]
-    setMaxSeats(defaults.max_seats)
-    setMaxLeads(defaults.max_leads_per_month)
-  }, [plan])  // eslint-disable-line react-hooks/exhaustive-deps
+  function handlePlanChange(newPlan: typeof plan) {
+    setPlan(newPlan)
+    const defaults = PLAN_DEFAULTS[newPlan]
+    if (defaults) { setMaxSeats(defaults.max_seats); setMaxLeads(defaults.max_leads_per_month) }
+  }
 
   function toggleMarket(market: string) {
     setMarkets(prev => prev.includes(market) ? prev.filter(m => m !== market) : [...prev, market])
@@ -263,7 +247,7 @@ export default function NewOrganizationPage() {
 
             <div style={fieldStyle}>
               <label style={labelStyle}>{t('plan')} *</label>
-              <select value={plan} onChange={e => setPlan(e.target.value as typeof plan)} required style={inputStyle}>
+              <select value={plan} onChange={e => handlePlanChange(e.target.value as typeof plan)} required style={inputStyle}>
                 <option value="basic">Basic</option>
                 <option value="premium">Premium</option>
                 <option value="enterprise">Enterprise</option>
@@ -377,7 +361,7 @@ export default function NewOrganizationPage() {
                     onChange={() => toggleAddon(addon.type)}
                     style={{ width: 15, height: 15, accentColor: colors.accent, cursor: 'pointer', flexShrink: 0 }}
                   />
-                  <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, color: colors.textPrimary, flex: 1 }}>{addon.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, color: colors.textPrimary, flex: 1 }}>{t(addon.labelKey)}</span>
                   <span style={{ fontSize: 12, color: colors.textMuted }}>{addon.price}</span>
                 </label>
               )

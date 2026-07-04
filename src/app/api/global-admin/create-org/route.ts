@@ -119,7 +119,12 @@ export async function POST(req: NextRequest) {
       }))
 
     if (marketRows.length > 0) {
-      await admin.from('organization_markets').insert(marketRows)
+      const { error: marketsError } = await admin.from('organization_markets').insert(marketRows)
+      if (marketsError) {
+        await admin.auth.admin.deleteUser(authData.user.id)
+        await admin.from('organizations').delete().eq('id', org.id)
+        return NextResponse.json({ error: `Failed to set markets: ${marketsError.message}` }, { status: 400 })
+      }
     }
   }
 
@@ -132,7 +137,12 @@ export async function POST(req: NextRequest) {
       price_monthly: null,
       activated_at: new Date().toISOString(),
     }))
-    await admin.from('organization_addons').insert(addonRows)
+    const { error: addonsError } = await admin.from('organization_addons').insert(addonRows)
+    if (addonsError) {
+      await admin.auth.admin.deleteUser(authData.user.id)
+      await admin.from('organizations').delete().eq('id', org.id)
+      return NextResponse.json({ error: `Failed to set addons: ${addonsError.message}` }, { status: 400 })
+    }
   }
 
   return NextResponse.json({ ok: true, org_id: org.id })

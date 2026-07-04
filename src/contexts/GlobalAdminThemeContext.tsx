@@ -32,7 +32,7 @@ const translations = {
     subject: '主題', priority: '優先級', lastReply: '最後回覆', reply: '回覆',
     viewWorkspace: '查看工作區', organization: '組織', newVendor: '新增銷售商',
     email: '郵箱', commissionPct: '佣金 %', add: '添加', noVendors: '暫無銷售商',
-    detail: '詳情', openTickets: '待處理工單',
+    detail: '詳情', openTickets: '待處理工單', allOrgs: '所有組織', activate: '啟用',
     addOn_account_management: '帳戶管理', addOn_multi_workspace: '多工作區',
     addOn_extended_data_retention: '延長數據保留', addOn_sso: 'SSO 整合',
     addOn_linkedin_auto_messaging: 'LinkedIn 自動發送',
@@ -60,7 +60,7 @@ const translations = {
     priority: 'Priority', lastReply: 'Last Reply', reply: 'Reply',
     viewWorkspace: 'View Workspace', organization: 'Organization',
     newVendor: 'New Vendor', email: 'Email', commissionPct: 'Commission %',
-    add: 'Add', noVendors: 'No vendors yet', detail: 'Detail', openTickets: 'Open Tickets',
+    add: 'Add', noVendors: 'No vendors yet', detail: 'Detail', openTickets: 'Open Tickets', allOrgs: 'All Orgs', activate: 'Activate',
     addOn_account_management: 'Account Management', addOn_multi_workspace: 'Multi-workspace',
     addOn_extended_data_retention: 'Extended Data Retention', addOn_sso: 'SSO Integration',
     addOn_linkedin_auto_messaging: 'LinkedIn Auto-messaging',
@@ -76,15 +76,14 @@ export const GlobalAdminThemeContext = createContext<GlobalAdminThemeContextType
 })
 
 export function GlobalAdminThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('dark')
-  const [lang, setLangState] = useState<Lang>('zh')
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('ga_theme') as Theme
-    const savedLang = localStorage.getItem('ga_lang') as Lang
-    if (savedTheme) setTheme(savedTheme)
-    if (savedLang) setLangState(savedLang)
-  }, [])
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === 'undefined') return 'dark'
+    return (localStorage.getItem('ga_theme') as Theme) || 'dark'
+  })
+  const [lang, setLangState] = useState<Lang>(() => {
+    if (typeof window === 'undefined') return 'zh'
+    return (localStorage.getItem('ga_lang') as Lang) || 'zh'
+  })
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark'

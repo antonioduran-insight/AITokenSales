@@ -6,6 +6,7 @@ import { useLocale } from 'next-intl'
 import { ArrowLeft } from 'lucide-react'
 import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
 import type { Organization, OrganizationAddon } from '@/lib/types'
+import { ADDON_LIST } from '@/lib/types'
 
 const PLAN_COLORS: Record<string, string> = {
   basic: '#3B82F6',
@@ -21,14 +22,6 @@ type OrgDetail = Organization & {
   open_tickets_count: number
   leads_this_month: number
 }
-
-const ADDON_LIST = [
-  { type: 'account_management', labelKey: 'addOn_account_management', price: '$149/mo' },
-  { type: 'multi_workspace', labelKey: 'addOn_multi_workspace', price: '$300/mo' },
-  { type: 'extended_data_retention', labelKey: 'addOn_extended_data_retention', price: '$99/mo' },
-  { type: 'sso', labelKey: 'addOn_sso', price: '$299 one-time' },
-  { type: 'linkedin_auto_messaging', labelKey: 'addOn_linkedin_auto_messaging', price: 'TBD' },
-] as const
 
 type AddonType = typeof ADDON_LIST[number]['type']
 
@@ -59,6 +52,7 @@ export default function OrgDetailPage() {
 
   const [deactivating, setDeactivating] = useState(false)
   const [confirmDeactivate, setConfirmDeactivate] = useState(false)
+  const [confirmReactivate, setConfirmReactivate] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -86,57 +80,69 @@ export default function OrgDetailPage() {
 
   async function saveInfo() {
     setSavingInfo(true)
-    const res = await fetch(`/api/global-admin/organizations/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, slug, vendor: vendor || null, billing_day: billingDay, default_language: defaultLanguage, logo_url: logoUrl || null }),
-    })
-    setSavingInfo(false)
-    if (res.ok) { setSavedInfo(true); setTimeout(() => setSavedInfo(false), 2000) }
+    try {
+      const res = await fetch(`/api/global-admin/organizations/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, slug, vendor: vendor || null, billing_day: billingDay, default_language: defaultLanguage, logo_url: logoUrl || null }),
+      })
+      if (res.ok) { setSavedInfo(true); setTimeout(() => setSavedInfo(false), 2000) }
+    } catch { /* network error */ } finally {
+      setSavingInfo(false)
+    }
   }
 
   async function saveNotes() {
-    await fetch(`/api/global-admin/organizations/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ internal_notes: internalNotes || null }),
-    })
+    try {
+      await fetch(`/api/global-admin/organizations/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ internal_notes: internalNotes || null }),
+      })
+    } catch { /* network error */ }
   }
 
   async function toggleAddon(addonType: AddonType) {
     setTogglingAddon(addonType)
     const isActive = activeAddons.has(addonType)
-    if (isActive) {
-      await fetch(`/api/global-admin/organizations/${id}/addons`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ addon_type: addonType }),
-      })
-      setActiveAddons(prev => { const s = new Set(prev); s.delete(addonType); return s })
-    } else {
-      await fetch(`/api/global-admin/organizations/${id}/addons`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ addon_type: addonType }),
-      })
-      setActiveAddons(prev => new Set([...prev, addonType]))
+    try {
+      if (isActive) {
+        const res = await fetch(`/api/global-admin/organizations/${id}/addons`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ addon_type: addonType }),
+        })
+        if (res.ok) setActiveAddons(prev => { const s = new Set(prev); s.delete(addonType); return s })
+      } else {
+        const res = await fetch(`/api/global-admin/organizations/${id}/addons`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ addon_type: addonType }),
+        })
+        if (res.ok) setActiveAddons(prev => new Set([...prev, addonType]))
+      }
+    } catch { /* network error */ } finally {
+      setTogglingAddon(null)
     }
-    setTogglingAddon(null)
   }
 
   async function toggleActive() {
     if (!org) return
     if (!org.is_active) {
-      // Just reactivate
-      const res = await fetch(`/api/global-admin/organizations/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: true }),
-      })
-      if (res.ok) setOrg(prev => prev ? { ...prev, is_active: true } : prev)
+      setConfirmReactivate(true)
     } else {
       setConfirmDeactivate(true)
     }
+  }
+
+  async function doReactivate() {
+    const res = await fetch(`/api/global-admin/organizations/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: true }),
+    })
+    setConfirmReactivate(false)
+    if (res.ok) setOrg(prev => prev ? { ...prev, is_active: true } : prev)
   }
 
   async function doDeactivate() {
@@ -330,29 +336,52 @@ export default function OrgDetailPage() {
       {/* Danger Zone */}
       <div style={{ ...card, border: `1px solid ${colors.danger}33` }}>
         <h2 style={{ ...sectionTitle, color: colors.danger }}>Danger Zone</h2>
-        {!confirmDeactivate ? (
-          <button
-            onClick={() => org.is_active && setConfirmDeactivate(true)}
-            disabled={!org.is_active}
-            style={{
-              backgroundColor: 'transparent', color: colors.danger,
-              border: `1px solid ${colors.danger}`, borderRadius: 7,
-              padding: '8px 16px', fontSize: 13, cursor: org.is_active ? 'pointer' : 'not-allowed',
-              opacity: org.is_active ? 1 : 0.5,
-            }}
-          >
-            {t('deactivate')}
-          </button>
+        {org.is_active ? (
+          !confirmDeactivate ? (
+            <button
+              onClick={() => setConfirmDeactivate(true)}
+              style={{
+                backgroundColor: 'transparent', color: colors.danger,
+                border: `1px solid ${colors.danger}`, borderRadius: 7,
+                padding: '8px 16px', fontSize: 13, cursor: 'pointer',
+              }}
+            >
+              {t('deactivate')}
+            </button>
+          ) : (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <span style={{ fontSize: 13, color: colors.textSecondary }}>Are you sure? This will disable the organization.</span>
+              <button onClick={doDeactivate} disabled={deactivating} style={{ backgroundColor: colors.danger, color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
+                {deactivating ? 'Deactivating...' : 'Confirm'}
+              </button>
+              <button onClick={() => setConfirmDeactivate(false)} style={{ backgroundColor: 'transparent', color: colors.textSecondary, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
+                {t('cancel')}
+              </button>
+            </div>
+          )
         ) : (
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <span style={{ fontSize: 13, color: colors.textSecondary }}>Are you sure? This will disable the organization.</span>
-            <button onClick={doDeactivate} disabled={deactivating} style={{ backgroundColor: colors.danger, color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
-              {deactivating ? 'Deactivating...' : 'Confirm'}
+          !confirmReactivate ? (
+            <button
+              onClick={() => setConfirmReactivate(true)}
+              style={{
+                backgroundColor: 'transparent', color: '#22C55E',
+                border: '1px solid #22C55E', borderRadius: 7,
+                padding: '8px 16px', fontSize: 13, cursor: 'pointer',
+              }}
+            >
+              Reactivate Organization
             </button>
-            <button onClick={() => setConfirmDeactivate(false)} style={{ backgroundColor: 'transparent', color: colors.textSecondary, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
-              {t('cancel')}
-            </button>
-          </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <span style={{ fontSize: 13, color: colors.textSecondary }}>Reactivate this organization? Users will be able to log in again.</span>
+              <button onClick={doReactivate} style={{ backgroundColor: '#22C55E', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
+                Confirm
+              </button>
+              <button onClick={() => setConfirmReactivate(false)} style={{ backgroundColor: 'transparent', color: colors.textSecondary, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
+                {t('cancel')}
+              </button>
+            </div>
+          )
         )}
       </div>
     </div>

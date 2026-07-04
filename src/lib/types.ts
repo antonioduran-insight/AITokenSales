@@ -218,6 +218,23 @@ export const PLAN_PRICES: Record<string, number> = {
   ultra: 0,
 }
 
+export const MAX_INT = 2147483647
+
+export const PLAN_DEFAULTS: Record<string, { max_seats: number; max_leads_per_month: number }> = {
+  basic:      { max_seats: 3,        max_leads_per_month: 1000 },
+  premium:    { max_seats: 10,       max_leads_per_month: 3000 },
+  enterprise: { max_seats: 15,       max_leads_per_month: 10000 },
+  ultra:      { max_seats: MAX_INT,  max_leads_per_month: MAX_INT },
+}
+
+export const ADDON_LIST = [
+  { type: 'account_management', labelKey: 'addOn_account_management', price: '$149/mo' },
+  { type: 'multi_workspace', labelKey: 'addOn_multi_workspace', price: '$300/mo' },
+  { type: 'extended_data_retention', labelKey: 'addOn_extended_data_retention', price: '$99/mo' },
+  { type: 'sso', labelKey: 'addOn_sso', price: '$299 one-time' },
+  { type: 'linkedin_auto_messaging', labelKey: 'addOn_linkedin_auto_messaging', price: 'TBD' },
+] as const
+
 export interface UserArea {
   id: string
   user_id: string
