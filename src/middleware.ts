@@ -5,6 +5,7 @@ import { createServerClient } from '@supabase/ssr'
 const locales = ['zh', 'en', 'vi', 'es']
 const defaultLocale = 'zh'
 const publicPages = ['/login']
+const publicPaths = ['/landing']
 
 const intlMiddleware = createMiddleware({
   locales,
@@ -23,6 +24,11 @@ export async function middleware(request: NextRequest) {
   )
 
   if (isPublicPage) return intlMiddleware(request)
+
+  // Fully public paths (no locale, no auth required)
+  if (publicPaths.some(p => pathname === p || pathname.startsWith(p + '/'))) {
+    return NextResponse.next()
+  }
 
   // Auth check
   let response = NextResponse.next({ request })
