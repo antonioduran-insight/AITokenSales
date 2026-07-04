@@ -1,0 +1,357 @@
+# AITokenSales — Security Documentation
+
+Documentation for the cybersecurity team covering the security architecture, trust boundaries, authentication model, data isolation mechanisms, and known considerations.
+
+---
+
+## Table of Contents
+
+- [Architecture Overview](#architecture-overview)
+- [Authentication & Session Management](#authentication--session-management)
+- [Authorization Model](#authorization-model)
+- [Data Isolation (Multi-tenancy)](#data-isolation-multi-tenancy)
+- [API Security](#api-security)
+- [Secret Management](#secret-management)
+- [Input Validation & Injection](#input-validation--injection)
+- [Client-Side Security](#client-side-security)
+- [Supabase Storage](#supabase-storage)
+- [Impersonation Feature](#impersonation-feature)
+- [Audit Trail](#audit-trail)
+- [Known Limitations & Accepted Risks](#known-limitations--accepted-risks)
+- [Security Checklist](#security-checklist)
+
+---
+
+## Architecture Overview
+
+```
+Browser
+  │
+  ├─── Next.js Frontend (Vercel)
+  │      ├─ src/app/[locale]/**         (React Server Components + Client Components)
+  │      ├─ src/middleware.ts           (Auth gate on every request)
+  │      └─ src/app/api/**             (API route handlers — server-only)
+  │
+  ├─── Supabase (managed PostgreSQL + Auth + Storage)
+  │      ├─ public.users               (user profiles, roles, org scoping)
+  │      ├─ public.prospects + others  (business data, RLS enforced)
+  │      ├─ auth.users                 (email/password credentials, JWTs)
+  │      └─ storage: logos bucket      (public org logos)
+  │
+  └─── Python Scraper Backend (optional, external service)
+         └─ /api/scraper/** proxies all requests server-side
+```
+
+**Trust boundary**: The Next.js API layer is the security enforcement boundary. The browser has the Supabase anon key (safe, limited by RLS) and never has the service role key.
+
+---
+
+## Authentication & Session Management
+
+### Mechanism
+
+- **Supabase Auth** — email/password authentication. JWTs are issued by Supabase and stored as **httpOnly cookies** via `@supabase/ssr`.
+- Cookie-based sessions are validated server-side on every request in `src/middleware.ts` using `supabase.auth.getUser()`.
+- Unauthenticated requests to any non-public path are **redirected to `/login`** — no 401 JSON responses, no content served.
+
+### Public pages
+
+Only `/[locale]/login` is publicly accessible. Every other route requires a valid Supabase session.
+
+### Session cookies
+
+`@supabase/ssr` sets the session as httpOnly, Secure, SameSite=Lax cookies. The session token itself is a Supabase JWT signed with the project's JWT secret.
+
+### Additional cookies set by middleware
+
+The middleware sets two non-sensitive informational cookies on each request:
+- `user_role` — the user's role string (`admin`, `sdr`, `admin_global`)
+- `user_org_id` — the user's organization UUID
+
+These are **not used for security decisions** in API routes (which re-verify from DB). They are used only for UI rendering decisions in client components. Tampering with these cookies would only affect UI display, not data access — all data access goes through RLS or server-side role checks.
+
+### Password policy
+
+No custom password policy is enforced at the application layer. Password complexity and account lockout policies must be configured in the Supabase project settings under **Authentication → Providers → Email**.
+
+---
+
+## Authorization Model
+
+### Role hierarchy
+
+| Role | Stored in | Scope | Trust Level |
+|---|---|---|---|
+| `admin_global` | `public.users.role` | All organizations | Highest — full system access |
+| `admin` | `public.users.role` | Own organization | High — all data within org |
+| `sdr` | `public.users.role` | Own area within org | Limited — own area's prospects only |
+| `support` | `public.users.role` | TBD | Limited |
+
+### How authorization is enforced
+
+Authorization is enforced at **two independent layers**:
+
+#### Layer 1 — Supabase Row Level Security (RLS)
+
+RLS policies on every table enforce data isolation at the database level. Even if application code has a bug, the database enforces the rules.
+
+Key policies:
+```sql
+-- Prospects: SDR sees own area; admin sees all in own org
+CREATE POLICY "prospects_read" ON prospects FOR SELECT
+  USING (
+    EXISTS (SELECT 1 FROM users u WHERE u.id = auth.uid() AND u.role = 'admin' AND u.organization_id = prospects.organization_id)
+    OR (area_id IN (SELECT area_id FROM users WHERE id = auth.uid()))
+  );
+```
+
+#### Layer 2 — API route server-side checks
+
+Every API route that performs privileged operations validates the caller's role from the database before acting:
+
+```typescript
+// Pattern used in all global-admin routes
+async function verifyGlobalAdmin() {
+  const supabase = createServerClient(...)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
+  return profile?.role === 'admin_global' ? user : null
+}
+```
+
+The role is **always read from the database** in API routes — never trusted from cookies or request headers.
+
+#### Layered defense summary
+
+| Attack vector | Layer 1 (RLS) | Layer 2 (API check) |
+|---|---|---|
+| Direct Supabase anon key abuse | ✓ blocks | N/A |
+| Forged `user_role` cookie | N/A | ✓ ignores cookie, checks DB |
+| IDOR on API route | N/A | ✓ verifies session + role |
+| SDR querying another area | ✓ blocks | ✓ area scoped queries |
+
+---
+
+## Data Isolation (Multi-tenancy)
+
+### Organization isolation
+
+Every organization's data is scoped via `organization_id` columns and RLS policies. An admin in Org A **cannot** see Org B's data through any application path.
+
+### Area isolation within an org
+
+Within a single org, SDRs are further isolated to their assigned `area_id`. An SDR assigned to the Taiwan area cannot read LATAM prospects, even via direct Supabase queries.
+
+### Cross-tenant uniqueness
+
+`prospects.linkedin_url` has a global UNIQUE constraint across all orgs. This means:
+1. A LinkedIn profile can only exist in the system once
+2. If Org A has scraped and stored a profile, Org B's import will get a `23505` constraint violation for that row
+3. This is handled gracefully — the row is skipped and counted as a failed import, and the error does not reveal which org owns the existing record
+
+### Monthly lead counting
+
+Lead counts are cached in `monthly_lead_counts` scoped to `organization_id`. There is no cross-org data exposure through this mechanism.
+
+---
+
+## API Security
+
+### Service role key usage
+
+The Supabase service role key (`SUPABASE_SERVICE_ROLE_KEY`) bypasses all RLS policies. It is:
+- **Only used** in `src/app/api/` route handlers (server-side, never sent to browser)
+- **Never** imported in client components (`'use client'`) or server components
+- **Never** in `next.config.*`, `src/lib/supabase/client.ts`, or any file that could be bundled for the browser
+
+Verify: run `grep -r "SERVICE_ROLE" src/` — results should only be in `src/app/api/` files.
+
+### Scraper proxy
+
+The scraper backend (`SCRAPER_API_URL`) is proxied through `/api/scraper/[...path]`. The browser never communicates with the scraper directly. The scraper API key (`SCRAPER_API_KEY` env var, if used) is injected server-side in the proxy handler.
+
+### CORS
+
+Next.js API routes do not set permissive CORS headers by default. Cross-origin requests from unauthorized domains cannot call these endpoints with cookies.
+
+### Rate limiting
+
+No application-level rate limiting is currently implemented. Rate limiting should be configured at the Vercel edge or Supabase Auth level (Supabase has built-in rate limiting on auth endpoints).
+
+---
+
+## Secret Management
+
+### Environment variables
+
+| Variable | Exposure | Used where |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Public (browser) | Client + Server |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public (browser) | Client + Server |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Private** (server only) | API routes only |
+| `NEXT_PUBLIC_APP_URL` | Public | Redirects |
+| `SCRAPER_API_URL` | Private (server) | Scraper proxy |
+
+`NEXT_PUBLIC_*` variables are bundled into the client JS. All others are server-only. Never add sensitive values to `NEXT_PUBLIC_*` variables.
+
+### Vercel deployment
+
+Secrets are stored as Vercel environment variables. The service role key must be set as a **Server-only** (non-public) variable in Vercel project settings.
+
+---
+
+## Input Validation & Injection
+
+### SQL injection
+
+Not applicable — the application never constructs raw SQL strings. All database operations use the Supabase JS client with parameterized queries. The Supabase PostgREST API is inherently parameterized.
+
+### XSS
+
+- **React's JSX** auto-escapes all string values rendered to the DOM. No `dangerouslySetInnerHTML` is used in this codebase.
+- User-provided strings (prospect names, notes, chat content) are rendered as React text nodes — not as HTML.
+- Exception: `logo_url` is rendered in an `<img src={...}>` tag. This is an open redirect / SSRF vector if the URL is attacker-controlled — see [Known Limitations](#known-limitations--accepted-risks).
+
+### CSV injection
+
+CSV files are parsed by `papaparse` and the resulting data is treated as plain strings. Values are never passed to `eval`, shell commands, or formula engines. Spreadsheet formula injection (cells starting with `=`, `+`, `-`, `@`) is not a risk in this context since the data goes into a database, not back to a CSV/spreadsheet without sanitization.
+
+### SSRF via logo URL
+
+Logo URLs are stored in the `organization.logo_url` column and rendered with `<img src={...}>`. A malicious `admin_global` could set this to an internal URL. This is acceptable since only `admin_global` can set org-level logo URLs via the Global Admin panel — it's an internal trust issue, not an external attack surface. For the Settings upload flow, the URL is always a Supabase Storage public URL (no user-controlled path).
+
+### Path traversal (Supabase Storage)
+
+Logo uploads use the path `{org_id}/logo.{ext}` where `org_id` is the UUID from the database (not user-controlled input). File extension is extracted from `file.name` — only the extension is used, not the full filename. Accepted types are restricted to image MIME types on the client side.
+
+---
+
+## Client-Side Security
+
+### Role cookies
+
+`user_role` and `user_org_id` cookies are set by the middleware and read by client components for **UI rendering only** (which nav items to show, whether to display admin controls). All actual data access goes through Supabase (where RLS applies) or API routes (where DB role check applies). Modifying these cookies does not grant data access.
+
+### Impersonation state
+
+Impersonation is conveyed by URL query parameters (`?impersonate_org_id=...`), not by any elevated session. The impersonation proxy route (`/api/crm/[table]`) uses the service role key to read the target org's data but:
+1. Verifies the caller is `admin_global` first
+2. Exposes only read endpoints (GET)
+3. All CRM write operations short-circuit with `isImpersonating` guard client-side, AND the underlying APIs also verify the session for writes
+
+---
+
+## Supabase Storage
+
+The `logos` bucket is **public** — any URL from this bucket is accessible without authentication. This is by design, as org logos are meant to be displayed in login pages and public-facing contexts.
+
+**What's stored**: Organization logo images only. No user data, no conversation content, no CSV files.
+
+**Upload access**: The anon key is used for uploads (Supabase Storage policies must allow authenticated uploads to the `logos` bucket). Downloads are public.
+
+**Recommended Supabase Storage policy**:
+```sql
+-- Allow authenticated users to upload to their org's folder
+CREATE POLICY "org_logo_upload" ON storage.objects FOR INSERT
+  TO authenticated
+  WITH CHECK (bucket_id = 'logos');
+
+-- Allow public reads
+CREATE POLICY "org_logo_read" ON storage.objects FOR SELECT
+  TO public
+  USING (bucket_id = 'logos');
+```
+
+---
+
+## Impersonation Feature
+
+The Global Admin impersonation mode allows `admin_global` users to view any org's CRM as that org's admin.
+
+### Security properties
+
+- **Read-only**: All write operations are blocked client-side via `isImpersonating` guard from `useOrgId()`. Client components check this before any mutation.
+- **Server-side validation**: The `/api/crm/[table]` proxy verifies the caller is `admin_global` before returning any data.
+- **No session elevation**: The `admin_global` does not receive a session for the target org. They access data via their own `admin_global` session, which the proxy route uses with a service-role call.
+- **Visible indicator**: A yellow banner is always displayed during impersonation. There is no way to enter impersonation without the banner showing (the banner reads from the URL param which is required for data to load).
+- **Audit trail**: Impersonation sessions are not explicitly logged, but all actions performed in the impersonated context are read-only, so no audit entries are created under wrong org context.
+
+### Potential misuse
+
+A compromised `admin_global` account has full read access to all organizations' data via impersonation. Protect `admin_global` accounts with:
+- Strong passwords
+- MFA (configured in Supabase Auth settings)
+- Minimal number of `admin_global` accounts
+
+---
+
+## Audit Trail
+
+`audit_log` provides an immutable record of significant actions. Properties:
+
+- **Append-only**: No DELETE or UPDATE operations on `audit_log` exist in the application code
+- **Actor identification**: Every entry records `actor_id` (UUID) and `actor_name` (full name at time of action)
+- **Prospect FK**: When a prospect is deleted, `prospect_id` is set to NULL (FK ON DELETE SET NULL) but `prospect_name` is retained in the row — the action history is never lost
+- **Metadata**: Rich JSONB metadata per event type (e.g., `from_status`, `to_status` for status changes; `count` and `duplicates` for imports)
+- **RLS**: Only `admin` role can SELECT from `audit_log`; any authenticated user can INSERT (clients call `logAuditEvent()` helper from browser)
+
+**Gap**: Audit log INSERTs come from browser-side `logAuditEvent()` calls, meaning a determined user could skip calling this helper. Server-side audit logging for critical operations (bulk delete, bulk reassign) is done via API routes. For lower-risk operations (status changes, notes), the audit write is client-side.
+
+---
+
+## Known Limitations & Accepted Risks
+
+| Item | Risk level | Notes |
+|---|---|---|
+| No MFA enforcement at app layer | Medium | Must be enforced in Supabase Auth project settings |
+| No rate limiting on import API | Low | Supabase's auth rate limits apply; large imports are bounded by file size limit (5 MB) |
+| Client-side audit for some events | Low | Status changes and notes are audit-logged from the browser. A motivated user could skip the call. |
+| `logo_url` open redirect potential | Low | Only writable by `admin_global` — internal trust issue, not external attack surface. Storage upload flow mitigates for normal usage. |
+| No CSP header | Low | No `Content-Security-Policy` header is configured. Vercel security headers config can address this. |
+| SDR `is_active` checked by RLS? | **Verify** | The `is_active` flag on `public.users` must be included in RLS policies to block deactivated SDRs at the DB level, not just at the auth level. Confirm this is enforced. |
+| Scraper backend authentication | **Verify** | Confirm `SCRAPER_API_KEY` is validated by the Python scraper backend and that the proxy always passes it. |
+
+---
+
+## Security Checklist
+
+### Deployment checklist
+
+- [ ] `SUPABASE_SERVICE_ROLE_KEY` set as server-only in Vercel (not prefixed with `NEXT_PUBLIC_`)
+- [ ] `SCRAPER_API_KEY` set as server-only in Vercel
+- [ ] Supabase project has email confirmation enabled for new users
+- [ ] Supabase Auth rate limiting configured
+- [ ] MFA available (and enforced for `admin_global` accounts)
+- [ ] Supabase Storage `logos` bucket exists with correct policies
+- [ ] RLS enabled on all tables (verify in Supabase Dashboard → Table Editor → RLS column)
+- [ ] No `admin_global` account uses a weak or shared password
+
+### Code review checklist
+
+- [ ] No `SERVICE_ROLE_KEY` in client-side files (`'use client'` or `src/lib/supabase/client.ts`)
+- [ ] Every new API route calls a session/role verification function before touching data
+- [ ] No `dangerouslySetInnerHTML` added
+- [ ] New Supabase queries on `prospects` do NOT filter or join on `organization_id` (column doesn't exist)
+- [ ] New forms with user input use controlled React state (not `innerHTML` or `eval`)
+- [ ] Any new write operation checks `isImpersonating` and returns early if true
+
+### Penetration testing targets
+
+Priority areas for security testing:
+
+1. **Cross-org data leakage** — authenticated as Org B, attempt to read Org A prospects via:
+   - Direct Supabase anon key queries
+   - API endpoints with manipulated body params
+   - URL manipulation in impersonation mode
+
+2. **Privilege escalation** — authenticated as `sdr`, attempt to:
+   - Call `admin`-only API routes (bulk delete, user management)
+   - Call `admin_global` routes (create org, edit org)
+   - Access `/admin/users`, `/audit`, `/stats` pages
+
+3. **RLS bypass** — using the anon key directly (bypassing the Next.js layer), verify no data is accessible beyond the user's scope
+
+4. **Impersonation abuse** — as a regular `admin`, attempt to pass `?impersonate_org_id=` on requests and access `/api/crm/[table]`
+
+5. **File upload** — upload non-image files to the logo endpoint, attempt path traversal in filename, attempt to upload oversized files
