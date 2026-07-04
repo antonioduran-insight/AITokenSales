@@ -573,9 +573,21 @@ const steps = [
 ]
 
 const plans = [
-  { name: 'Basic', price: '$550', seats: '3 seats', leads: '1,000 leads/mo', color: '#3B82F6', highlight: false, features: ['Kanban pipeline', 'CSV import', 'Scraper access', 'Audit log'] },
-  { name: 'Premium', price: '$2,300', seats: '10 seats', leads: '3,000 leads/mo', color: ACCENT, highlight: true, features: ['Everything in Basic', 'Analytics dashboard', 'Multi-region SDRs', 'Support tickets'] },
-  { name: 'Enterprise', price: 'Custom', seats: '15 seats', leads: '10,000 leads/mo', color: '#F59E0B', highlight: false, features: ['Everything in Premium', 'Custom pipeline stages', 'Account management', 'Priority support'] },
+  {
+    name: 'Basic', seats: 3, leads: '1,000', color: '#3B82F6', highlight: false,
+    tagline: 'Perfect for small teams getting started',
+    features: ['Kanban pipeline', 'CSV import wizard', 'LinkedIn scraper access', 'AI ICP scoring', 'Audit log', 'Email support'],
+  },
+  {
+    name: 'Premium', seats: 10, leads: '3,000', color: ACCENT, highlight: true,
+    tagline: 'The go-to plan for growing sales teams',
+    features: ['Everything in Basic', 'Analytics dashboard', 'Multi-region SDR management', 'Support ticket system', 'Conversation log archive', 'Faster scraper queue'],
+  },
+  {
+    name: 'Enterprise', seats: 15, leads: '10,000', color: '#F59E0B', highlight: false,
+    tagline: 'For large teams with complex workflows',
+    features: ['Everything in Premium', 'Custom pipeline stage names', 'Account management add-on', 'Priority support SLA', 'Advanced audit trail', 'Custom onboarding'],
+  },
 ]
 
 export default function LandingPage() {
@@ -722,32 +734,64 @@ export default function LandingPage() {
         {/* Pricing */}
         <div id="pricing" style={S.section}>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
-            <div style={S.chip}>Pricing</div>
-            <h2 style={{ fontSize: 42, fontWeight: 800, letterSpacing: '-1.5px', margin: '0 0 16px' }}>Simple, transparent pricing</h2>
+            <div style={S.chip}>Plans</div>
+            <h2 style={{ fontSize: 42, fontWeight: 800, letterSpacing: '-1.5px', margin: '0 0 16px' }}>Choose the right plan for your team</h2>
             <p style={{ fontSize: 17, color: TEXT_SECONDARY }}>Scale as your team grows. Switch plans anytime.</p>
           </div>
-          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
             {plans.map(plan => (
-              <div key={plan.name} style={{ ...(plan.highlight ? { backgroundColor: `${ACCENT}10`, border: `2px solid ${ACCENT}`, borderRadius: 16, padding: '32px 28px', flex: 1, minWidth: 220, position: 'relative' } : { backgroundColor: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 16, padding: '32px 28px', flex: 1, minWidth: 220 }) }}>
-                {plan.highlight && <div style={{ position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', backgroundColor: ACCENT, color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 14px', borderRadius: 20, whiteSpace: 'nowrap' }}>Most Popular</div>}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: plan.color }} />
-                  <div style={{ fontSize: 16, fontWeight: 700, color: plan.color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{plan.name}</div>
+              <div key={plan.name} style={{
+                backgroundColor: plan.highlight ? `${plan.color}0D` : SURFACE,
+                border: `2px solid ${plan.highlight ? plan.color : BORDER}`,
+                borderRadius: 20,
+                padding: '36px 32px',
+                position: 'relative',
+                cursor: 'pointer',
+                transition: 'transform 0.2s, box-shadow 0.2s',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 0,
+                boxShadow: plan.highlight ? `0 8px 40px ${plan.color}30` : 'none',
+              }}
+                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-6px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = `0 16px 48px ${plan.color}40` }}
+                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLDivElement).style.boxShadow = plan.highlight ? `0 8px 40px ${plan.color}30` : 'none' }}
+              >
+                {plan.highlight && (
+                  <div style={{ position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)', backgroundColor: plan.color, color: '#fff', fontSize: 11, fontWeight: 800, padding: '4px 18px', borderRadius: 20, whiteSpace: 'nowrap', letterSpacing: '0.04em', textTransform: 'uppercase' }}>⭐ Most Popular</div>
+                )}
+
+                {/* Plan name */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: plan.color, flexShrink: 0 }} />
+                  <div style={{ fontSize: 20, fontWeight: 800, color: plan.color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{plan.name}</div>
                 </div>
-                <div style={{ fontSize: 38, fontWeight: 900, letterSpacing: '-1px', margin: '12px 0 4px', color: '#F0F0F5' }}>
-                  {plan.price}{plan.price !== 'Custom' && <span style={{ fontSize: 16, fontWeight: 400, color: TEXT_SECONDARY }}>/mo</span>}
+                <div style={{ fontSize: 13, color: TEXT_MUTED, marginBottom: 28, lineHeight: 1.5 }}>{plan.tagline}</div>
+
+                {/* Seats & Leads stats */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 28 }}>
+                  <div style={{ backgroundColor: SURFACE_RAISED, borderRadius: 12, padding: '16px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 32, fontWeight: 900, color: plan.color, fontFamily: 'monospace', lineHeight: 1 }}>{plan.seats}</div>
+                    <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Seats</div>
+                  </div>
+                  <div style={{ backgroundColor: SURFACE_RAISED, borderRadius: 12, padding: '16px', textAlign: 'center' }}>
+                    <div style={{ fontSize: plan.leads.length > 5 ? 22 : 32, fontWeight: 900, color: plan.color, fontFamily: 'monospace', lineHeight: 1 }}>{plan.leads}</div>
+                    <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Leads / mo</div>
+                  </div>
                 </div>
-                <div style={{ fontSize: 12, color: TEXT_MUTED, marginBottom: 24 }}>{plan.seats} · {plan.leads}</div>
-                <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                {/* Features */}
+                <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 22, display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
                   {plan.features.map(f => (
-                    <div key={f} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                      <span style={{ color: SUCCESS, fontSize: 14, lineHeight: 1.4, flexShrink: 0 }}>✓</span>
-                      <span style={{ fontSize: 13, color: TEXT_SECONDARY, lineHeight: 1.4 }}>{f}</span>
+                    <div key={f} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <span style={{ width: 18, height: 18, borderRadius: '50%', backgroundColor: `${plan.color}22`, color: plan.color, fontSize: 11, fontWeight: 800, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>✓</span>
+                      <span style={{ fontSize: 14, color: TEXT_SECONDARY, lineHeight: 1.4 }}>{f}</span>
                     </div>
                   ))}
                 </div>
-                <a href="/en/login" style={{ display: 'block', marginTop: 28, textAlign: 'center', padding: '11px', borderRadius: 8, fontSize: 14, fontWeight: 600, textDecoration: 'none', backgroundColor: plan.highlight ? ACCENT : 'transparent', color: plan.highlight ? '#fff' : TEXT_SECONDARY, border: plan.highlight ? 'none' : `1px solid ${BORDER}` }}>
-                  {plan.price === 'Custom' ? 'Contact us' : 'Get started'}
+
+                {/* CTA */}
+                <a href="/en/login" style={{ display: 'block', marginTop: 28, textAlign: 'center', padding: '13px', borderRadius: 10, fontSize: 14, fontWeight: 700, textDecoration: 'none', backgroundColor: plan.highlight ? plan.color : 'transparent', color: plan.highlight ? '#fff' : plan.color, border: `2px solid ${plan.color}` }}>
+                  {plan.name === 'Enterprise' ? 'Contact us →' : 'Get started →'}
                 </a>
               </div>
             ))}
@@ -764,31 +808,31 @@ export default function LandingPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
             {[
               {
-                icon: '🤖', name: 'LinkedIn Auto Messaging', price: 'Coming soon',
+                icon: '🤖', name: 'LinkedIn Auto Messaging',
                 tag: 'Most wanted', tagColor: '#EF4444',
                 desc: 'Send personalized LinkedIn connection requests and follow-ups automatically, directly from the CRM — no copy-paste required.',
                 highlight: true,
               },
               {
-                icon: '🏢', name: 'Multi Workspace', price: '$300/mo',
+                icon: '🏢', name: 'Multi Workspace',
                 tag: 'Best for agencies', tagColor: '#8B5CF6',
                 desc: 'Manage multiple brands or client organizations under one account. Separate data, pipelines, and SDR teams per workspace.',
                 highlight: false,
               },
               {
-                icon: '👤', name: 'Account Management', price: '$149/mo',
+                icon: '👤', name: 'Account Management',
                 tag: 'High ROI', tagColor: '#F59E0B',
                 desc: 'A dedicated account manager who onboards your team, optimizes your ICP combos, and runs monthly strategy reviews with you.',
                 highlight: false,
               },
               {
-                icon: '🔐', name: 'SSO / Single Sign-On', price: '$299 one-time',
+                icon: '🔐', name: 'SSO / Single Sign-On',
                 tag: 'Enterprise', tagColor: '#3B82F6',
                 desc: 'Connect your company identity provider (Google Workspace, Okta, Azure AD). One-time setup — your team logs in with existing credentials.',
                 highlight: false,
               },
               {
-                icon: '🗄️', name: 'Extended Data Retention', price: '$99/mo',
+                icon: '🗄️', name: 'Extended Data Retention',
                 tag: 'Compliance', tagColor: '#22C55E',
                 desc: 'Keep your full lead history, conversation logs, and audit trail for up to 5 years. Required for regulated industries and enterprise audits.',
                 highlight: false,
@@ -798,19 +842,21 @@ export default function LandingPage() {
                 backgroundColor: addon.highlight ? `${ACCENT}0D` : SURFACE,
                 border: `1px solid ${addon.highlight ? ACCENT + '60' : BORDER}`,
                 borderRadius: 14,
-                padding: '24px 22px',
+                padding: '28px 24px',
                 position: 'relative',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 10,
-              }}>
+                cursor: 'pointer',
+                transition: 'transform 0.2s',
+              }}
+                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-3px)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)' }}
+              >
                 <div style={{ position: 'absolute', top: -12, right: 16, backgroundColor: addon.tagColor, color: '#fff', fontSize: 10, fontWeight: 800, padding: '3px 10px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{addon.tag}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ fontSize: 28 }}>{addon.icon}</div>
-                  <div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: '#F0F0F5' }}>{addon.name}</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: addon.highlight ? '#A78BFA' : ACCENT, marginTop: 2 }}>{addon.price}</div>
-                  </div>
+                  <div style={{ fontSize: 32 }}>{addon.icon}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#F0F0F5' }}>{addon.name}</div>
                 </div>
                 <div style={{ fontSize: 13, color: TEXT_SECONDARY, lineHeight: 1.65 }}>{addon.desc}</div>
                 <div style={{ marginTop: 'auto', paddingTop: 8 }}>
