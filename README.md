@@ -1,11 +1,28 @@
-# AITokenSales — B2B LinkedIn Outreach CRM
+# AITokenKing — B2B LinkedIn Outreach CRM
 
-Multi-tenant CRM platform for managing LinkedIn outreach campaigns across geographic regions. Built for sales teams with SDRs working dedicated markets, full admin oversight, LinkedIn scraper integration, conversation logging, and a Global Admin control plane for managing multiple client organizations.
+Multi-tenant CRM platform for managing LinkedIn outreach campaigns across geographic regions. Built for sales teams with SDRs working dedicated markets, full admin oversight, AI-powered LinkedIn scraper, conversation logging, and a Global Admin control plane for managing all client organizations.
+
+---
+
+## 🔗 Important Links (for the team)
+
+| What | Link |
+|---|---|
+| **Production App** | https://ai-token-sales.vercel.app |
+| **Landing Page** | https://ai-token-sales.vercel.app/landing |
+| **GitHub Repository** | https://github.com/ceo-synera/AITokenSales |
+| **Vercel Dashboard** | https://vercel.com (login with org account) |
+| **Supabase Dashboard** | https://supabase.com/dashboard/project/cyhfwixemswyusvcbmrn |
+| **Scraper Backend** | https://pwa-aitokensales-production.up.railway.app |
+| **Railway Dashboard** | https://railway.app (scraper backend deployment) |
+
+> **For Antonio (Project Manager):** Production deploys automatically when code is pushed to `main`. The landing page at `/landing` is public — no login required. The CRM at the root requires authentication.
 
 ---
 
 ## Table of Contents
 
+- [What's New](#whats-new)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Architecture](#architecture)
@@ -21,10 +38,51 @@ Multi-tenant CRM platform for managing LinkedIn outreach campaigns across geogra
 
 ---
 
+## What's New
+
+Recent changes deployed to production:
+
+### Landing Page (`/landing`)
+- Public marketing page in English, no login required
+- Hero section with social proof stats (10K+ leads, 99.9% import accuracy, Asia · Europe · LATAM · Custom markets, <2min import)
+- Fake browser kanban mockup showing the product in action
+- 8-feature grid describing each CRM page
+- 3 pricing plans (Basic · Premium · Enterprise) — seats and leads/mo shown prominently, no prices
+- 5 add-ons section below pricing (LinkedIn Auto Messaging, Multi Workspace, Account Management, SSO, Extended Data Retention)
+- CTA section at top and bottom with **Watch Demo** button
+
+### Interactive Chinese Demo Modal
+- Triggered by the "▶ Watch demo 中文" button on the landing page
+- Full animated 8-slide walkthrough in Traditional Chinese, 20–25 seconds per slide
+- Covers: Scraper launch → Live scraping → ICP scoring → Personalized message generation → CRM import → LinkedIn connection request sent → Lead replies → Call scheduled
+- Sidebar step navigator, progress bar, Space to pause, arrow keys to navigate
+- Persona: 陳怡婷 / VP Growth / CloudBase Taiwan
+
+### Performance Fixes
+- **Navigation speed**: Sidebar and Global Admin Navbar replaced `<a>` tags with Next.js `<Link>` — navigation is now client-side with prefetch on hover, eliminating full page reloads between CRM pages
+- **KanbanBoard**: Replaced 4 sequential Supabase calls with a single `Promise.all` init — SDRs no longer trigger a double prospects fetch; meta queries (areas, stages) run in parallel with each other
+- **ProspectsTable**: Areas and SDRs queries now run in parallel
+- **Middleware timeout fix**: Added 900ms race on the `users` DB call to prevent `MIDDLEWARE_INVOCATION_TIMEOUT` on Vercel Edge when Supabase responds slowly
+
+### Bug Fixes (from internal code review)
+- Lead count in Global Admin org detail now reads from `monthly_lead_counts` (was always 0 due to missing `organization_id` column on `prospects`)
+- Commission % in Revenue page reads from real vendor data (was hardcoded 30%)
+- `replyText` in Support page now clears when switching between tickets
+- Theme flash on Global Admin eliminated with lazy `useState` initializer
+- `ADDON_LIST` and plan constants unified in `src/lib/types.ts` — no more duplicates across files
+- `toggleAddon` now checks `res.ok` before updating local state
+- `saveInfo` / `saveNotes` wrapped in try/catch/finally — loading state always clears
+- Reactivate org now shows a confirmation dialog (was instant, same as deactivate)
+- `formatSeats` / `formatLeads` fixed falsy-zero bug (0 was showing as ∞)
+- Fragment keys fixed in Support page ticket table
+- Plan change in new org form replaced `useEffect` with inline handler
+
+---
+
 ## Features
 
 ### CRM
-- **Kanban Board** — drag-and-drop pipeline with 7 outreach stages, area filter pill tabs, custom stage labels/colors per org
+- **Kanban Board** — drag-and-drop pipeline with 7 outreach stages, area filter tabs, custom stage labels/colors per org
 - **Prospects Table** — full-text search, area/SDR/status/temperature filters, pagination (25/50/100/250), bulk delete, bulk SDR reassign, per-prospect drawer
 - **Prospect Drawer** — edit status, temperature, ICP score, notes, LinkedIn/email/company info, custom messages with copy button, flag for next-day follow-up
 - **Closed Deals** — dedicated view for `closed` prospects with conversation upload and chat count tracking
@@ -46,9 +104,22 @@ Multi-tenant CRM platform for managing LinkedIn outreach campaigns across geogra
 - **Create Org** — full org provisioning (org + admin user) in one flow with add-ons, market chips, plan defaults
 - **Org Detail** — per-org stats, addon toggles, internal notes auto-save, danger zone
 - **Support Tickets** — view and respond to all support tickets across all orgs
-- **Revenue** — revenue tracking per organization
-- **Vendors** — vendor management
-- **Impersonation** — view any org's CRM as read-only (banner shown, no writes)
+- **Revenue** — MRR by plan and by vendor with real commission % from vendors table
+- **Vendors** — vendor management with commission tracking
+- **Impersonation** — view any org's CRM as read-only (yellow banner shown, all writes blocked)
+
+---
+
+## Plans
+
+| Plan | Seats | Leads/mo |
+|---|---|---|
+| Basic | 3 | 1,000 |
+| Premium | 7 | 3,000 |
+| Enterprise | 15+ | 10,000 |
+| Ultra (internal) | Unlimited | Unlimited |
+
+Plan limits apply immediately on selection. Seats and leads/mo stored as `int4`; Ultra uses `2147483647` (INT_MAX) displayed as `∞`.
 
 ---
 
@@ -64,9 +135,10 @@ Multi-tenant CRM platform for managing LinkedIn outreach campaigns across geogra
 | Icons | lucide-react |
 | Drag & Drop | @dnd-kit/core |
 | CSV Parsing | papaparse |
-| i18n | next-intl v4 |
+| i18n | next-intl v4 (zh · en · es · vi) |
 | Date Formatting | date-fns |
-| Fonts | JetBrains Mono (data fields), system sans-serif |
+| Deployment | Vercel (auto-deploy on push to `main`) |
+| Scraper Backend | Python on Railway |
 
 ---
 
@@ -75,23 +147,24 @@ Multi-tenant CRM platform for managing LinkedIn outreach campaigns across geogra
 ### Authentication & Session
 
 - Auth handled by Supabase Auth via cookie-based SSR sessions
-- Middleware (`src/middleware.ts` / `src/proxy.ts`) validates every request server-side
+- `src/middleware.ts` validates every request server-side and sets `user_role` / `user_org_id` cookies
 - Unauthenticated users are redirected to `/{locale}/login`
+- `/landing` is exempt from auth (public marketing page)
 - A `public.users` table mirrors `auth.users` with `role`, `area_id`, `organization_id`, and `is_active`
 
-### Client Types
+### Three Supabase Client Types
 
-| Client | Created by | Key | Used for |
+| Client | File | Key | Used for |
 |---|---|---|---|
-| **Anon client** | `createClient()` from `@/lib/supabase/client` | `ANON_KEY` | Browser-side reads, RLS applies |
-| **Server client** | `createServerClient()` from `@supabase/ssr` | `ANON_KEY` | SSR/API session validation |
-| **Admin client** | `createClient()` from `@supabase/supabase-js` | `SERVICE_ROLE_KEY` | Cross-area ops, bypasses RLS |
+| **Browser** | `@/lib/supabase/client` | `ANON_KEY` | Client-side reads, RLS applies |
+| **Server** | `@/lib/supabase/server` | `ANON_KEY` | SSR/API session validation |
+| **Admin** | inline in API routes | `SERVICE_ROLE_KEY` | Cross-area ops, bypasses RLS |
 
 The `SERVICE_ROLE_KEY` is **never** exposed to the browser — only used in `src/app/api/` route handlers.
 
 ### Row Level Security
 
-All tables have RLS enabled. The core policies:
+All tables have RLS enabled. Core policies:
 
 - **Areas**: public read
 - **Users**: read own row; admin reads all in own org
@@ -103,9 +176,7 @@ All tables have RLS enabled. The core policies:
 
 Every org has its own isolated data via `organization_id` columns and RLS policies. Admins are scoped to their org. The Global Admin (`admin_global` role) operates across all orgs using service-role calls.
 
-### API Routes pattern
-
-All cross-RLS operations go through Next.js API routes with service-role access:
+### API Routes
 
 ```
 src/app/api/
@@ -113,7 +184,7 @@ src/app/api/
 ├── prospects/                 # Bulk delete + bulk reassign (PATCH)
 ├── users/                     # SDR CRUD
 ├── conversations/             # Conversation log + counts
-├── scraper/                   # Proxy to Python scraper backend
+├── scraper/                   # Reverse proxy to Python scraper backend
 ├── scraper/to-crm/            # Import scraped leads into CRM
 ├── settings/
 │   ├── organization/          # Org settings read/update
@@ -146,33 +217,27 @@ src/app/api/
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/antonioduran-insight/AITokenSales.git
+git clone https://github.com/ceo-synera/AITokenSales.git
 cd AITokenSales
 npm install
 ```
 
-### 2. Create a Supabase project
-
-Go to [supabase.com](https://supabase.com), create a project, then grab keys from **Project Settings → API**.
-
-### 3. Configure environment variables
+### 2. Configure environment variables
 
 ```bash
-cp .env.example .env
-# Fill in your Supabase URL and keys
+cp .env.example .env.local
+# Fill in your Supabase URL, keys, and scraper URL
 ```
 
-### 4. Run database migrations
+### 3. Run database migrations
 
-Run all `.sql` files in `supabase/migrations/` (or the combined schema) in the Supabase SQL Editor in order.
+Run all `.sql` files in `supabase/migrations/` in order via the Supabase SQL Editor.
 
-### 5. Create Storage bucket for logos
+### 4. Create Storage bucket for logos
 
-In Supabase Dashboard → Storage → New Bucket:
-- Name: `logos`
-- Public: ✓
+Supabase Dashboard → Storage → New Bucket → name: `logos`, Public: ✓
 
-### 6. Create the first Global Admin
+### 5. Create the first Global Admin
 
 ```sql
 -- After creating an auth user in Supabase Dashboard:
@@ -180,11 +245,12 @@ INSERT INTO public.users (id, full_name, email, role, is_active)
 VALUES ('<auth-user-uuid>', 'Admin Name', 'admin@aitokenking.com', 'admin_global', true);
 ```
 
-### 7. Start dev server
+### 6. Start dev server
 
 ```bash
 npm run dev
-# Open http://localhost:3000
+# CRM:     http://localhost:3000
+# Landing: http://localhost:3000/landing
 ```
 
 ---
@@ -195,37 +261,37 @@ npm run dev
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=https://ai-token-sales.vercel.app
 
-# Optional: Python scraper backend
-SCRAPER_API_URL=http://localhost:8000
-SCRAPER_API_KEY=your-scraper-api-key
+# Python scraper backend (Railway)
+NEXT_PUBLIC_SCRAPER_API_URL=https://pwa-aitokensales-production.up.railway.app
+NEXT_PUBLIC_SCRAPER_WS_URL=wss://pwa-aitokensales-production.up.railway.app
 ```
 
-> **Security**: `SUPABASE_SERVICE_ROLE_KEY` must never be sent to the client. It is only used server-side in `src/app/api/` route handlers.
+> `SUPABASE_SERVICE_ROLE_KEY` must never reach the browser. It is server-only.
 
 ---
 
 ## Database Schema
 
-Core tables (simplified):
+Core tables:
 
 ```sql
-organizations       -- Multi-tenant root: plan, seats, billing, addons
-users               -- Auth mirror: role, area_id, organization_id, is_active
-areas               -- Sales regions (Taiwan, LATAM, Vietnam, Europe, Global)
-prospects           -- Core lead record: status, temperature, ICP score, messages
-notes               -- Per-prospect timestamped notes
-conversations       -- Full chat logs uploaded per closed deal
-audit_log           -- Immutable action trail
-pipeline_stages     -- Customizable kanban columns per org
-organization_addons -- Feature add-ons per org
-support_tickets     -- Support requests from org admins
-support_ticket_messages -- Thread messages for each ticket
-monthly_lead_counts -- Cached lead import counts for billing/limits
+organizations        -- Multi-tenant root: plan, seats, billing, addons
+users                -- Auth mirror: role, area_id, organization_id, is_active
+areas                -- Sales regions (Taiwan, LATAM, Vietnam, Europe, Global)
+prospects            -- Core lead: status, temperature, ICP score, messages
+notes                -- Per-prospect timestamped notes
+conversations        -- Full chat logs per closed deal
+audit_log            -- Immutable action trail
+pipeline_stages      -- Customizable kanban columns per org
+organization_addons  -- Feature add-ons per org
+support_tickets      -- Support requests from org admins
+support_ticket_messages -- Thread messages per ticket
+monthly_lead_counts  -- Cached lead import counts keyed by (org_id, YYYY-MM)
 ```
 
-See `supabase/migrations/` for complete schema with RLS policies.
+> **Lead counting**: always use `monthly_lead_counts` — `prospects` has no `organization_id` column.
 
 ---
 
@@ -234,17 +300,18 @@ See `supabase/migrations/` for complete schema with RLS policies.
 ```
 src/
 ├── app/
+│   ├── landing/                # Public marketing page + demo modal
 │   ├── [locale]/
 │   │   ├── (scraper)/          # Scraper module (dashboard, run, history, leads, export)
 │   │   ├── admin/              # Admin-only: import, user management
-│   │   ├── global-admin/       # Global Admin panel (organizations, support, revenue, vendors)
+│   │   ├── global-admin/       # Global Admin panel
 │   │   ├── kanban/             # Kanban board
 │   │   ├── prospects/          # Prospects table
 │   │   ├── convertidos/        # Closed deals
 │   │   ├── conversations/      # Conversation log
 │   │   ├── stats/              # Analytics dashboard
-│   │   ├── audit/              # Audit log (admin only)
-│   │   ├── import/             # CSV import wizard (all users)
+│   │   ├── audit/              # Audit log
+│   │   ├── import/             # CSV import wizard
 │   │   ├── settings/           # Org settings
 │   │   └── login/              # Auth
 │   └── api/                    # All API routes (service-role ops)
@@ -252,24 +319,23 @@ src/
 │   ├── global-admin/           # GlobalAdminNavbar
 │   ├── import/                 # CSVImportWizard
 │   ├── kanban/                 # KanbanBoard, KanbanColumn, ProspectCard
-│   ├── layout/                 # AppShell, Sidebar (collapsible), LanguageSwitcher
+│   ├── layout/                 # AppShell, Sidebar, LanguageSwitcher
 │   ├── prospects/              # ProspectsTable, ProspectDrawer, ProspectForm
-│   ├── conversations/          # ConversationsPage, ConvertidosPage, ConversationsLog
+│   ├── conversations/          # ConversationsPage, ConvertidosPage
 │   ├── stats/                  # StatsDashboard
 │   ├── users/                  # UsersManagement
 │   ├── audit/                  # AuditLogTable
-│   └── ui/                     # Base UI components (Button, badges, PremiumFeature gate)
+│   └── ui/                     # Button, badges, PremiumFeature gate
 ├── contexts/
 │   ├── UserContext.tsx          # Current user + role
-│   └── GlobalAdminThemeContext.tsx  # Dark/light theme + zh/en i18n for Global Admin
+│   └── GlobalAdminThemeContext.tsx  # Dark/light + zh/en for Global Admin
 ├── lib/
 │   ├── supabase/               # client.ts · server.ts
+│   ├── types.ts                # All TypeScript types + shared constants (MAX_INT, PLAN_DEFAULTS, ADDON_LIST)
 │   ├── theme.ts                # darkTheme / lightTheme color tokens
 │   ├── scraper-api.ts          # Scraper HTTP client
-│   ├── scraper-websocket.ts    # WebSocket log streaming
-│   ├── types.ts                # All TypeScript types
 │   └── utils/audit.ts          # logAuditEvent helper
-├── i18n/                       # next-intl routing config
+├── middleware.ts               # Auth gate + role/org cookies
 └── messages/                   # en.json · zh.json · es.json · vi.json
 ```
 
@@ -280,20 +346,16 @@ src/
 ```bash
 npm install          # Install dependencies
 npm run dev          # Start dev server (Turbopack)
-npm run build        # Production build
+npm run build        # Production build + TypeScript check
 npm run start        # Start production server
 npm run lint         # ESLint
 ```
 
-> Use `npm run` scripts only. Do **not** use `npx next` — module resolution may fail with this Next.js version.
+> Always use `npm run` scripts. Do **not** use `npx next` directly.
 
 ---
 
 ## API Reference
-
-See [docs/API.md](docs/API.md) for full endpoint documentation.
-
-Quick reference:
 
 | Method | Route | Auth | Purpose |
 |---|---|---|---|
@@ -311,6 +373,8 @@ Quick reference:
 | POST | `/api/global-admin/create-org` | admin_global | Provision new org |
 | GET/POST | `/api/global-admin/tickets` | admin_global | Support ticket management |
 
+Full endpoint docs: [docs/API.md](docs/API.md)
+
 ---
 
 ## Documentation
@@ -325,16 +389,18 @@ Quick reference:
 
 ## Key Design Decisions
 
-**Service role pattern** — All writes that cross RLS boundaries use `SUPABASE_SERVICE_ROLE_KEY` exclusively inside server-side API routes. Never sent to the browser.
+**Service role pattern** — All writes that cross RLS boundaries use `SUPABASE_SERVICE_ROLE_KEY` exclusively in server-side API routes. Never sent to the browser.
 
 **Area isolation** — SDRs are scoped to one area at DB level via RLS. The CSV dedup check uses service-role so all SDRs in the same area share one deduplicated prospect pool.
 
-**Global `linkedin_url` uniqueness** — LinkedIn URLs are globally unique across the entire table. The import handles `23505` Postgres constraint violations row-by-row, counting them separately from intentional skips.
+**Global `linkedin_url` uniqueness** — LinkedIn URLs are globally unique across the entire prospects table. Import handles `23505` constraint violations row-by-row.
 
-**Monthly lead counting** — `monthly_lead_counts` table caches per-org monthly lead imports for billing/limit enforcement, avoiding expensive `COUNT` queries on `prospects`.
+**Monthly lead counting** — `monthly_lead_counts` caches per-org monthly imports for billing/limit enforcement, keyed by `(organization_id, YYYY-MM)`. Never count via `prospects.organization_id` — that column does not exist.
 
-**Audit immutability** — `audit_log` rows are never deleted (only the FK reference to a deleted prospect is nullified). This preserves the full history even after prospect deletion.
+**INT_MAX for unlimited plans** — Ultra plan seats/leads stored as `2147483647` (Postgres `int4` max), displayed as `∞`. Avoids nullable columns while preserving numeric comparisons.
 
-**INT_MAX for unlimited plans** — Ultra plan seats/leads are stored as `2147483647` (Postgres `int4` max) and displayed as `∞`. This avoids nullable columns while preserving numeric comparisons.
+**Audit immutability** — `audit_log` rows are never deleted. FK references to deleted prospects are nullified, preserving the full history.
 
-**Impersonation as read-only** — Global Admin impersonation passes `impersonate_org_id` as a URL query param. All write operations check `isImpersonating` and return early. A yellow banner is always shown.
+**Impersonation as read-only** — Global Admin impersonation passes `impersonate_org_id` as a URL query param. All write operations check `isImpersonating` and return early. Yellow banner always shown.
+
+**Client-side navigation** — All internal links use Next.js `<Link>` (not `<a>`) for instant client-side routing with automatic prefetch on hover. This applies to both the CRM Sidebar and the Global Admin Navbar.
