@@ -576,7 +576,6 @@ const plans = [
   { name: 'Basic', price: '$550', seats: '3 seats', leads: '1,000 leads/mo', color: '#3B82F6', highlight: false, features: ['Kanban pipeline', 'CSV import', 'Scraper access', 'Audit log'] },
   { name: 'Premium', price: '$2,300', seats: '10 seats', leads: '3,000 leads/mo', color: ACCENT, highlight: true, features: ['Everything in Basic', 'Analytics dashboard', 'Multi-region SDRs', 'Support tickets'] },
   { name: 'Enterprise', price: 'Custom', seats: '15 seats', leads: '10,000 leads/mo', color: '#F59E0B', highlight: false, features: ['Everything in Premium', 'Custom pipeline stages', 'Account management', 'Priority support'] },
-  { name: 'Ultra', price: 'Internal', seats: 'Unlimited', leads: 'Unlimited', color: '#EF4444', highlight: false, features: ['Unlimited everything', 'All add-ons included', 'SSO integration', 'Dedicated infra'] },
 ]
 
 export default function LandingPage() {
@@ -736,7 +735,7 @@ export default function LandingPage() {
                   <div style={{ fontSize: 16, fontWeight: 700, color: plan.color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{plan.name}</div>
                 </div>
                 <div style={{ fontSize: 38, fontWeight: 900, letterSpacing: '-1px', margin: '12px 0 4px', color: '#F0F0F5' }}>
-                  {plan.price}{plan.price !== 'Custom' && plan.price !== 'Internal' && <span style={{ fontSize: 16, fontWeight: 400, color: TEXT_SECONDARY }}>/mo</span>}
+                  {plan.price}{plan.price !== 'Custom' && <span style={{ fontSize: 16, fontWeight: 400, color: TEXT_SECONDARY }}>/mo</span>}
                 </div>
                 <div style={{ fontSize: 12, color: TEXT_MUTED, marginBottom: 24 }}>{plan.seats} · {plan.leads}</div>
                 <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -748,7 +747,7 @@ export default function LandingPage() {
                   ))}
                 </div>
                 <a href="/en/login" style={{ display: 'block', marginTop: 28, textAlign: 'center', padding: '11px', borderRadius: 8, fontSize: 14, fontWeight: 600, textDecoration: 'none', backgroundColor: plan.highlight ? ACCENT : 'transparent', color: plan.highlight ? '#fff' : TEXT_SECONDARY, border: plan.highlight ? 'none' : `1px solid ${BORDER}` }}>
-                  {plan.price === 'Custom' || plan.price === 'Internal' ? 'Contact us' : 'Get started'}
+                  {plan.price === 'Custom' ? 'Contact us' : 'Get started'}
                 </a>
               </div>
             ))}
