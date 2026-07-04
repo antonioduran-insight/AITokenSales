@@ -754,6 +754,75 @@ export default function LandingPage() {
           </div>
         </div>
 
+        {/* Add-ons */}
+        <div style={{ ...S.section, paddingTop: 0, paddingBottom: 80 }}>
+          <div style={{ textAlign: 'center', marginBottom: 48 }}>
+            <div style={{ ...S.chip, background: 'linear-gradient(135deg, #F59E0B18, #EF444418)', color: '#F59E0B', borderColor: '#F59E0B44' }}>⚡ Power-ups</div>
+            <h2 style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 12px' }}>Supercharge your plan</h2>
+            <p style={{ fontSize: 16, color: TEXT_SECONDARY, maxWidth: 480, margin: '0 auto' }}>Add exactly what your team needs. Mix and match — no bundles, no waste.</p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+            {[
+              {
+                icon: '🤖', name: 'LinkedIn Auto Messaging', price: 'Coming soon',
+                tag: 'Most wanted', tagColor: '#EF4444',
+                desc: 'Send personalized LinkedIn connection requests and follow-ups automatically, directly from the CRM — no copy-paste required.',
+                highlight: true,
+              },
+              {
+                icon: '🏢', name: 'Multi Workspace', price: '$300/mo',
+                tag: 'Best for agencies', tagColor: '#8B5CF6',
+                desc: 'Manage multiple brands or client organizations under one account. Separate data, pipelines, and SDR teams per workspace.',
+                highlight: false,
+              },
+              {
+                icon: '👤', name: 'Account Management', price: '$149/mo',
+                tag: 'High ROI', tagColor: '#F59E0B',
+                desc: 'A dedicated account manager who onboards your team, optimizes your ICP combos, and runs monthly strategy reviews with you.',
+                highlight: false,
+              },
+              {
+                icon: '🔐', name: 'SSO / Single Sign-On', price: '$299 one-time',
+                tag: 'Enterprise', tagColor: '#3B82F6',
+                desc: 'Connect your company identity provider (Google Workspace, Okta, Azure AD). One-time setup — your team logs in with existing credentials.',
+                highlight: false,
+              },
+              {
+                icon: '🗄️', name: 'Extended Data Retention', price: '$99/mo',
+                tag: 'Compliance', tagColor: '#22C55E',
+                desc: 'Keep your full lead history, conversation logs, and audit trail for up to 5 years. Required for regulated industries and enterprise audits.',
+                highlight: false,
+              },
+            ].map(addon => (
+              <div key={addon.name} style={{
+                backgroundColor: addon.highlight ? `${ACCENT}0D` : SURFACE,
+                border: `1px solid ${addon.highlight ? ACCENT + '60' : BORDER}`,
+                borderRadius: 14,
+                padding: '24px 22px',
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+              }}>
+                <div style={{ position: 'absolute', top: -12, right: 16, backgroundColor: addon.tagColor, color: '#fff', fontSize: 10, fontWeight: 800, padding: '3px 10px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{addon.tag}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ fontSize: 28 }}>{addon.icon}</div>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#F0F0F5' }}>{addon.name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: addon.highlight ? '#A78BFA' : ACCENT, marginTop: 2 }}>{addon.price}</div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 13, color: TEXT_SECONDARY, lineHeight: 1.65 }}>{addon.desc}</div>
+                <div style={{ marginTop: 'auto', paddingTop: 8 }}>
+                  <a href="/en/login" style={{ display: 'inline-block', fontSize: 12, fontWeight: 600, color: addon.highlight ? '#A78BFA' : TEXT_SECONDARY, textDecoration: 'none', border: `1px solid ${addon.highlight ? ACCENT + '60' : BORDER}`, borderRadius: 6, padding: '6px 14px' }}>
+                    {addon.highlight ? 'Join waitlist →' : 'Add to plan →'}
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* CTA */}
         <div style={{ background: `linear-gradient(135deg, ${ACCENT}20, #A78BFA10)`, borderTop: `1px solid ${ACCENT}30`, borderBottom: `1px solid ${ACCENT}30` }}>
           <div style={{ ...S.section, paddingTop: 70, paddingBottom: 70, textAlign: 'center' }}>
