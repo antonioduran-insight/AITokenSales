@@ -555,11 +555,11 @@ function DemoModal({ onClose }: { onClose: () => void }) {
 /* ─────────────────────────── LANDING PAGE ─────────────────────────── */
 
 const features = [
-  { icon: '📋', title: 'Kanban Pipeline', desc: 'Drag-and-drop cards through every outreach stage. Custom columns, colors, and stage names per organization.' },
-  { icon: '🤖', title: 'LinkedIn Scraper', desc: 'AI-powered scraping — select audience combos, launch a run, get ICP-scored leads with generated outreach messages ready to copy.' },
-  { icon: '🌏', title: 'Multi-Region SDRs', desc: 'Assign reps to specific markets. Each SDR sees only their area — full DB-level isolation via Supabase RLS policies.' },
-  { icon: '📊', title: 'Analytics Dashboard', desc: 'Conversion rates by SDR and by region, temperature breakdowns, weekly velocity. Benchmarkable data for every team member.' },
-  { icon: '💬', title: 'Conversation Logging', desc: 'Upload and archive every closed-deal chat. Search, filter, and replay conversations across your entire closed-deals history.' },
+  { icon: '📋', title: 'Kanban', desc: 'Your main workspace. Each prospect is a card you drag through stages: New → Connection Sent → Connected → Demo Scheduled → Closed. Full history on every card.' },
+  { icon: '🤖', title: 'Scraper', desc: 'Launch a LinkedIn scraping run in seconds. Pick your audience combos, choose a market, set the volume — the AI handles extraction, scoring, and message drafting.' },
+  { icon: '🌡️', title: 'Leads', desc: 'Browse all scraped leads with ICP score, temperature (HOT / WARM / COLD), and generated outreach messages. Filter by run or temperature. Copy messages with one click.' },
+  { icon: '📊', title: 'Analytics', desc: 'Track conversion rates by SDR, by region, and by stage. See weekly velocity and temperature breakdowns across your entire pipeline at a glance.' },
+  { icon: '💬', title: 'Closed Deals', desc: 'Archive and search every closed-deal conversation. Upload the chat log when a deal closes — your team builds a searchable library of winning conversations.' },
   { icon: '🛡️', title: 'Enterprise Security', desc: 'Supabase RLS policies enforce data isolation at the DB layer. Service-role key never leaves the server. Full audit trail.' },
   { icon: '📥', title: 'CSV Import Wizard', desc: '5-step import: upload → area → column mapping → duplicate detection → results. Handles LinkedIn exports out of the box.' },
   { icon: '🏢', title: 'Global Admin Plane', desc: 'Manage every client org from a single control plane. Edit plans, toggle addons, impersonate any org in read-only mode.' },
