@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useTranslations, useLocale } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
@@ -127,7 +128,7 @@ export function Sidebar({ user }: Props) {
           const linkHref = `/${locale}${item.href}${queryStr}`
 
           return (
-            <a
+            <Link
               key={item.href}
               href={linkHref}
               title={collapsed ? item.label : undefined}
@@ -149,7 +150,7 @@ export function Sidebar({ user }: Props) {
             >
               <Icon size={16} strokeWidth={isActive ? 2.2 : 1.8} />
               {!collapsed && item.label}
-            </a>
+            </Link>
           )
         })}
 
@@ -172,7 +173,7 @@ export function Sidebar({ user }: Props) {
               const isActive = pathname === fullHref || pathname.startsWith(fullHref + '/')
               const Icon = item.icon
               return (
-                <a
+                <Link
                   key={item.href}
                   href={`/${locale}${item.href}`}
                   title={collapsed ? item.label : undefined}
@@ -188,7 +189,7 @@ export function Sidebar({ user }: Props) {
                 >
                   <Icon size={14} strokeWidth={isActive ? 2.2 : 1.8} />
                   {!collapsed && item.label}
-                </a>
+                </Link>
               )
             })}
           </>
