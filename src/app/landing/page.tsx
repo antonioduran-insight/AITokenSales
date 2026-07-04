@@ -579,12 +579,12 @@ const plans = [
     features: ['Kanban pipeline', 'CSV import wizard', 'LinkedIn scraper access', 'AI ICP scoring', 'Audit log', 'Email support'],
   },
   {
-    name: 'Premium', seats: 10, leads: '3,000', color: ACCENT, highlight: true,
+    name: 'Premium', seats: 7, leads: '3,000', color: ACCENT, highlight: true,
     tagline: 'The go-to plan for growing sales teams',
     features: ['Everything in Basic', 'Analytics dashboard', 'Multi-region SDR management', 'Support ticket system', 'Conversation log archive', 'Faster scraper queue'],
   },
   {
-    name: 'Enterprise', seats: 15, leads: '10,000', color: '#F59E0B', highlight: false,
+    name: 'Enterprise', seats: '15+', leads: '10,000', color: '#F59E0B', highlight: false,
     tagline: 'For large teams with complex workflows',
     features: ['Everything in Premium', 'Custom pipeline stage names', 'Account management add-on', 'Priority support SLA', 'Advanced audit trail', 'Custom onboarding'],
   },
