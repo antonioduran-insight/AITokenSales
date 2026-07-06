@@ -181,18 +181,34 @@ export function AuditLogTable() {
           </span>
         </div>
 
-        {/* Filters row 2: Time + Limit as dropdowns */}
+        {/* Filters row 2: Time buttons + Limit dropdown */}
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <select
-            value={timeFilter}
-            onChange={e => setTimeFilter(e.target.value as TimeFilter)}
-            style={S.select}
-          >
-            <option value="all">All time</option>
-            <option value="today">Today</option>
-            <option value="week">This week</option>
-            <option value="month">This month</option>
-          </select>
+          <div style={{ display: 'flex', border: '1px solid #2A2A3A', borderRadius: 7, overflow: 'hidden' }}>
+            {([
+              { key: 'all', label: 'All time' },
+              { key: 'today', label: 'Today' },
+              { key: 'week', label: 'This week' },
+              { key: 'month', label: 'This month' },
+            ] as { key: TimeFilter; label: string }[]).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setTimeFilter(key)}
+                style={{
+                  padding: '6px 13px',
+                  fontSize: 12,
+                  fontWeight: timeFilter === key ? 600 : 400,
+                  border: 'none',
+                  borderRight: '1px solid #2A2A3A',
+                  backgroundColor: timeFilter === key ? '#6C63FF' : 'transparent',
+                  color: timeFilter === key ? '#fff' : '#8B8BA0',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap' as const,
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
           <select
             value={limit}

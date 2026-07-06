@@ -71,6 +71,28 @@ export default function SupportPage() {
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Realtime subscription for expanded ticket messages
+  useEffect(() => {
+    if (!expandedId) return
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`ticket-messages-${expandedId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'support_ticket_messages', filter: `ticket_id=eq.${expandedId}` },
+        (payload) => {
+          const newMsg = payload.new as TicketMessage
+          setTickets(prev => prev.map(t => {
+            if (t.id !== expandedId) return t
+            if (t.messages.some(m => m.id === newMsg.id)) return t
+            return { ...t, messages: [...t.messages, newMsg] }
+          }))
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [expandedId])
+
   const fetchTickets = useCallback(async () => {
     setLoading(true)
     try {
@@ -247,6 +269,12 @@ export default function SupportPage() {
             {/* Expanded thread */}
             {isExpanded && (
               <div style={{ borderTop: '1px solid #2A2A3A', marginTop: 16, paddingTop: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: '#22C55E', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#22C55E', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                    Live
+                  </span>
+                </div>
                 {/* Description */}
                 <div style={{ backgroundColor: '#1C1C27', borderRadius: 8, padding: '12px 14px', marginBottom: 12, fontSize: 13, color: '#8B8BA0', lineHeight: 1.6 }}>
                   <div style={{ fontSize: 11, color: '#52526A', fontWeight: 600, marginBottom: 6 }}>ORIGINAL REQUEST</div>
