@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { scraperApi, type Run, type Lead } from '@/lib/scraper-api';
+import { scraperApi, type Lead } from '@/lib/scraper-api';
 import { createClient } from '@/lib/supabase/client';
 import { StatusBadge } from '@/components/scraper/StatusBadge';
 import { TemperatureBadge } from '@/components/scraper/TemperatureBadge';
 import { ICPScore } from '@/components/scraper/ICPScore';
 import { ChevronDown, ChevronUp, Trash2, DatabaseZap, CheckCircle2 } from 'lucide-react';
-import type { Area, User } from '@/lib/types';
+import type { Area, User, RunRecord } from '@/lib/types';
 
 interface ImportState {
   area_id: string;
@@ -19,16 +19,15 @@ interface ImportState {
 
 const S: Record<string, React.CSSProperties> = {
   page: { padding: '24px', color: '#F0F0F5', maxWidth: 900 },
-  row: { backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, overflow: 'hidden', marginBottom: 8 },
+  row:  { backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, overflow: 'hidden', marginBottom: 8 },
 };
 
 export default function HistoryPage() {
-  const [runs, setRuns] = useState<Run[]>([]);
+  const [runs, setRuns] = useState<RunRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [runLeads, setRunLeads] = useState<Record<string, Lead[]>>({});
   const [leadsLoading, setLeadsLoading] = useState<Record<string, boolean>>({});
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [clearAllConfirm, setClearAllConfirm] = useState(false);
   const [clearAllInput, setClearAllInput] = useState('');
 
@@ -38,8 +37,9 @@ export default function HistoryPage() {
   const [importState, setImportState] = useState<Record<string, ImportState>>({});
 
   useEffect(() => {
-    scraperApi.get<Run[]>('/run/?limit=50')
-      .then(data => setRuns(data))
+    fetch('/api/runs')
+      .then(r => r.json())
+      .then((data: RunRecord[]) => setRuns(Array.isArray(data) ? data : []))
       .catch(() => {})
       .finally(() => setLoading(false));
 
@@ -61,19 +61,10 @@ export default function HistoryPage() {
     }
   };
 
-  const handleDelete = async (runId: string) => {
-    try {
-      await scraperApi.delete(`/run/${runId}`);
-      setRuns(prev => prev.filter(r => r.id !== runId));
-      if (expandedId === runId) setExpandedId(null);
-    } catch { /* error */ }
-    finally { setDeleteConfirmId(null); }
-  };
-
   const handleClearAll = async () => {
     if (clearAllInput !== 'DELETE') return;
     try {
-      await scraperApi.delete('/run/clear-all');
+      await scraperApi.delete('/runs/clear-all');
       setRuns([]); setExpandedId(null); setRunLeads({});
     } catch { /* error */ }
     finally { setClearAllConfirm(false); setClearAllInput(''); }
@@ -106,8 +97,8 @@ export default function HistoryPage() {
         body: JSON.stringify({ run_id: runId, area_id: s.area_id, assigned_to: s.assigned_to || undefined }),
       });
       const data = await res.json();
-      if (!res.ok) { setImportField(runId, 'error', data.error ?? 'Import failed'); }
-      else { setImportField(runId, 'result', data); }
+      if (!res.ok) setImportField(runId, 'error', data.error ?? 'Import failed');
+      else setImportField(runId, 'result', data);
     } catch (e) {
       setImportField(runId, 'error', String(e));
     } finally {
@@ -115,7 +106,7 @@ export default function HistoryPage() {
     }
   };
 
-  const SELECT = {
+  const SELECT: React.CSSProperties = {
     padding: '7px 10px', borderRadius: 7, backgroundColor: '#1C1C27',
     border: '1px solid #2A2A3A', color: '#F0F0F5', fontSize: 12, outline: 'none',
   };
@@ -146,56 +137,59 @@ export default function HistoryPage() {
         </div>
       </div>
 
-      {loading && <p style={{ color: '#52526A', textAlign: 'center', padding: 40 }}>Loading...</p>}
+      {loading && <p style={{ color: '#52526A', textAlign: 'center', padding: 40 }}>Loading…</p>}
       {!loading && runs.length === 0 && <p style={{ color: '#52526A', textAlign: 'center', padding: 40 }}>No runs yet.</p>}
 
       {runs.map(run => {
         const isExpanded = expandedId === run.id;
         const leads = runLeads[run.id] ?? [];
         const leadsLoad = leadsLoading[run.id] ?? false;
-        const isDel = deleteConfirmId === run.id;
         const imp = importState[run.id];
         const showImport = importOpen === run.id;
 
         return (
           <div key={run.id} style={S.row}>
-            <div onClick={() => !isDel && toggleExpand(run.id)}
+            <div onClick={() => toggleExpand(run.id)}
               style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer' }}>
-              <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#52526A', flexShrink: 0, width: 72 }}>
+              <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#52526A', flexShrink: 0, width: 80 }}>
                 {new Date(run.created_at).toLocaleDateString()}
               </span>
               <span style={{ fontSize: 13, fontWeight: 600, minWidth: 80 }}>{run.market}</span>
-              <div style={{ flex: 1, display: 'flex', gap: 12, fontSize: 11 }}>
-                <span style={{ color: '#8B8BA0' }}>{run.total_leads} leads</span>
+              <div style={{ flex: 1, display: 'flex', gap: 12, fontSize: 11, flexWrap: 'wrap' }}>
+                <span style={{ color: '#8B8BA0' }}>{run.total_leads_requested} leads req.</span>
+                {run.combos?.length > 0 && (
+                  <span style={{ color: '#52526A' }}>{run.combos.join(' · ')}</span>
+                )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <StatusBadge status={run.status} />
-                {isDel ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={e => e.stopPropagation()}>
-                    <span style={{ fontSize: 11, color: '#8B8BA0' }}>Delete?</span>
-                    <button onClick={() => handleDelete(run.id)} style={{ fontSize: 11, backgroundColor: '#EF4444', color: '#FFF', padding: '3px 8px', borderRadius: 5, border: 'none', cursor: 'pointer' }}>Yes</button>
-                    <button onClick={() => setDeleteConfirmId(null)} style={{ fontSize: 11, color: '#52526A', background: 'none', border: 'none', cursor: 'pointer' }}>No</button>
-                  </div>
-                ) : (
-                  <button onClick={e => { e.stopPropagation(); setDeleteConfirmId(run.id); }} style={{ padding: 5, borderRadius: 6, background: 'transparent', border: 'none', cursor: 'pointer', color: '#52526A' }}>
-                    <Trash2 size={13} />
-                  </button>
-                )}
+                <StatusBadge status={run.status as Parameters<typeof StatusBadge>[0]['status']} />
                 {isExpanded ? <ChevronUp size={14} color="#52526A" /> : <ChevronDown size={14} color="#52526A" />}
               </div>
             </div>
 
             {isExpanded && (
               <div style={{ borderTop: '1px solid #2A2A3A', padding: 16 }}>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                  <span style={{ padding: '3px 12px', borderRadius: 50, fontSize: 11, fontWeight: 600, fontFamily: 'monospace', backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>
-                    {run.total_leads} leads
-                  </span>
-                  <span style={{ padding: '3px 12px', borderRadius: 50, fontSize: 11, backgroundColor: '#2A2A3A', color: '#8B8BA0' }}>{run.combos.join(' · ')}</span>
+
+                {/* Run metadata */}
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 12, fontSize: 12, color: '#8B8BA0' }}>
+                  {run.executor?.full_name && (
+                    <span>Executed by: <span style={{ color: '#F0F0F5', fontWeight: 500 }}>{run.executor.full_name}</span></span>
+                  )}
+                  {run.run_sdr_assignments && run.run_sdr_assignments.length > 0 && (
+                    <span>
+                      SDRs: {run.run_sdr_assignments.map(a => (
+                        <span key={a.sdr_id} style={{ color: '#F0F0F5', fontWeight: 500, marginLeft: 4 }}>
+                          {a.user?.full_name ?? a.sdr_id}
+                          {a.leads_assigned > 0 ? ` (${a.leads_assigned})` : ''}
+                          {a.sender_profile_id ? ' ✦' : ''}
+                        </span>
+                      ))}
+                    </span>
+                  )}
                 </div>
 
                 {leadsLoad ? (
-                  <p style={{ fontSize: 12, color: '#52526A' }}>Loading leads...</p>
+                  <p style={{ fontSize: 12, color: '#52526A' }}>Loading leads…</p>
                 ) : leads.length > 0 ? (
                   <div style={{ border: '1px solid #2A2A3A', borderRadius: 8, overflow: 'auto', marginBottom: 12 }}>
                     <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
@@ -218,7 +212,7 @@ export default function HistoryPage() {
                         ))}
                       </tbody>
                     </table>
-                    {leads.length > 15 && <p style={{ padding: '6px 12px', fontSize: 11, color: '#52526A', textAlign: 'center', borderTop: '1px solid #2A2A3A', margin: 0 }}>... and {leads.length - 15} more</p>}
+                    {leads.length > 15 && <p style={{ padding: '6px 12px', fontSize: 11, color: '#52526A', textAlign: 'center', borderTop: '1px solid #2A2A3A', margin: 0 }}>… and {leads.length - 15} more</p>}
                   </div>
                 ) : <p style={{ fontSize: 12, color: '#52526A' }}>No leads for this run.</p>}
 
@@ -235,7 +229,6 @@ export default function HistoryPage() {
                     <button onClick={() => setExpandedId(null)} style={{ fontSize: 12, color: '#52526A', border: '1px solid #2A2A3A', padding: '7px 14px', borderRadius: 7, background: 'transparent', cursor: 'pointer' }}>Close</button>
                   </div>
 
-                  {/* Import form */}
                   {showImport && run.status === 'completed' && imp && !imp.result && (
                     <div style={{ backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 8, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                       <p style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', margin: 0, letterSpacing: '0.06em' }}>Import to CRM</p>
@@ -243,7 +236,7 @@ export default function HistoryPage() {
                         <div style={{ flex: 1, minWidth: 180 }}>
                           <label style={{ fontSize: 11, color: '#8B8BA0', display: 'block', marginBottom: 4 }}>Area *</label>
                           <select value={imp.area_id} onChange={e => setImportField(run.id, 'area_id', e.target.value)} style={{ ...SELECT, width: '100%' }}>
-                            <option value="">Select...</option>
+                            <option value="">Select…</option>
                             {areas.filter(a => a.is_active).map(a => (
                               <option key={a.id} value={a.id}>{a.label_en}</option>
                             ))}
@@ -262,12 +255,11 @@ export default function HistoryPage() {
                         onClick={() => handleImportToCRM(run.id)}
                         disabled={!imp.area_id || imp.loading}
                         style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, backgroundColor: !imp.area_id || imp.loading ? '#2A2A3A' : '#6C63FF', color: '#FFF', padding: '7px 16px', borderRadius: 7, border: 'none', cursor: !imp.area_id || imp.loading ? 'default' : 'pointer', opacity: !imp.area_id ? 0.5 : 1 }}>
-                        <DatabaseZap size={13} />{imp.loading ? 'Importing...' : `Import ${leads.length} leads`}
+                        <DatabaseZap size={13} />{imp.loading ? 'Importing…' : `Import ${leads.length} leads`}
                       </button>
                     </div>
                   )}
 
-                  {/* Import result */}
                   {imp?.result && (
                     <div style={{ backgroundColor: '#14532D20', border: '1px solid #16A34A40', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
                       <CheckCircle2 size={16} color="#22C55E" />

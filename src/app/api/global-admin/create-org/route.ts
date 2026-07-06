@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
     name, slug, plan, logo_url, admin_name, admin_email, admin_password,
     max_seats, max_leads_per_month, custom_price, vendor,
     default_language, markets, internal_notes, addons,
+    apify_token, anthropic_key,
   } = body
 
   if (!name || !slug || !plan || !admin_name || !admin_email || !admin_password) {
@@ -69,6 +70,8 @@ export async function POST(req: NextRequest) {
       vendor: vendor ?? null,
       default_language: default_language ?? 'zh',
       internal_notes: internal_notes ?? null,
+      apify_token: apify_token ?? null,
+      anthropic_key: anthropic_key ?? null,
       is_active: true,
       billing_day: 10,
     })
@@ -143,6 +146,18 @@ export async function POST(req: NextRequest) {
       await admin.from('organizations').delete().eq('id', org.id)
       return NextResponse.json({ error: `Failed to set addons: ${addonsError.message}` }, { status: 400 })
     }
+  }
+
+  // 6. Seed all active combos for this org
+  const { data: masterCombos } = await admin.from('scraper_combos_master').select('code').eq('is_active', true)
+  if (masterCombos && masterCombos.length > 0) {
+    await admin.from('org_combos').insert(
+      masterCombos.map((c: { code: string }) => ({
+        organization_id: org.id,
+        combo_code: c.code,
+        is_active: true,
+      }))
+    )
   }
 
   return NextResponse.json({ ok: true, org_id: org.id })

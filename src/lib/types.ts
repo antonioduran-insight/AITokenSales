@@ -45,6 +45,7 @@ export interface User {
   area_id: string | null
   organization_id: string | null
   is_active: boolean
+  scraper_access: boolean
   created_at: string
   // Joined
   area?: Area
@@ -156,8 +157,75 @@ export interface Organization {
   internal_notes: string | null
   domain_blacklist: string | null
   billing_day: number
+  apify_token: string | null
+  anthropic_key: string | null
   created_at: string
   updated_at: string
+}
+
+export interface ScraperComboMaster {
+  id: string
+  code: string
+  name: string
+  description: string | null
+  title_keywords: string[]
+  seniority_levels: string[]
+  company_headcounts: string[]
+  functions: string[]
+  is_active: boolean
+  position: number
+  created_at: string
+  org_active?: boolean
+}
+
+export interface OrgCombo {
+  id: string
+  organization_id: string
+  combo_code: string
+  is_active: boolean
+  created_at: string
+}
+
+export interface SenderProfile {
+  id: string
+  user_id: string
+  organization_id: string
+  display_name: string
+  title: string
+  company: string
+  style_hint: string
+  icp_focus: string[]
+  language: string
+  is_default: boolean
+  is_active: boolean
+  created_at: string
+}
+
+export interface RunRecord {
+  id: string
+  organization_id: string
+  executed_by: string | null
+  combos: string[]
+  market: string
+  total_leads_requested: number
+  sdr_count: number
+  plan: string
+  status: string
+  error_message: string | null
+  created_at: string
+  updated_at: string
+  executor?: { full_name: string }
+  run_sdr_assignments?: RunSdrAssignment[]
+}
+
+export interface RunSdrAssignment {
+  id: string
+  run_id: string
+  sdr_id: string
+  sender_profile_id: string | null
+  leads_assigned: number
+  created_at: string
+  user?: { full_name: string }
 }
 
 export interface PipelineStage {

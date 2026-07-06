@@ -54,6 +54,11 @@ export default function OrgDetailPage() {
   const [confirmDeactivate, setConfirmDeactivate] = useState(false)
   const [confirmReactivate, setConfirmReactivate] = useState(false)
 
+  const [apifyToken, setApifyToken] = useState('')
+  const [anthropicKey, setAnthropicKey] = useState('')
+  const [savingKeys, setSavingKeys] = useState(false)
+  const [savedKeys, setSavedKeys] = useState(false)
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -68,6 +73,8 @@ export default function OrgDetailPage() {
       setDefaultLanguage(data.default_language ?? 'zh')
       setLogoUrl(data.logo_url ?? '')
       setInternalNotes(data.internal_notes ?? '')
+      setApifyToken(data.apify_token ?? '')
+      setAnthropicKey(data.anthropic_key ?? '')
       setActiveAddons(new Set(data.addons.map((a: OrganizationAddon) => a.addon_type)))
     } catch (e) {
       setError((e as Error).message)
@@ -89,6 +96,21 @@ export default function OrgDetailPage() {
       if (res.ok) { setSavedInfo(true); setTimeout(() => setSavedInfo(false), 2000) }
     } catch { /* network error */ } finally {
       setSavingInfo(false)
+    }
+  }
+
+  async function saveApiKeys() {
+    setSavingKeys(true)
+    try {
+      await fetch(`/api/global-admin/organizations/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apify_token: apifyToken || null, anthropic_key: anthropicKey || null }),
+      })
+      setSavedKeys(true)
+      setTimeout(() => setSavedKeys(false), 2000)
+    } catch { /* network error */ } finally {
+      setSavingKeys(false)
     }
   }
 
@@ -317,6 +339,35 @@ export default function OrgDetailPage() {
             )
           })}
         </div>
+      </div>
+
+      {/* Scraper API Keys card */}
+      <div style={card}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <h2 style={{ ...sectionTitle, marginBottom: 0 }}>Scraper API Keys</h2>
+          {apifyToken && anthropicKey && (
+            <span style={{ fontSize: 10, backgroundColor: '#22C55E20', color: '#22C55E', border: '1px solid #22C55E30', borderRadius: 3, padding: '2px 8px', fontWeight: 600 }}>
+              ✓ Configured
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+          <div>
+            <label style={labelStyle}>Apify Token</label>
+            <input type="password" value={apifyToken} onChange={e => setApifyToken(e.target.value)} placeholder="apify_api_…" style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Anthropic API Key</label>
+            <input type="password" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} placeholder="sk-ant-…" style={inputStyle} />
+          </div>
+        </div>
+        <button
+          onClick={saveApiKeys}
+          disabled={savingKeys}
+          style={{ backgroundColor: colors.accent, color: '#fff', border: 'none', borderRadius: 7, padding: '8px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: savingKeys ? 0.6 : 1 }}
+        >
+          {savingKeys ? 'Saving…' : savedKeys ? '✓ Saved' : 'Save API Keys'}
+        </button>
       </div>
 
       {/* Internal Notes card */}

@@ -53,6 +53,8 @@ export default function NewOrganizationPage() {
   const [markets, setMarkets] = useState<string[]>([])
   const [internalNotes, setInternalNotes] = useState('')
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set())
+  const [apifyToken, setApifyToken] = useState('')
+  const [anthropicKey, setAnthropicKey] = useState('')
 
   useEffect(() => {
     fetch('/api/global-admin/vendors')
@@ -108,6 +110,8 @@ export default function NewOrganizationPage() {
         markets,
         internal_notes: internalNotes || null,
         addons: Array.from(selectedAddons),
+        apify_token: apifyToken || null,
+        anthropic_key: anthropicKey || null,
       }),
     })
 
@@ -366,6 +370,22 @@ export default function NewOrganizationPage() {
                 </label>
               )
             })}
+          </div>
+        </div>
+
+        {/* Scraper API Keys */}
+        <div style={{ ...cardStyle, marginBottom: 20 }}>
+          <h2 style={{ fontSize: 13, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>Scraper API Keys</h2>
+          <p style={{ fontSize: 12, color: colors.textMuted, margin: '0 0 14px' }}>Optional — can be configured later in the org's Settings → Scraper.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Apify Token</label>
+              <input type="password" value={apifyToken} onChange={e => setApifyToken(e.target.value)} placeholder="apify_api_…" style={inputStyle} />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Anthropic API Key</label>
+              <input type="password" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} placeholder="sk-ant-…" style={inputStyle} />
+            </div>
           </div>
         </div>
 

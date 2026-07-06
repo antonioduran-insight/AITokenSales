@@ -5,8 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { useUser } from '@/contexts/UserContext'
-import { GripVertical, Plus, Trash2, X, ChevronDown } from 'lucide-react'
-import type { Organization, PipelineStage, OrganizationAddon, SupportTicket } from '@/lib/types'
+import { GripVertical, Plus, Trash2, X, ChevronDown, Eye, EyeOff } from 'lucide-react'
+import type { Organization, PipelineStage, OrganizationAddon, SupportTicket, ScraperComboMaster } from '@/lib/types'
 
 const PLAN_COLORS: Record<string, string> = {
   basic: '#3B82F6',
@@ -732,6 +732,185 @@ function PlanTab() {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Tab 5 — Scraper
+// ────────────────────────────────────────────────────────────────────────────
+function ScraperTab() {
+  const [combos, setCombos] = useState<ScraperComboMaster[]>([])
+  const [combosLoading, setCombosLoading] = useState(true)
+  const [toggling, setToggling] = useState<string | null>(null)
+
+  const [apifyToken, setApifyToken] = useState('')
+  const [anthropicKey, setAnthropicKey] = useState('')
+  const [showApify, setShowApify] = useState(false)
+  const [showAnthropic, setShowAnthropic] = useState(false)
+  const [savingKeys, setSavingKeys] = useState(false)
+  const [keySaved, setKeySaved] = useState(false)
+  const [keyError, setKeyError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/scraper-combos')
+      .then(r => r.json())
+      .then((data: ScraperComboMaster[]) => { setCombos(data); setCombosLoading(false) })
+      .catch(() => setCombosLoading(false))
+
+    fetch('/api/settings/organization')
+      .then(r => r.json())
+      .then(d => {
+        setApifyToken(d.apify_token ?? '')
+        setAnthropicKey(d.anthropic_key ?? '')
+      })
+  }, [])
+
+  async function toggleCombo(code: string, isActive: boolean) {
+    setToggling(code)
+    const res = await fetch('/api/scraper-combos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ combo_code: code, is_active: isActive }),
+    })
+    if (res.ok) {
+      setCombos(prev => prev.map(c => c.code === code ? { ...c, org_active: isActive } : c))
+    }
+    setToggling(null)
+  }
+
+  async function saveKeys() {
+    setSavingKeys(true); setKeyError(null)
+    const res = await fetch('/api/settings/organization', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apify_token: apifyToken || null, anthropic_key: anthropicKey || null }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setKeyError(data.error); setSavingKeys(false); return }
+    setApifyToken(data.apify_token ?? '')
+    setAnthropicKey(data.anthropic_key ?? '')
+    setKeySaved(true)
+    setTimeout(() => setKeySaved(false), 2500)
+    setSavingKeys(false)
+  }
+
+  const hasKeys = apifyToken && anthropicKey
+
+  return (
+    <div>
+      {/* API Keys */}
+      <div style={S.card}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <p style={{ ...S.sectionTitle, marginBottom: 0 }}>API Keys</p>
+          {hasKeys && (
+            <span style={{ fontSize: 10, backgroundColor: '#22C55E20', color: '#22C55E', border: '1px solid #22C55E30', borderRadius: 3, padding: '2px 8px', fontWeight: 600 }}>
+              ✓ Configured
+            </span>
+          )}
+        </div>
+        <p style={{ fontSize: 12, color: '#52526A', marginBottom: 16 }}>
+          Required to run the scraper pipeline. Keys are stored securely and never exposed to SDRs.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={S.label}>Apify Token</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showApify ? 'text' : 'password'}
+                value={apifyToken}
+                onChange={e => setApifyToken(e.target.value)}
+                placeholder="apify_api_…"
+                style={{ ...S.input, paddingRight: 40 }}
+              />
+              <button
+                onClick={() => setShowApify(v => !v)}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#52526A' }}
+              >
+                {showApify ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label style={S.label}>Anthropic API Key</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showAnthropic ? 'text' : 'password'}
+                value={anthropicKey}
+                onChange={e => setAnthropicKey(e.target.value)}
+                placeholder="sk-ant-…"
+                style={{ ...S.input, paddingRight: 40 }}
+              />
+              <button
+                onClick={() => setShowAnthropic(v => !v)}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#52526A' }}
+              >
+                {showAnthropic ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {keyError && <p style={{ color: '#EF4444', fontSize: 13, marginTop: 12 }}>{keyError}</p>}
+
+        <button onClick={saveKeys} disabled={savingKeys} style={{ ...S.btn, marginTop: 16 }}>
+          {savingKeys ? 'Saving…' : keySaved ? '✓ Saved' : 'Save API Keys'}
+        </button>
+      </div>
+
+      {/* Search Combos */}
+      <div style={S.card}>
+        <p style={{ ...S.sectionTitle, marginBottom: 8 }}>Search Combos</p>
+        <p style={{ fontSize: 12, color: '#52526A', marginBottom: 16 }}>
+          Select which search strategies your organization uses.
+        </p>
+
+        {combosLoading ? (
+          <div style={{ color: '#52526A', padding: '16px 0', textAlign: 'center', fontSize: 13 }}>Loading…</div>
+        ) : combos.length === 0 ? (
+          <div style={{ color: '#52526A', fontSize: 13 }}>No combos available.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {combos.map(combo => (
+              <div
+                key={combo.code}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 14px',
+                  backgroundColor: combo.org_active ? '#6C63FF08' : '#1C1C27',
+                  border: `1px solid ${combo.org_active ? '#6C63FF30' : '#2A2A3A'}`,
+                  borderRadius: 8, transition: 'all .15s',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={combo.org_active ?? false}
+                  disabled={toggling === combo.code}
+                  onChange={e => toggleCombo(combo.code, e.target.checked)}
+                  style={{ accentColor: '#6C63FF', width: 15, height: 15, marginTop: 2, cursor: 'pointer', flexShrink: 0 }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: combo.org_active ? '#F0F0F5' : '#8B8BA0' }}>
+                    {combo.name}
+                  </div>
+                  {combo.description && (
+                    <div style={{ fontSize: 12, color: '#52526A', marginTop: 2 }}>{combo.description}</div>
+                  )}
+                  {combo.title_keywords.length > 0 && (
+                    <div style={{ fontSize: 11, color: '#52526A', marginTop: 4, fontFamily: 'monospace' }}>
+                      {combo.title_keywords.slice(0, 4).join(' · ')}{combo.title_keywords.length > 4 ? ` +${combo.title_keywords.length - 4}` : ''}
+                    </div>
+                  )}
+                </div>
+                {toggling === combo.code && (
+                  <span style={{ fontSize: 11, color: '#52526A' }}>Saving…</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Main Settings page
 // ────────────────────────────────────────────────────────────────────────────
 const TABS = [
@@ -739,6 +918,7 @@ const TABS = [
   { key: 'pipeline',     label: 'Pipeline' },
   { key: 'support',      label: 'Support' },
   { key: 'plan',         label: 'Plan & Usage' },
+  { key: 'scraper',      label: 'Scraper' },
 ]
 
 function SettingsContent() {
@@ -794,6 +974,7 @@ function SettingsContent() {
       {tab === 'pipeline'     && <PipelineTab />}
       {tab === 'support'      && <SupportTab orgPlan={orgPlan} />}
       {tab === 'plan'         && <PlanTab />}
+      {tab === 'scraper'      && <ScraperTab />}
     </div>
   )
 }
