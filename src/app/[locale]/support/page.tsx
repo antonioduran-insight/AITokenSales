@@ -288,8 +288,8 @@ export default function SupportPage() {
                   </div>
                 )}
 
-                {/* Admin status controls */}
-                {isAdmin && (
+                {/* Status controls — only for support/admin_global roles */}
+                {(user?.role === 'support' || user?.role === 'admin_global') && (
                   <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 12, color: '#52526A', alignSelf: 'center' }}>Change status:</span>
                     {(['open', 'in_progress', 'resolved', 'closed'] as const).map(s => (

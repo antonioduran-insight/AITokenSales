@@ -266,6 +266,21 @@ function PipelineTab() {
 
   async function deleteStage(stage: PipelineStage, idx: number) {
     if (stage.is_default) { setError('Cannot delete default stages'); return }
+    if (stages.length <= 1) { setError('Cannot delete the only stage'); return }
+
+    const statusKey = stage.name.toLowerCase().replace(/\s+/g, '_')
+    const { count } = await createClient()
+      .from('prospects')
+      .select('*', { count: 'exact', head: true })
+      .eq('outreach_status', statusKey)
+
+    if (count && count > 0) {
+      setError(`Cannot delete "${stage.name}" — ${count} prospect(s) are in this stage. Move them first.`)
+      return
+    }
+
+    if (!confirm(`Delete stage "${stage.name}"? This cannot be undone.`)) return
+
     const res = await fetch('/api/settings/pipeline-stages', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
@@ -273,6 +288,7 @@ function PipelineTab() {
     })
     if (res.ok) {
       setStages(prev => prev.filter((_, i) => i !== idx))
+      setPendingChanges(false)
     } else {
       const d = await res.json()
       setError(d.error)

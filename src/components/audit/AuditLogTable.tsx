@@ -12,8 +12,6 @@ import { useUser } from '@/contexts/UserContext'
 
 type TimeFilter = 'today' | 'week' | 'month' | 'all'
 
-const LOG_LIMITS = [7, 30, 70, 200]
-
 const EVENT_COLORS: Record<AuditEventType, string> = {
   prospect_created: '#22C55E',
   status_changed: '#6C63FF',
@@ -145,8 +143,6 @@ export function AuditLogTable() {
     URL.revokeObjectURL(url)
   }
 
-  const TIME_LABELS: Record<TimeFilter, string> = { today: 'Today', week: 'Week', month: 'Month', all: 'All time' }
-
   return (
     <PremiumFeature plan={orgPlan} requiredPlan="premium" featureName="Audit Log is available from Premium plan">
     <div style={S.page}>
@@ -185,50 +181,30 @@ export function AuditLogTable() {
           </span>
         </div>
 
-        {/* Filters row 2: Time + Limit */}
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Time filter */}
-          <div style={{ display: 'flex', gap: 2, padding: 3, backgroundColor: '#1C1C27', borderRadius: 8, border: '1px solid #2A2A3A' }}>
-            {(['today', 'week', 'month', 'all'] as TimeFilter[]).map(f => (
-              <button
-                key={f}
-                onClick={() => setTimeFilter(f)}
-                style={{
-                  padding: '5px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12,
-                  fontWeight: timeFilter === f ? 600 : 400,
-                  backgroundColor: timeFilter === f ? '#6C63FF' : 'transparent',
-                  color: timeFilter === f ? '#fff' : '#8B8BA0',
-                }}
-              >
-                {TIME_LABELS[f]}
-              </button>
-            ))}
-          </div>
+        {/* Filters row 2: Time + Limit as dropdowns */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <select
+            value={timeFilter}
+            onChange={e => setTimeFilter(e.target.value as TimeFilter)}
+            style={S.select}
+          >
+            <option value="all">All time</option>
+            <option value="today">Today</option>
+            <option value="week">This week</option>
+            <option value="month">This month</option>
+          </select>
 
-          {/* Quantity selector */}
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            <span style={{ fontSize: 12, color: '#52526A' }}>Show:</span>
-            {LOG_LIMITS.map(n => (
-              <button key={n} onClick={() => setLimit(n)}
-                style={{
-                  padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                  border: '1px solid #2A2A3A',
-                  backgroundColor: limit === n ? '#6C63FF' : 'transparent',
-                  color: limit === n ? '#fff' : '#8B8BA0',
-                }}>
-                {n}
-              </button>
-            ))}
-            <button onClick={() => setLimit(9999)}
-              style={{
-                padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                border: '1px solid #2A2A3A',
-                backgroundColor: limit === 9999 ? '#6C63FF' : 'transparent',
-                color: limit === 9999 ? '#fff' : '#8B8BA0',
-              }}>
-              All
-            </button>
-          </div>
+          <select
+            value={limit}
+            onChange={e => setLimit(Number(e.target.value))}
+            style={S.select}
+          >
+            <option value={7}>Last 7 events</option>
+            <option value={30}>Last 30 events</option>
+            <option value={70}>Last 70 events</option>
+            <option value={200}>Last 200 events</option>
+            <option value={9999}>All events</option>
+          </select>
         </div>
       </div>
 

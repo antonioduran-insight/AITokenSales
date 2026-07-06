@@ -4,16 +4,14 @@ import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { AreaBadge } from '@/components/ui/AreaBadge'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 import { TemperatureBadge } from '@/components/ui/TemperatureBadge'
 import { ICPScore } from '@/components/ui/ICPScore'
 import { NotesLog } from './NotesLog'
 import { ConversationsLog } from '@/components/conversations/ConversationsLog'
 import { useUser } from '@/contexts/UserContext'
 import { useOrgId } from '@/lib/hooks/useOrgId'
-import { ExternalLink, Copy, Check, Star, ChevronDown, CheckCircle } from 'lucide-react'
+import { ExternalLink, Copy, Check, Star, ChevronDown, CheckCircle, X } from 'lucide-react'
 import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, LeadTemperature, User } from '@/lib/types'
 import { OUTREACH_STATUSES, LEAD_TEMPERATURES } from '@/lib/types'
@@ -28,21 +26,19 @@ interface Props {
 function CopyButton({ text }: { text: string }) {
   const t = useTranslations('prospect')
   const [copied, setCopied] = useState(false)
-
   async function handleCopy() {
     await navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
-
   return (
     <button
       onClick={handleCopy}
       style={{
         display: 'flex', alignItems: 'center', gap: 5,
-        padding: '5px 10px', borderRadius: 6, border: '1px solid #2A2A3A',
-        backgroundColor: copied ? '#1A3A2A' : '#1C1C27',
-        color: copied ? '#4ADE80' : '#8B8BA0',
+        padding: '5px 10px', borderRadius: 6, border: '1px solid var(--crm-border)',
+        backgroundColor: copied ? '#1A3A2A' : 'var(--crm-surface-raised)',
+        color: copied ? '#4ADE80' : 'var(--crm-text-secondary)',
         fontSize: 12, cursor: 'pointer',
       }}
     >
@@ -55,24 +51,20 @@ function CopyButton({ text }: { text: string }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 11, color: '#52526A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+      <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
         {label}
       </div>
-      <div style={{ fontSize: 13, color: '#F0F0F5' }}>{children}</div>
+      <div style={{ fontSize: 13, color: 'var(--crm-text-primary)' }}>{children}</div>
     </div>
   )
 }
 
-const TAB_STYLE = (active: boolean) => ({
-  padding: '6px 14px',
-  borderRadius: 6,
-  border: 'none',
-  cursor: 'pointer',
-  fontSize: 13,
-  fontWeight: active ? 600 : 400,
-  backgroundColor: active ? '#2A2A3A' : 'transparent',
-  color: active ? '#F0F0F5' : '#8B8BA0',
-})
+const selectStyle: React.CSSProperties = {
+  width: '100%', padding: '7px 28px 7px 10px',
+  backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)',
+  borderRadius: 6, color: 'var(--crm-text-primary)', fontSize: 13,
+  cursor: 'pointer', appearance: 'none' as const,
+}
 
 export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: Props) {
   const t = useTranslations()
@@ -82,12 +74,10 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
   const [tab, setTab] = useState<'info' | 'messages' | 'notes' | 'conversations'>('info')
   const [saving, setSaving] = useState(false)
 
-  // Reassign (admin only)
   const [sdrsForArea, setSdrsForArea] = useState<User[]>([])
   const [reassigning, setReassigning] = useState(false)
   const [reassignToast, setReassignToast] = useState<string | null>(null)
 
-  // Keep in sync when parent updates
   if (initial.id !== prospect.id) setProspect(initial)
 
   useEffect(() => {
@@ -99,10 +89,16 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
       .eq('is_active', true)
       .eq('area_id', prospect.area_id)
       .order('full_name')
-      .then(({ data }) => {
-        if (data) setSdrsForArea(data as User[])
-      })
+      .then(({ data }) => { if (data) setSdrsForArea(data as User[]) })
   }, [isAdmin, prospect.area_id])
+
+  // Close on Escape
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [open, onClose])
 
   async function handleReassign(newSdrId: string) {
     if (!newSdrId || newSdrId === prospect.assigned_to) return
@@ -116,24 +112,19 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
       })
       const data = await res.json()
       if (!res.ok) { setReassigning(false); return }
-
       const newSdr = sdrsForArea.find(s => s.id === newSdrId)
       const updated = { ...prospect, assigned_to: newSdrId, assigned_user: newSdr }
       setProspect(updated as Prospect)
       onUpdated(updated as Prospect)
-
       await logAuditEvent({
         event_type: 'prospect_reassigned',
         prospect_id: prospect.id,
         prospect_name: prospect.name,
         metadata: { from_sdr: fromName, to_sdr: data.sdr_name },
       })
-
       setReassignToast(`Lead reasignado a ${data.sdr_name}`)
       setTimeout(() => setReassignToast(null), 3000)
-    } finally {
-      setReassigning(false)
-    }
+    } finally { setReassigning(false) }
   }
 
   async function updateField(field: string, value: unknown) {
@@ -160,26 +151,25 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
     })
   }
 
-  async function toggleFlag() {
-    await updateField('flag_tomorrow', !prospect.flag_tomorrow)
-  }
+  async function toggleFlag() { await updateField('flag_tomorrow', !prospect.flag_tomorrow) }
+
+  const TAB_STYLE = (active: boolean): React.CSSProperties => ({
+    padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13,
+    fontWeight: active ? 600 : 400,
+    backgroundColor: active ? 'var(--crm-surface-raised)' : 'transparent',
+    color: active ? 'var(--crm-text-primary)' : 'var(--crm-text-secondary)',
+  })
+
+  if (!open) return null
 
   return (
-    <Sheet open={open} onOpenChange={v => !v && onClose()}>
-      <SheetContent
-        side="right"
-        style={{
-          width: 480,
-          maxWidth: '95vw',
-          backgroundColor: '#13131A',
-          borderLeft: '1px solid #2A2A3A',
-          padding: 0,
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {/* Read-only banner when impersonating */}
+    <div
+      style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 16, width: '100%', maxWidth: 720, maxHeight: '88vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+
+        {/* Read-only banner */}
         {isImpersonating && (
           <div style={{ backgroundColor: '#1C1410', borderBottom: '1px solid #F59E0B', padding: '6px 20px', fontSize: 11, color: '#FCD34D', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             👁 Read-only view
@@ -187,48 +177,50 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
         )}
 
         {/* Header */}
-        <SheetHeader style={{ padding: '16px 20px', borderBottom: '1px solid #2A2A3A', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ padding: '20px 24px 0', borderBottom: '1px solid var(--crm-border)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
             <div style={{ flex: 1 }}>
-              <SheetTitle style={{ color: '#F0F0F5', fontSize: 16, fontWeight: 700, margin: 0 }}>
-                {prospect.name}
-              </SheetTitle>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <button
+                  onClick={toggleFlag}
+                  disabled={isImpersonating}
+                  style={{ background: 'none', border: 'none', cursor: isImpersonating ? 'default' : 'pointer', padding: 0, opacity: isImpersonating ? 0.4 : 1, display: 'flex', alignItems: 'center' }}
+                  title={t('common.flagTomorrow')}
+                >
+                  <Star size={15} fill={prospect.flag_tomorrow ? '#F59E0B' : 'none'} stroke={prospect.flag_tomorrow ? '#F59E0B' : 'var(--crm-text-muted)'} />
+                </button>
+                <h2 style={{ color: 'var(--crm-text-primary)', fontSize: 18, fontWeight: 700, margin: 0 }}>
+                  {prospect.name}
+                </h2>
+                {prospect.area && <AreaBadge area={prospect.area} size="md" />}
+              </div>
               {prospect.company && (
-                <p style={{ color: '#8B8BA0', fontSize: 13, margin: '2px 0 0' }}>
+                <p style={{ color: 'var(--crm-text-secondary)', fontSize: 13, margin: 0 }}>
                   {prospect.title && <span>{prospect.title} · </span>}
                   {prospect.company}
                 </p>
               )}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-              {prospect.area && <AreaBadge area={prospect.area} size="md" />}
-              <button
-                onClick={toggleFlag}
-                title={t('common.flagTomorrow')}
-                disabled={isImpersonating}
-                style={{ background: 'none', border: 'none', cursor: isImpersonating ? 'default' : 'pointer', padding: 4, opacity: isImpersonating ? 0.4 : 1 }}
-              >
-                <Star
-                  size={16}
-                  fill={prospect.flag_tomorrow ? '#F59E0B' : 'none'}
-                  stroke={prospect.flag_tomorrow ? '#F59E0B' : '#52526A'}
-                />
-              </button>
-            </div>
+            <button
+              onClick={onClose}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', padding: 4, display: 'flex', alignItems: 'center', flexShrink: 0 }}
+            >
+              <X size={18} />
+            </button>
           </div>
 
           {/* Tabs */}
-          <div style={{ display: 'flex', gap: 4, marginTop: 12 }}>
+          <div style={{ display: 'flex', gap: 2 }}>
             {(['info', 'messages', 'notes', 'conversations'] as const).map(tab_ => (
               <button key={tab_} style={TAB_STYLE(tab === tab_)} onClick={() => setTab(tab_)}>
                 {tab_ === 'info' ? t('prospect.info') : tab_ === 'messages' ? t('prospect.messages') : tab_ === 'notes' ? t('prospect.notes') : t('prospect.chats')}
               </button>
             ))}
           </div>
-        </SheetHeader>
+        </div>
 
         {/* Content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
 
           {/* INFO TAB */}
           {tab === 'info' && (
@@ -236,79 +228,51 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
               {/* Status + Temperature */}
               <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, color: '#52526A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
                     {t('prospect.outreachStatus')}
                   </div>
                   <div style={{ position: 'relative' }}>
-                    <select
-                      value={prospect.outreach_status}
-                      onChange={e => handleStatusChange(e.target.value as OutreachStatus)}
-                      style={{
-                        width: '100%', padding: '7px 28px 7px 10px',
-                        backgroundColor: '#1C1C27', border: '1px solid #2A2A3A',
-                        borderRadius: 6, color: '#F0F0F5', fontSize: 13,
-                        cursor: 'pointer', appearance: 'none',
-                      }}
-                    >
-                      {OUTREACH_STATUSES.map(s => (
-                        <option key={s} value={s}>{t(`outreachStatus.${s}`)}</option>
-                      ))}
+                    <select value={prospect.outreach_status} onChange={e => handleStatusChange(e.target.value as OutreachStatus)} style={selectStyle}>
+                      {OUTREACH_STATUSES.map(s => <option key={s} value={s}>{t(`outreachStatus.${s}`)}</option>)}
                     </select>
-                    <ChevronDown size={12} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: '#52526A', pointerEvents: 'none' }} />
+                    <ChevronDown size={12} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--crm-text-muted)', pointerEvents: 'none' }} />
                   </div>
                 </div>
-
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, color: '#52526A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
                     {t('prospect.leadTemperature')}
                   </div>
                   <div style={{ position: 'relative' }}>
-                    <select
-                      value={prospect.lead_temperature ?? ''}
-                      onChange={e => updateField('lead_temperature', e.target.value || null)}
-                      style={{
-                        width: '100%', padding: '7px 28px 7px 10px',
-                        backgroundColor: '#1C1C27', border: '1px solid #2A2A3A',
-                        borderRadius: 6, color: '#F0F0F5', fontSize: 13,
-                        cursor: 'pointer', appearance: 'none',
-                      }}
-                    >
+                    <select value={prospect.lead_temperature ?? ''} onChange={e => updateField('lead_temperature', e.target.value || null)} style={selectStyle}>
                       <option value="">{t('common.none')}</option>
-                      {LEAD_TEMPERATURES.map(temp => (
-                        <option key={temp} value={temp}>{t(`temperature.${temp}`)}</option>
-                      ))}
+                      {LEAD_TEMPERATURES.map(temp => <option key={temp} value={temp}>{t(`temperature.${temp}`)}</option>)}
                     </select>
-                    <ChevronDown size={12} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: '#52526A', pointerEvents: 'none' }} />
+                    <ChevronDown size={12} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--crm-text-muted)', pointerEvents: 'none' }} />
                   </div>
                 </div>
               </div>
 
               {/* ICP Score */}
               <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 11, color: '#52526A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
                   {t('prospect.icpScore')}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <input
-                    type="number"
-                    min={0} max={100}
+                    type="number" min={0} max={100}
                     value={prospect.icp_score ?? ''}
                     onChange={e => updateField('icp_score', e.target.value ? Number(e.target.value) : null)}
-                    style={{
-                      width: 80, padding: '6px 10px',
-                      backgroundColor: '#1C1C27', border: '1px solid #2A2A3A',
-                      borderRadius: 6, color: '#F0F0F5', fontSize: 13,
-                    }}
+                    style={{ width: 80, padding: '6px 10px', backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 6, color: 'var(--crm-text-primary)', fontSize: 13 }}
                   />
                   <ICPScore score={prospect.icp_score} size="md" />
                 </div>
               </div>
 
-              <div style={{ borderTop: '1px solid #2A2A3A', paddingTop: 16 }}>
+              <div style={{ borderTop: '1px solid var(--crm-border)', paddingTop: 16 }}>
                 {prospect.linkedin_url && (
                   <Field label={t('prospect.linkedinUrl')}>
                     <a href={prospect.linkedin_url} target="_blank" rel="noopener noreferrer"
-                      style={{ color: '#6C63FF', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', fontSize: 13 }}>
+                      style={{ color: 'var(--crm-accent)', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', fontSize: 13 }}>
                       {prospect.linkedin_url.replace('https://www.linkedin.com/', '')}
                       <ExternalLink size={11} />
                     </a>
@@ -320,7 +284,7 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
                 {prospect.market && <Field label={t('prospect.market')}>{prospect.market}</Field>}
                 {prospect.search_combo && (
                   <Field label={t('prospect.searchCombo')}>
-                    <span style={{ backgroundColor: '#1C1C27', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>
+                    <span style={{ backgroundColor: 'var(--crm-surface-raised)', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>
                       {t(`searchCombo.${prospect.search_combo}`)}
                     </span>
                   </Field>
@@ -334,7 +298,7 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
                 )}
                 {isAdmin ? (
                   <div style={{ marginBottom: 14 }}>
-                    <div style={{ fontSize: 11, color: '#52526A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                    <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
                       {t('prospect.assignedTo')}
                     </div>
                     <div style={{ position: 'relative' }}>
@@ -342,23 +306,15 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
                         value={prospect.assigned_to ?? ''}
                         onChange={e => handleReassign(e.target.value)}
                         disabled={reassigning || sdrsForArea.length === 0}
-                        style={{
-                          width: '100%', padding: '7px 28px 7px 10px',
-                          backgroundColor: '#1C1C27', border: '1px solid #2A2A3A',
-                          borderRadius: 6, color: '#F0F0F5', fontSize: 13,
-                          cursor: 'pointer', appearance: 'none',
-                          opacity: reassigning ? 0.6 : 1,
-                        }}
+                        style={{ ...selectStyle, opacity: reassigning ? 0.6 : 1 }}
                       >
                         <option value="">Sin asignar</option>
-                        {sdrsForArea.map(s => (
-                          <option key={s.id} value={s.id}>{s.full_name}</option>
-                        ))}
+                        {sdrsForArea.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
                       </select>
-                      <ChevronDown size={12} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: '#52526A', pointerEvents: 'none' }} />
+                      <ChevronDown size={12} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--crm-text-muted)', pointerEvents: 'none' }} />
                     </div>
                     {sdrsForArea.length === 0 && (
-                      <p style={{ fontSize: 11, color: '#52526A', marginTop: 4 }}>No hay SDRs activos en esta área</p>
+                      <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 4 }}>No hay SDRs activos en esta área</p>
                     )}
                   </div>
                 ) : prospect.assigned_user ? (
@@ -367,7 +323,7 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
                   </Field>
                 ) : null}
                 <Field label={t('prospect.createdAt')}>
-                  <span className="font-mono-data" style={{ fontSize: 11, color: '#8B8BA0' }}>
+                  <span className="font-mono-data" style={{ fontSize: 11, color: 'var(--crm-text-secondary)' }}>
                     {format(new Date(prospect.created_at), 'dd MMM yyyy, HH:mm')}
                   </span>
                 </Field>
@@ -381,21 +337,17 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
               {(['custom1', 'custom2', 'custom3'] as const).map(field => (
                 <div key={field}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#8B8BA0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--crm-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                       {t(`prospect.${field}`)}
                     </span>
                     {prospect[field] && <CopyButton text={prospect[field]!} />}
                   </div>
                   {prospect[field] ? (
-                    <div style={{
-                      backgroundColor: '#1C1C27', border: '1px solid #2A2A3A',
-                      borderRadius: 8, padding: '12px 14px',
-                      fontSize: 13, color: '#F0F0F5', lineHeight: 1.6, whiteSpace: 'pre-wrap',
-                    }}>
+                    <div style={{ backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '12px 14px', fontSize: 13, color: 'var(--crm-text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
                       {prospect[field]}
                     </div>
                   ) : (
-                    <p style={{ color: '#52526A', fontSize: 13 }}>{t('prospect.noMessage')}</p>
+                    <p style={{ color: 'var(--crm-text-muted)', fontSize: 13 }}>{t('prospect.noMessage')}</p>
                   )}
                 </div>
               ))}
@@ -419,18 +371,12 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
 
         {/* Reassign toast */}
         {reassignToast && (
-          <div style={{
-            position: 'absolute', bottom: 20, left: 20, right: 20,
-            backgroundColor: '#1A3A2A', border: '1px solid #22C55E40',
-            borderRadius: 8, padding: '10px 14px',
-            display: 'flex', alignItems: 'center', gap: 8,
-            fontSize: 13, color: '#22C55E', zIndex: 10,
-          }}>
+          <div style={{ position: 'absolute', bottom: 20, left: 20, right: 20, backgroundColor: '#1A3A2A', border: '1px solid #22C55E40', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#22C55E', zIndex: 10 }}>
             <CheckCircle size={14} />
             {reassignToast}
           </div>
         )}
-      </SheetContent>
-    </Sheet>
+      </div>
+    </div>
   )
 }
