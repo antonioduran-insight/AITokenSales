@@ -137,20 +137,27 @@ export default function SupportPage() {
   async function sendReply(ticketId: string) {
     if (!replyContent.trim()) return
     setSending(true)
-    const res = await fetch(`/api/support/tickets/${ticketId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: replyContent }),
-    })
-    if (res.ok) {
-      const msg = await res.json()
+    try {
+      const res = await fetch(`/api/support/tickets/${ticketId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: replyContent }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        console.error('sendReply error:', data)
+        return
+      }
       setTickets(prev => prev.map(t => t.id === ticketId
-        ? { ...t, messages: [...t.messages, msg] }
+        ? { ...t, messages: [...t.messages.filter(m => m.id !== data.id), data] }
         : t
       ))
       setReplyContent('')
+    } catch (e) {
+      console.error('sendReply exception:', e)
+    } finally {
+      setSending(false)
     }
-    setSending(false)
   }
 
   async function updateStatus(ticketId: string, status: string) {
