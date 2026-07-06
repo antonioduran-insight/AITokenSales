@@ -29,7 +29,7 @@ const PRIORITY_COLORS: Record<string, string> = {
   urgent: '#EF4444', high: '#F97316', medium: '#EAB308', low: '#6B7280',
 }
 const STATUS_COLORS: Record<string, string> = {
-  open: '#6C63FF', in_progress: '#F59E0B', resolved: '#22C55E', closed: '#52526A',
+  open: '#6C63FF', in_progress: '#F59E0B', closed: '#52526A', resolved: '#52526A',
 }
 
 const S: Record<string, React.CSSProperties> = {
@@ -71,9 +71,11 @@ export default function SupportPage() {
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Realtime subscription for expanded ticket messages
+  // Realtime subscription for expanded ticket messages (only when not closed)
   useEffect(() => {
     if (!expandedId) return
+    const expandedTicket = tickets.find(t => t.id === expandedId)
+    if (expandedTicket?.status === 'closed') return
     const supabase = createClient()
     const channel = supabase
       .channel(`ticket-messages-${expandedId}`)
@@ -202,7 +204,6 @@ export default function SupportPage() {
             <option value="">All Status</option>
             <option value="open">Open</option>
             <option value="in_progress">In Progress</option>
-            <option value="resolved">Resolved</option>
             <option value="closed">Closed</option>
           </select>
           <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
@@ -269,12 +270,14 @@ export default function SupportPage() {
             {/* Expanded thread */}
             {isExpanded && (
               <div style={{ borderTop: '1px solid #2A2A3A', marginTop: 16, paddingTop: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: '#22C55E', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#22C55E', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                    Live
-                  </span>
-                </div>
+                {ticket.status !== 'closed' && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: '#22C55E', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#22C55E', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                      Live
+                    </span>
+                  </div>
+                )}
                 {/* Description */}
                 <div style={{ backgroundColor: '#1C1C27', borderRadius: 8, padding: '12px 14px', marginBottom: 12, fontSize: 13, color: '#8B8BA0', lineHeight: 1.6 }}>
                   <div style={{ fontSize: 11, color: '#52526A', fontWeight: 600, marginBottom: 6 }}>ORIGINAL REQUEST</div>
@@ -296,7 +299,7 @@ export default function SupportPage() {
                 )}
 
                 {/* Reply form */}
-                {(ticket.status !== 'closed' && ticket.status !== 'resolved') && (
+                {ticket.status !== 'closed' && (
                   <div style={{ display: 'flex', gap: 8 }}>
                     <textarea
                       value={replyContent}
@@ -320,7 +323,7 @@ export default function SupportPage() {
                 {(user?.role === 'support' || user?.role === 'admin_global') && (
                   <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 12, color: '#52526A', alignSelf: 'center' }}>Change status:</span>
-                    {(['open', 'in_progress', 'resolved', 'closed'] as const).map(s => (
+                    {(['open', 'in_progress', 'closed'] as const).map(s => (
                       <button key={s} onClick={() => updateStatus(ticket.id, s)}
                         style={{
                           padding: '4px 12px', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',

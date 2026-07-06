@@ -50,7 +50,8 @@ export async function POST(
   if (!ticket || ticket.organization_id !== ctx.orgId) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
-  if (ctx.role !== 'admin' && ticket.created_by !== ctx.userId) {
+  const canReply = ctx.role === 'admin' || ctx.role === 'support' || ctx.role === 'admin_global'
+  if (!canReply && ticket.created_by !== ctx.userId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -70,7 +71,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const ctx = await getAuthUser()
-  if (!ctx || ctx.role !== 'admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const canChangeStatus = ctx && (ctx.role === 'admin' || ctx.role === 'support' || ctx.role === 'admin_global')
+  if (!canChangeStatus) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
   const { status } = await req.json()

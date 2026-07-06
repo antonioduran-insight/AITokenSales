@@ -38,7 +38,8 @@ export async function GET() {
     .eq('organization_id', ctx.orgId)
     .order('created_at', { ascending: false })
 
-  if (ctx.role !== 'admin') {
+  const canSeeAll = ctx.role === 'admin' || ctx.role === 'support' || ctx.role === 'admin_global'
+  if (!canSeeAll) {
     query = query.eq('created_by', ctx.userId)
   }
 
