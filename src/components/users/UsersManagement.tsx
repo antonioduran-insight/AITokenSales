@@ -119,17 +119,13 @@ export function UsersManagement() {
     if (!editUser || !editName.trim()) { setEditError('Name is required'); return }
     setEditSaving(true); setEditError('')
     try {
-      const supabase = createClient()
-      const { error: nameErr } = await supabase.from('users').update({ full_name: editName.trim(), role: editRole }).eq('id', editUser.id)
-      if (nameErr) { setEditError(nameErr.message); return }
-
-      // Update user_areas
-      await supabase.from('user_areas').delete().eq('user_id', editUser.id)
-      if (editAreaIds.length > 0) {
-        await supabase.from('user_areas').insert(editAreaIds.map(aid => ({ user_id: editUser.id, area_id: aid })))
-        await supabase.from('users').update({ area_id: editAreaIds[0] }).eq('id', editUser.id)
-      }
-
+      const res = await fetch('/api/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editUser.id, action: 'edit', full_name: editName.trim(), role: editRole, area_ids: editAreaIds }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setEditError(json.error ?? 'Failed to save'); return }
       setEditUser(null)
       fetchUsers()
     } finally { setEditSaving(false) }
@@ -300,29 +296,29 @@ export function UsersManagement() {
                   </span>
                 </div>
 
-                {/* Actions: Unassign | Edit | Delete */}
-                {!isAdminUser && (
-                  <div style={{ display: 'flex', gap: 6, borderTop: '1px solid #1C1C27', paddingTop: 12 }}>
+                {/* Actions: Unassign (SDR only) | Edit | Delete */}
+                <div style={{ display: 'flex', gap: 6, borderTop: '1px solid #1C1C27', paddingTop: 12 }}>
+                  {!isAdminUser && (
                     <button
                       onClick={() => setUnassignUser(u)}
                       style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 5, fontSize: 12, cursor: 'pointer', border: '1px solid #F59E0B40', backgroundColor: '#F59E0B10', color: '#F59E0B' }}
                     >
                       <UserMinus size={12} /> Unassign
                     </button>
-                    <button
-                      onClick={() => openEdit(u)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 5, fontSize: 12, cursor: 'pointer', border: '1px solid #6C63FF40', backgroundColor: '#6C63FF10', color: '#6C63FF' }}
-                    >
-                      <Pencil size={12} /> Edit
-                    </button>
-                    <button
-                      onClick={() => { setDeleteError(''); setDeleteUser(u) }}
-                      style={{ display: 'flex', alignItems: 'center', padding: '5px 10px', borderRadius: 5, fontSize: 12, cursor: 'pointer', border: '1px solid #EF444440', backgroundColor: '#EF444410', color: '#EF4444', marginLeft: 'auto' }}
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                )}
+                  )}
+                  <button
+                    onClick={() => openEdit(u)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 5, fontSize: 12, cursor: 'pointer', border: '1px solid #6C63FF40', backgroundColor: '#6C63FF10', color: '#6C63FF' }}
+                  >
+                    <Pencil size={12} /> Edit
+                  </button>
+                  <button
+                    onClick={() => { setDeleteError(''); setDeleteUser(u) }}
+                    style={{ display: 'flex', alignItems: 'center', padding: '5px 10px', borderRadius: 5, fontSize: 12, cursor: 'pointer', border: '1px solid #EF444440', backgroundColor: '#EF444410', color: '#EF4444', marginLeft: 'auto' }}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
               </div>
             )
           })}
@@ -462,11 +458,13 @@ export function UsersManagement() {
       {deleteUser && (
         <div style={S.modal} onClick={e => { if (e.target === e.currentTarget) setDeleteUser(null) }}>
           <div style={{ ...S.modalCard, maxWidth: 380 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, color: '#EF4444', marginBottom: 12 }}>{t('delete')} SDR</h2>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: '#EF4444', marginBottom: 12 }}>Delete User</h2>
             <p style={{ fontSize: 13, color: '#8B8BA0', lineHeight: 1.6, marginBottom: 8 }}>
               This will <strong style={{ color: '#F0F0F5' }}>permanently delete</strong> <strong style={{ color: '#F0F0F5' }}>{deleteUser.full_name}</strong> from the platform.
             </p>
-            <p style={{ fontSize: 12, color: '#52526A', marginBottom: 20 }}>Their leads will become unassigned. This action cannot be undone.</p>
+            <p style={{ fontSize: 12, color: '#52526A', marginBottom: 20 }}>
+              {deleteUser.role === 'sdr' ? 'Their leads will become unassigned. ' : ''}This action cannot be undone.
+            </p>
             {deleteError && <div style={{ padding: '8px 12px', backgroundColor: '#3A1A1A', border: '1px solid #EF4444', borderRadius: 6, color: '#F87171', fontSize: 12, marginBottom: 14 }}>{deleteError}</div>}
             <div style={{ display: 'flex', gap: 10 }}>
               <Button onClick={() => setDeleteUser(null)} style={{ flex: 1, backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>{t('cancel')}</Button>

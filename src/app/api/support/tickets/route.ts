@@ -34,7 +34,7 @@ export async function GET() {
 
   let query = admin
     .from('support_tickets')
-    .select('*, messages:support_ticket_messages(*), created_by_user:users!created_by(id, full_name)')
+    .select('*, messages:support_ticket_messages(*)')
     .eq('organization_id', ctx.orgId)
     .order('created_at', { ascending: false })
 
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
       priority: priority ?? 'medium',
       status: 'open',
     })
-    .select('*, messages:support_ticket_messages(*), created_by_user:users!created_by(id, full_name)')
+    .select('*, messages:support_ticket_messages(*)')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })

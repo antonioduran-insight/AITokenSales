@@ -140,9 +140,16 @@ export async function DELETE(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  const { data: profile } = await adminClient.from('users').select('role').eq('id', id).single()
+  const { data: profile } = await adminClient.from('users').select('role, organization_id').eq('id', id).single()
   if (profile?.role === 'admin') {
-    return NextResponse.json({ error: 'Cannot delete admin users' }, { status: 403 })
+    const { count: adminCount } = await adminClient
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', profile.organization_id)
+      .eq('role', 'admin')
+    if ((adminCount ?? 0) <= 1) {
+      return NextResponse.json({ error: 'Cannot delete the last admin. Promote another user to admin first.' }, { status: 403 })
+    }
   }
 
   await adminClient.from('prospects').update({ assigned_to: null }).eq('assigned_to', id)
