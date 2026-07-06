@@ -26,11 +26,11 @@ export function ThemeToggle() {
       title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
       style={{
         background: 'none',
-        border: '1px solid var(--crm-border, #2A2A3A)',
+        border: '1px solid var(--crm-border)',
         borderRadius: 6,
         padding: '6px 8px',
         cursor: 'pointer',
-        color: 'var(--crm-text-secondary, #8B8BA0)',
+        color: 'var(--crm-text-secondary)',
         display: 'flex',
         alignItems: 'center',
       }}

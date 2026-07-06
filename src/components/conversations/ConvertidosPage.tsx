@@ -24,12 +24,12 @@ interface ClosedProspect {
 }
 
 const S: Record<string, React.CSSProperties> = {
-  page: { padding: '20px 24px', color: '#F0F0F5', height: '100%', display: 'flex', flexDirection: 'column' },
+  page: { padding: '20px 24px', color: 'var(--crm-text-primary)', height: '100%', display: 'flex', flexDirection: 'column' },
   header: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' as const },
-  input: { backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 6, color: '#F0F0F5', padding: '7px 10px 7px 32px', fontSize: 13, width: 220, outline: 'none' },
-  select: { backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 6, color: '#F0F0F5', padding: '7px 10px', fontSize: 13 },
-  textarea: { width: '100%', backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 6, padding: '8px 10px', color: '#F0F0F5', fontSize: 13, resize: 'vertical' as const, outline: 'none', fontFamily: 'inherit', lineHeight: 1.5, boxSizing: 'border-box' as const },
-  label: { fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.05em', display: 'block', marginBottom: 6 },
+  input: { backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 6, color: 'var(--crm-text-primary)', padding: '7px 10px 7px 32px', fontSize: 13, width: 220, outline: 'none' },
+  select: { backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 6, color: 'var(--crm-text-primary)', padding: '7px 10px', fontSize: 13 },
+  textarea: { width: '100%', backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 6, padding: '8px 10px', color: 'var(--crm-text-primary)', fontSize: 13, resize: 'vertical' as const, outline: 'none', fontFamily: 'inherit', lineHeight: 1.5, boxSizing: 'border-box' as const },
+  label: { fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.05em', display: 'block', marginBottom: 6 },
 }
 
 const CLOSED_SELECT = 'id, name, company, assigned_to, created_at, area:areas(label_en), assigned_user:users!assigned_to(id, full_name)'
@@ -164,10 +164,10 @@ export function ConvertidosPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
           <Trophy size={20} color="#F59E0B" />
           <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{t('title')}</h1>
-          <span style={{ fontSize: 12, color: '#52526A' }}>{prospects.length} total</span>
+          <span style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{prospects.length} total</span>
         </div>
         {isAdmin ? (
-          <p style={{ fontSize: 13, color: '#8B8BA0', margin: '0 0 12px' }}>
+          <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', margin: '0 0 12px' }}>
             Closed deals and their conversations from your team. Review your team&apos;s successful outreach.
           </p>
         ) : (
@@ -191,7 +191,7 @@ export function ConvertidosPage() {
 
         <div style={S.header}>
           <div style={{ position: 'relative' }}>
-            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#52526A' }} />
+            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--crm-text-muted)' }} />
             <input
               style={S.input}
               placeholder={t('searchPlaceholder')}
@@ -208,14 +208,14 @@ export function ConvertidosPage() {
           )}
 
           {(search || filterSdr) && (
-            <button onClick={() => { setSearch(''); setFilterSdr('') }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 6, border: '1px solid #2A2A3A', backgroundColor: 'transparent', color: '#8B8BA0', cursor: 'pointer', fontSize: 12 }}>
+            <button onClick={() => { setSearch(''); setFilterSdr('') }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer', fontSize: 12 }}>
               <X size={12} /> {tc('clearFilters')}
             </button>
           )}
 
           <div style={{ flex: 1 }} />
 
-          <button onClick={fetchProspects} disabled={loading} style={{ padding: '7px 8px', borderRadius: 6, border: '1px solid #2A2A3A', backgroundColor: 'transparent', color: '#8B8BA0', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          <button onClick={fetchProspects} disabled={loading} style={{ padding: '7px 8px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
             <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
           </button>
         </div>
@@ -223,8 +223,8 @@ export function ConvertidosPage() {
 
       {/* List */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        {loading && <div style={{ textAlign: 'center', color: '#52526A', padding: 40 }}>{tc('loading')}</div>}
-        {!loading && prospects.length === 0 && <div style={{ textAlign: 'center', color: '#52526A', padding: 40 }}>{t('noData')}</div>}
+        {loading && <div style={{ textAlign: 'center', color: 'var(--crm-text-muted)', padding: 40 }}>{tc('loading')}</div>}
+        {!loading && prospects.length === 0 && <div style={{ textAlign: 'center', color: 'var(--crm-text-muted)', padding: 40 }}>{t('noData')}</div>}
 
         {!loading && prospects.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 10 }}>
@@ -234,8 +234,8 @@ export function ConvertidosPage() {
                 <div
                   key={p.id}
                   style={{
-                    backgroundColor: '#13131A',
-                    border: `1px solid ${hasChat ? '#2A2A3A' : '#EF444430'}`,
+                    backgroundColor: 'var(--crm-surface)',
+                    border: `1px solid ${hasChat ? 'var(--crm-border)' : '#EF444430'}`,
                     borderRadius: 10,
                     padding: '16px 18px',
                     display: 'flex',
@@ -246,11 +246,11 @@ export function ConvertidosPage() {
                   {/* Top row */}
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: '#F0F0F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--crm-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.name}
                       </div>
                       {p.company && (
-                        <div style={{ fontSize: 12, color: '#52526A', marginTop: 2 }}>{p.company}</div>
+                        <div style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 2 }}>{p.company}</div>
                       )}
                     </div>
 
@@ -263,8 +263,8 @@ export function ConvertidosPage() {
 
                   {/* SDR + date */}
                   {isAdmin && p.assigned_user && (
-                    <div style={{ fontSize: 12, color: '#52526A' }}>
-                      SDR: <span style={{ color: '#8B8BA0' }}>{(p.assigned_user as { full_name: string }).full_name}</span>
+                    <div style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>
+                      SDR: <span style={{ color: 'var(--crm-text-secondary)' }}>{(p.assigned_user as { full_name: string }).full_name}</span>
                     </div>
                   )}
 
@@ -276,7 +276,7 @@ export function ConvertidosPage() {
                         style={{
                           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                           padding: '8px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                          border: '1px solid #2A2A3A', backgroundColor: 'transparent', color: '#8B8BA0', flex: 1,
+                          border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', flex: 1,
                         }}
                       >
                         <Eye size={13} />
@@ -290,8 +290,8 @@ export function ConvertidosPage() {
                           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                           padding: '8px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer',
                           border: 'none',
-                          backgroundColor: hasChat ? '#2A2A3A' : '#6C63FF',
-                          color: hasChat ? '#8B8BA0' : '#FFF',
+                          backgroundColor: hasChat ? 'var(--crm-border)' : 'var(--crm-accent)',
+                          color: hasChat ? 'var(--crm-text-secondary)' : '#FFF',
                           flex: hasChat ? 'none' : 1,
                         }}
                       >
@@ -313,13 +313,13 @@ export function ConvertidosPage() {
           style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
           onClick={e => { if (e.target === e.currentTarget) setViewTarget(null) }}
         >
-          <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 24, width: 600, maxWidth: '94vw', maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 24, width: 600, maxWidth: '94vw', maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
               <div>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: '#F0F0F5', margin: 0 }}>{viewTarget.name}</h3>
-                {viewTarget.company && <div style={{ fontSize: 13, color: '#52526A', marginTop: 3 }}>{viewTarget.company}</div>}
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--crm-text-primary)', margin: 0 }}>{viewTarget.name}</h3>
+                {viewTarget.company && <div style={{ fontSize: 13, color: 'var(--crm-text-muted)', marginTop: 3 }}>{viewTarget.company}</div>}
               </div>
-              <button onClick={() => setViewTarget(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52526A' }}>
+              <button onClick={() => setViewTarget(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)' }}>
                 <X size={16} />
               </button>
             </div>
@@ -334,21 +334,21 @@ export function ConvertidosPage() {
           style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
           onClick={e => { if (e.target === e.currentTarget) { setUploadTarget(null); setReason(''); setChatContent('') } }}
         >
-          <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 24, width: 540, maxWidth: '92vw', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 24, width: 540, maxWidth: '92vw', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
               <div>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: '#F0F0F5', margin: 0 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--crm-text-primary)', margin: 0 }}>
                   {isFirstUpload ? t('firstChatTitle') : t('anotherChatTitle')}
                 </h3>
-                <div style={{ fontSize: 13, color: '#52526A', marginTop: 4 }}>{uploadTarget.name}</div>
+                <div style={{ fontSize: 13, color: 'var(--crm-text-muted)', marginTop: 4 }}>{uploadTarget.name}</div>
               </div>
-              <button onClick={() => { setUploadTarget(null); setReason(''); setChatContent('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52526A', flexShrink: 0 }}>
+              <button onClick={() => { setUploadTarget(null); setReason(''); setChatContent('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', flexShrink: 0 }}>
                 <X size={16} />
               </button>
             </div>
 
             {isFirstUpload ? (
-              <div style={{ padding: '10px 12px', backgroundColor: '#6C63FF10', border: '1px solid #6C63FF30', borderRadius: 8, marginBottom: 16, fontSize: 13, color: '#8B8BA0' }}>
+              <div style={{ padding: '10px 12px', backgroundColor: '#6C63FF10', border: '1px solid #6C63FF30', borderRadius: 8, marginBottom: 16, fontSize: 13, color: 'var(--crm-text-secondary)' }}>
                 {t('firstChatHint')}
               </div>
             ) : (
@@ -361,7 +361,7 @@ export function ConvertidosPage() {
                   rows={2}
                   style={S.textarea}
                 />
-                <div style={{ fontSize: 11, color: reason.length > 180 ? '#F59E0B' : '#52526A', textAlign: 'right', marginTop: 4 }}>
+                <div style={{ fontSize: 11, color: reason.length > 180 ? '#F59E0B' : 'var(--crm-text-muted)', textAlign: 'right', marginTop: 4 }}>
                   {reason.length}/200
                 </div>
               </div>
@@ -379,13 +379,13 @@ export function ConvertidosPage() {
             </div>
 
             <div style={{ display: 'flex', gap: 10 }}>
-              <Button onClick={() => { setUploadTarget(null); setReason(''); setChatContent('') }} style={{ flex: 1, backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>
+              <Button onClick={() => { setUploadTarget(null); setReason(''); setChatContent('') }} style={{ flex: 1, backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}>
                 {tc('cancel')}
               </Button>
               <Button
                 onClick={handleSave}
                 disabled={saving || !canSave}
-                style={{ flex: 1, backgroundColor: '#6C63FF', color: '#FFF' }}
+                style={{ flex: 1, backgroundColor: 'var(--crm-accent)', color: '#FFF' }}
               >
                 {saving ? tc('loading') : tc('save')}
               </Button>

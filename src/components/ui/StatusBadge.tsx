@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl'
 import type { OutreachStatus } from '@/lib/types'
 
 const STATUS_STYLES: Record<OutreachStatus, { bg: string; color: string }> = {
-  new:              { bg: '#1C1C27', color: '#8B8BA0' },
+  new:              { bg: 'var(--crm-surface-raised)', color: 'var(--crm-text-secondary)' },
   connection_sent:  { bg: '#1E3A5F', color: '#60A5FA' },
   connected:        { bg: '#2A1F5F', color: '#A78BFA' },
   replied:          { bg: '#1A3A2A', color: '#4ADE80' },

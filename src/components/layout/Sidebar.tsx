@@ -71,8 +71,8 @@ export function Sidebar({ user }: Props) {
       style={{
         width: collapsed ? 64 : 240,
         minWidth: collapsed ? 64 : 240,
-        backgroundColor: '#13131A',
-        borderRight: '1px solid #2A2A3A',
+        backgroundColor: 'var(--crm-surface)',
+        borderRight: '1px solid var(--crm-border)',
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
@@ -91,9 +91,9 @@ export function Sidebar({ user }: Props) {
           transform: 'translateY(-50%)',
           width: 24, height: 24,
           borderRadius: '50%',
-          backgroundColor: '#2A2A3A',
+          backgroundColor: 'var(--crm-border)',
           border: '1px solid #3A3A4A',
-          color: '#8B8BA0',
+          color: 'var(--crm-text-secondary)',
           cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 12, fontWeight: 700,
@@ -105,15 +105,15 @@ export function Sidebar({ user }: Props) {
       </button>
 
       {/* Logo */}
-      <div style={{ padding: collapsed ? '20px 0 16px' : '20px 20px 16px', borderBottom: '1px solid #2A2A3A', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', overflow: 'hidden' }}>
+      <div style={{ padding: collapsed ? '20px 0 16px' : '20px 20px 16px', borderBottom: '1px solid var(--crm-border)', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', overflow: 'hidden' }}>
         {collapsed ? (
-          <span style={{ fontSize: 20, fontWeight: 700, color: '#6C63FF' }}>A</span>
+          <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--crm-accent)' }}>A</span>
         ) : (
           <div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#F0F0F5' }}>
-              AIToken<span style={{ color: '#6C63FF' }}>Sales</span>
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--crm-text-primary)' }}>
+              AIToken<span style={{ color: 'var(--crm-accent)' }}>Sales</span>
             </div>
-            <div style={{ fontSize: 11, color: '#52526A', marginTop: 2 }}>CRM B2B Outreach</div>
+            <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 2 }}>CRM B2B Outreach</div>
           </div>
         )}
       </div>
@@ -142,8 +142,8 @@ export function Sidebar({ user }: Props) {
                 marginBottom: 2,
                 fontSize: 14,
                 fontWeight: isActive ? 600 : 400,
-                color: isActive ? '#F0F0F5' : '#8B8BA0',
-                backgroundColor: isActive ? '#2A2A3A' : 'transparent',
+                color: isActive ? 'var(--crm-text-primary)' : 'var(--crm-text-secondary)',
+                backgroundColor: isActive ? 'var(--crm-border)' : 'transparent',
                 textDecoration: 'none',
                 transition: 'all 0.15s',
               }}
@@ -158,10 +158,10 @@ export function Sidebar({ user }: Props) {
         {(isAdmin || (user?.role === 'sdr' && user?.scraper_access)) && !isImpersonating && (
           <>
             <div style={{ margin: '10px 4px 6px', display: 'flex', alignItems: 'center', gap: 8 }}>
-              {!collapsed && <div style={{ flex: 1, height: 1, backgroundColor: '#2A2A3A' }} />}
-              {!collapsed && <span style={{ fontSize: 10, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Scraper</span>}
-              {!collapsed && <div style={{ flex: 1, height: 1, backgroundColor: '#2A2A3A' }} />}
-              {collapsed && <div style={{ width: '100%', height: 1, backgroundColor: '#2A2A3A' }} />}
+              {!collapsed && <div style={{ flex: 1, height: 1, backgroundColor: 'var(--crm-border)' }} />}
+              {!collapsed && <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Scraper</span>}
+              {!collapsed && <div style={{ flex: 1, height: 1, backgroundColor: 'var(--crm-border)' }} />}
+              {collapsed && <div style={{ width: '100%', height: 1, backgroundColor: 'var(--crm-border)' }} />}
             </div>
             {[
               { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -182,7 +182,7 @@ export function Sidebar({ user }: Props) {
                     padding: collapsed ? '10px 0' : '8px 12px', borderRadius: 8, marginBottom: 2,
                     fontSize: 13,
                     fontWeight: isActive ? 600 : 400,
-                    color: isActive ? '#A78BFA' : '#52526A',
+                    color: isActive ? '#A78BFA' : 'var(--crm-text-muted)',
                     backgroundColor: isActive ? '#6C63FF15' : 'transparent',
                     textDecoration: 'none', transition: 'all 0.15s',
                   }}
@@ -197,26 +197,26 @@ export function Sidebar({ user }: Props) {
       </nav>
 
       {/* User footer */}
-      <div style={{ padding: collapsed ? '12px 0' : '12px 16px', borderTop: '1px solid #2A2A3A', display: 'flex', flexDirection: 'column', alignItems: collapsed ? 'center' : 'stretch' }}>
+      <div style={{ padding: collapsed ? '12px 0' : '12px 16px', borderTop: '1px solid var(--crm-border)', display: 'flex', flexDirection: 'column', alignItems: collapsed ? 'center' : 'stretch' }}>
         {user && (
           <div style={{ display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 10, marginBottom: 10, justifyContent: collapsed ? 'center' : 'flex-start' }}>
             <div
               style={{
                 width: 32, height: 32, borderRadius: '50%',
-                backgroundColor: '#2A2A3A',
+                backgroundColor: 'var(--crm-border)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 13, fontWeight: 600, color: '#6C63FF', flexShrink: 0,
+                fontSize: 13, fontWeight: 600, color: 'var(--crm-accent)', flexShrink: 0,
               }}
             >
               {user.full_name?.[0]?.toUpperCase() ?? '?'}
             </div>
             {!collapsed && (
               <div style={{ overflow: 'hidden' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#F0F0F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {user.full_name}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                  <span style={{ fontSize: 11, color: '#52526A', textTransform: 'uppercase' }}>
+                  <span style={{ fontSize: 11, color: 'var(--crm-text-muted)', textTransform: 'uppercase' }}>
                     {user.role}
                   </span>
                   {user.area && <AreaBadge area={user.area} size="sm" />}
@@ -234,11 +234,11 @@ export function Sidebar({ user }: Props) {
             width: '100%', padding: collapsed ? '7px 0' : '7px 10px',
             borderRadius: 6, border: 'none', cursor: 'pointer',
             backgroundColor: 'transparent',
-            color: '#52526A', fontSize: 13,
+            color: 'var(--crm-text-muted)', fontSize: 13,
             transition: 'color 0.15s',
           }}
           onMouseEnter={e => (e.currentTarget.style.color = '#EF4444')}
-          onMouseLeave={e => (e.currentTarget.style.color = '#52526A')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'var(--crm-text-muted)')}
         >
           <LogOut size={14} />
           {!collapsed && 'Logout'}

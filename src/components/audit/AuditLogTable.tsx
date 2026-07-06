@@ -30,10 +30,10 @@ const ALL_EVENTS: AuditEventType[] = [
 ]
 
 const S: Record<string, React.CSSProperties> = {
-  page: { padding: '20px 24px', color: '#F0F0F5', height: '100%', display: 'flex', flexDirection: 'column' },
-  select: { backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 6, color: '#F0F0F5', padding: '6px 10px', fontSize: 13, outline: 'none' },
-  th: { padding: '9px 14px', textAlign: 'left' as const, fontSize: 11, fontWeight: 600, color: '#52526A', textTransform: 'uppercase' as const, letterSpacing: '0.05em', borderBottom: '1px solid #2A2A3A', whiteSpace: 'nowrap' as const },
-  td: { padding: '9px 14px', borderBottom: '1px solid #1C1C27', fontSize: 13, verticalAlign: 'top' as const },
+  page: { padding: '20px 24px', color: 'var(--crm-text-primary)', height: '100%', display: 'flex', flexDirection: 'column' },
+  select: { backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 6, color: 'var(--crm-text-primary)', padding: '6px 10px', fontSize: 13, outline: 'none' },
+  th: { padding: '9px 14px', textAlign: 'left' as const, fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.05em', borderBottom: '1px solid var(--crm-border)', whiteSpace: 'nowrap' as const },
+  td: { padding: '9px 14px', borderBottom: '1px solid var(--crm-surface-raised)', fontSize: 13, verticalAlign: 'top' as const },
 }
 
 function getFromDate(filter: TimeFilter): string | null {
@@ -150,10 +150,10 @@ export function AuditLogTable() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <h1 style={{ fontSize: 20, fontWeight: 700 }}>{t('title')}</h1>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={fetchLogs} style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #2A2A3A', backgroundColor: 'transparent', color: '#8B8BA0', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+            <button onClick={fetchLogs} style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
               <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
             </button>
-            <button onClick={exportCSV} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 6, border: '1px solid #2A2A3A', backgroundColor: 'transparent', color: '#8B8BA0', cursor: 'pointer', fontSize: 12 }}>
+            <button onClick={exportCSV} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer', fontSize: 12 }}>
               <Download size={12} /> {t('export')}
             </button>
           </div>
@@ -176,14 +176,14 @@ export function AuditLogTable() {
             ))}
           </select>
 
-          <span style={{ fontSize: 12, color: '#52526A', marginLeft: 'auto' }}>
+          <span style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginLeft: 'auto' }}>
             {t('eventsCount', { count: total })}
           </span>
         </div>
 
         {/* Filters row 2: Time buttons + Limit dropdown */}
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', border: '1px solid #2A2A3A', borderRadius: 7, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', border: '1px solid var(--crm-border)', borderRadius: 7, overflow: 'hidden' }}>
             {([
               { key: 'all', label: 'All time' },
               { key: 'today', label: 'Today' },
@@ -198,9 +198,9 @@ export function AuditLogTable() {
                   fontSize: 12,
                   fontWeight: timeFilter === key ? 600 : 400,
                   border: 'none',
-                  borderRight: '1px solid #2A2A3A',
-                  backgroundColor: timeFilter === key ? '#6C63FF' : 'transparent',
-                  color: timeFilter === key ? '#fff' : '#8B8BA0',
+                  borderRight: '1px solid var(--crm-border)',
+                  backgroundColor: timeFilter === key ? 'var(--crm-accent)' : 'transparent',
+                  color: timeFilter === key ? '#fff' : 'var(--crm-text-secondary)',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap' as const,
                 }}
@@ -225,9 +225,9 @@ export function AuditLogTable() {
       </div>
 
       {/* Table */}
-      <div style={{ flex: 1, overflow: 'auto', border: '1px solid #2A2A3A', borderRadius: 10, backgroundColor: '#13131A' }}>
+      <div style={{ flex: 1, overflow: 'auto', border: '1px solid var(--crm-border)', borderRadius: 10, backgroundColor: 'var(--crm-surface)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead style={{ position: 'sticky', top: 0, backgroundColor: '#13131A', zIndex: 1 }}>
+          <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--crm-surface)', zIndex: 1 }}>
             <tr>
               <th style={S.th}>{t('timestamp')}</th>
               <th style={S.th}>{t('actor')}</th>
@@ -238,27 +238,27 @@ export function AuditLogTable() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={5} style={{ ...S.td, textAlign: 'center', color: '#52526A', padding: 48 }}>Loading...</td></tr>
+              <tr><td colSpan={5} style={{ ...S.td, textAlign: 'center', color: 'var(--crm-text-muted)', padding: 48 }}>Loading...</td></tr>
             )}
             {!loading && logs.length === 0 && (
-              <tr><td colSpan={5} style={{ ...S.td, textAlign: 'center', color: '#52526A', padding: 48 }}>{t('noEvents')}</td></tr>
+              <tr><td colSpan={5} style={{ ...S.td, textAlign: 'center', color: 'var(--crm-text-muted)', padding: 48 }}>{t('noEvents')}</td></tr>
             )}
             {!loading && logs.map(log => {
-              const color = EVENT_COLORS[log.event_type] ?? '#52526A'
+              const color = EVENT_COLORS[log.event_type] ?? 'var(--crm-text-muted)'
               return (
                 <tr key={log.id}>
-                  <td style={{ ...S.td, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: '#52526A', whiteSpace: 'nowrap' }}>
+                  <td style={{ ...S.td, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: 'var(--crm-text-muted)', whiteSpace: 'nowrap' }}>
                     {format(new Date(log.created_at), 'MMM d, yyyy')}<br />
                     <span style={{ color: '#3A3A4A' }}>{format(new Date(log.created_at), 'HH:mm:ss')}</span>
                   </td>
-                  <td style={{ ...S.td, color: '#F0F0F5', fontWeight: 500 }}>{log.actor_name}</td>
+                  <td style={{ ...S.td, color: 'var(--crm-text-primary)', fontWeight: 500 }}>{log.actor_name}</td>
                   <td style={S.td}>
                     <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, backgroundColor: color + '20', color }}>
                       {t(`events.${log.event_type}`)}
                     </span>
                   </td>
-                  <td style={{ ...S.td, color: '#8B8BA0' }}>{log.prospect_name ?? '—'}</td>
-                  <td style={{ ...S.td, color: '#8B8BA0', fontSize: 12 }}>{formatDetail(log)}</td>
+                  <td style={{ ...S.td, color: 'var(--crm-text-secondary)' }}>{log.prospect_name ?? '—'}</td>
+                  <td style={{ ...S.td, color: 'var(--crm-text-secondary)', fontSize: 12 }}>{formatDetail(log)}</td>
                 </tr>
               )
             })}

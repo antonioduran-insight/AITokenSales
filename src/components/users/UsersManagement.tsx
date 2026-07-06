@@ -16,11 +16,11 @@ interface UserWithArea extends User {
 }
 
 const S: Record<string, React.CSSProperties> = {
-  page: { padding: '20px 24px', color: '#F0F0F5', height: '100%', display: 'flex', flexDirection: 'column' },
+  page: { padding: '20px 24px', color: 'var(--crm-text-primary)', height: '100%', display: 'flex', flexDirection: 'column' },
   modal: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 },
-  modalCard: { backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 28, width: 420, maxWidth: '90vw' },
-  input: { backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 6, color: '#F0F0F5', padding: '8px 12px', fontSize: 13, width: '100%', outline: 'none', boxSizing: 'border-box' as const },
-  label: { fontSize: 12, color: '#8B8BA0', display: 'block', marginBottom: 6 },
+  modalCard: { backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 28, width: 420, maxWidth: '90vw' },
+  input: { backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 6, color: 'var(--crm-text-primary)', padding: '8px 12px', fontSize: 13, width: '100%', outline: 'none', boxSizing: 'border-box' as const },
+  label: { fontSize: 12, color: 'var(--crm-text-secondary)', display: 'block', marginBottom: 6 },
 }
 
 function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled?: boolean }) {
@@ -28,7 +28,7 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
     <div
       onClick={disabled ? undefined : onChange}
       style={{
-        width: 36, height: 20, backgroundColor: checked ? '#22C55E' : '#52526A',
+        width: 36, height: 20, backgroundColor: checked ? '#22C55E' : 'var(--crm-text-muted)',
         borderRadius: 10, position: 'relative', cursor: disabled ? 'not-allowed' : 'pointer',
         transition: 'background 0.2s', flexShrink: 0, opacity: disabled ? 0.5 : 1,
       }}
@@ -221,16 +221,16 @@ export function UsersManagement() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 700 }}>{t('title')}</h1>
-          <div style={{ fontSize: 12, color: '#52526A', marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 4 }}>
             {activeSdrCount} / {maxSeats === 999 ? '∞' : maxSeats} seats used
           </div>
         </div>
-        <Button onClick={handleCreateClick} style={{ backgroundColor: activeSdrCount >= maxSeats ? '#2A2A3A' : '#6C63FF', color: '#FFF', height: 34, fontSize: 13, gap: 6, display: 'flex', alignItems: 'center' }}>
+        <Button onClick={handleCreateClick} style={{ backgroundColor: activeSdrCount >= maxSeats ? 'var(--crm-border)' : 'var(--crm-accent)', color: '#FFF', height: 34, fontSize: 13, gap: 6, display: 'flex', alignItems: 'center' }}>
           <Plus size={14} /> {t('createSDR')}
         </Button>
       </div>
 
-      {loading && <div style={{ color: '#52526A', textAlign: 'center', padding: 48 }}>Loading…</div>}
+      {loading && <div style={{ color: 'var(--crm-text-muted)', textAlign: 'center', padding: 48 }}>Loading…</div>}
 
       {!loading && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16, overflowY: 'auto', flex: 1 }}>
@@ -241,24 +241,24 @@ export function UsersManagement() {
               <div
                 key={u.id}
                 style={{
-                  backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 20,
+                  backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 20,
                   opacity: u.is_active ? 1 : 0.6, display: 'flex', flexDirection: 'column', gap: 12,
                 }}
               >
                 {/* Avatar + name + role */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{
-                    width: 40, height: 40, borderRadius: '50%', backgroundColor: '#2A2A3A',
+                    width: 40, height: 40, borderRadius: '50%', backgroundColor: 'var(--crm-border)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 15, fontWeight: 700, color: isAdminUser ? '#EC4899' : '#6C63FF', flexShrink: 0,
+                    fontSize: 15, fontWeight: 700, color: isAdminUser ? '#EC4899' : 'var(--crm-accent)', flexShrink: 0,
                   }}>
                     {u.full_name[0]?.toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#F0F0F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.full_name}</div>
-                    <div style={{ fontSize: 12, color: '#52526A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--crm-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.full_name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--crm-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</div>
                   </div>
-                  <span style={{ backgroundColor: isAdminUser ? '#EC489920' : '#6C63FF20', color: isAdminUser ? '#EC4899' : '#6C63FF', borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', flexShrink: 0 }}>
+                  <span style={{ backgroundColor: isAdminUser ? '#EC489920' : '#6C63FF20', color: isAdminUser ? '#EC4899' : 'var(--crm-accent)', borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', flexShrink: 0 }}>
                     {u.role}
                   </span>
                 </div>
@@ -269,14 +269,14 @@ export function UsersManagement() {
                     {userAreas.map(a => <AreaBadge key={a.id} area={a} size="sm" />)}
                   </div>
                 ) : (
-                  <div style={{ fontSize: 12, color: '#52526A' }}>No markets assigned</div>
+                  <div style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>No markets assigned</div>
                 )}
 
                 {/* Toggles row */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Toggle checked={u.is_active} onChange={() => handleToggleActive(u)} disabled={isAdminUser || deactivating} />
-                    <span style={{ fontSize: 12, color: u.is_active ? '#22C55E' : '#52526A', fontWeight: 600 }}>
+                    <span style={{ fontSize: 12, color: u.is_active ? '#22C55E' : 'var(--crm-text-muted)', fontWeight: 600 }}>
                       {u.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </div>
@@ -286,18 +286,18 @@ export function UsersManagement() {
                         type="checkbox"
                         checked={u.scraper_access ?? false}
                         onChange={() => handleScraperToggle(u)}
-                        style={{ accentColor: '#6C63FF', width: 13, height: 13 }}
+                        style={{ accentColor: 'var(--crm-accent)', width: 13, height: 13 }}
                       />
-                      <span style={{ fontSize: 11, color: '#52526A' }}>Scraper</span>
+                      <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>Scraper</span>
                     </label>
                   )}
-                  <span style={{ fontSize: 11, color: '#52526A', marginLeft: 'auto' }}>
+                  <span style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginLeft: 'auto' }}>
                     {format(new Date(u.created_at), 'MMM d, yyyy')}
                   </span>
                 </div>
 
                 {/* Actions: Unassign (SDR only) | Edit | Delete */}
-                <div style={{ display: 'flex', gap: 6, borderTop: '1px solid #1C1C27', paddingTop: 12 }}>
+                <div style={{ display: 'flex', gap: 6, borderTop: '1px solid var(--crm-surface-raised)', paddingTop: 12 }}>
                   {!isAdminUser && (
                     <button
                       onClick={() => setUnassignUser(u)}
@@ -308,7 +308,7 @@ export function UsersManagement() {
                   )}
                   <button
                     onClick={() => openEdit(u)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 5, fontSize: 12, cursor: 'pointer', border: '1px solid #6C63FF40', backgroundColor: '#6C63FF10', color: '#6C63FF' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 5, fontSize: 12, cursor: 'pointer', border: '1px solid #6C63FF40', backgroundColor: '#6C63FF10', color: 'var(--crm-accent)' }}
                   >
                     <Pencil size={12} /> Edit
                   </button>
@@ -333,10 +333,10 @@ export function UsersManagement() {
               <ShieldAlert size={22} color="#F59E0B" />
             </div>
             <h2 style={{ fontSize: 17, fontWeight: 700, color: '#F59E0B', marginBottom: 10 }}>Seat Limit Reached</h2>
-            <p style={{ fontSize: 13, color: '#8B8BA0', lineHeight: 1.6, marginBottom: 20 }}>
-              Your plan allows <strong style={{ color: '#F0F0F5' }}>{maxSeats}</strong> active SDR{maxSeats !== 1 ? 's' : ''}. Deactivate an existing SDR or upgrade your plan.
+            <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', lineHeight: 1.6, marginBottom: 20 }}>
+              Your plan allows <strong style={{ color: 'var(--crm-text-primary)' }}>{maxSeats}</strong> active SDR{maxSeats !== 1 ? 's' : ''}. Deactivate an existing SDR or upgrade your plan.
             </p>
-            <Button onClick={() => setShowSeatLimit(false)} style={{ backgroundColor: '#2A2A3A', color: '#F0F0F5', width: '100%' }}>Close</Button>
+            <Button onClick={() => setShowSeatLimit(false)} style={{ backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)', width: '100%' }}>Close</Button>
           </div>
         </div>
       )}
@@ -359,7 +359,7 @@ export function UsersManagement() {
                 <label style={S.label}>{t('tempPassword')} *</label>
                 <div style={{ position: 'relative' }}>
                   <input style={{ ...S.input, paddingRight: 36 }} type={showPassword ? 'text' : 'password'} value={formPassword} onChange={e => setFormPassword(e.target.value)} placeholder={t('passwordPlaceholder')} autoComplete="new-password" />
-                  <button type="button" onClick={() => setShowPassword(p => !p)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#52526A', cursor: 'pointer', padding: 0 }}>
+                  <button type="button" onClick={() => setShowPassword(p => !p)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--crm-text-muted)', cursor: 'pointer', padding: 0 }}>
                     {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
@@ -375,10 +375,10 @@ export function UsersManagement() {
                 <label style={S.label}>Markets (select all that apply)</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {areas.map(a => (
-                    <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '6px 10px', borderRadius: 6, border: `1px solid ${formAreaIds.includes(a.id) ? '#6C63FF40' : '#2A2A3A'}`, backgroundColor: formAreaIds.includes(a.id) ? '#6C63FF10' : 'transparent' }}>
-                      <input type="checkbox" checked={formAreaIds.includes(a.id)} onChange={() => toggleAreaId(a.id)} style={{ accentColor: '#6C63FF', width: 14, height: 14 }} />
+                    <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '6px 10px', borderRadius: 6, border: `1px solid ${formAreaIds.includes(a.id) ? '#6C63FF40' : 'var(--crm-border)'}`, backgroundColor: formAreaIds.includes(a.id) ? '#6C63FF10' : 'transparent' }}>
+                      <input type="checkbox" checked={formAreaIds.includes(a.id)} onChange={() => toggleAreaId(a.id)} style={{ accentColor: 'var(--crm-accent)', width: 14, height: 14 }} />
                       <AreaBadge area={a} size="sm" />
-                      <span style={{ fontSize: 13, color: '#F0F0F5' }}>{a.label_en}</span>
+                      <span style={{ fontSize: 13, color: 'var(--crm-text-primary)' }}>{a.label_en}</span>
                     </label>
                   ))}
                 </div>
@@ -387,8 +387,8 @@ export function UsersManagement() {
                 <div style={{ padding: '8px 12px', backgroundColor: '#3A1A1A', border: '1px solid #EF4444', borderRadius: 6, color: '#F87171', fontSize: 12 }}>{createError}</div>
               )}
               <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-                <Button onClick={() => { setShowForm(false); resetForm() }} style={{ flex: 1, backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>{t('cancel')}</Button>
-                <Button onClick={handleCreate} disabled={creating} style={{ flex: 1, backgroundColor: '#6C63FF', color: '#FFF' }}>{creating ? t('creating') : t('createSDR')}</Button>
+                <Button onClick={() => { setShowForm(false); resetForm() }} style={{ flex: 1, backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}>{t('cancel')}</Button>
+                <Button onClick={handleCreate} disabled={creating} style={{ flex: 1, backgroundColor: 'var(--crm-accent)', color: '#FFF' }}>{creating ? t('creating') : t('createSDR')}</Button>
               </div>
             </div>
           </div>
@@ -416,10 +416,10 @@ export function UsersManagement() {
                 <label style={S.label}>Markets</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {areas.map(a => (
-                    <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '6px 10px', borderRadius: 6, border: `1px solid ${editAreaIds.includes(a.id) ? '#6C63FF40' : '#2A2A3A'}`, backgroundColor: editAreaIds.includes(a.id) ? '#6C63FF10' : 'transparent' }}>
-                      <input type="checkbox" checked={editAreaIds.includes(a.id)} onChange={() => toggleEditAreaId(a.id)} style={{ accentColor: '#6C63FF', width: 14, height: 14 }} />
+                    <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '6px 10px', borderRadius: 6, border: `1px solid ${editAreaIds.includes(a.id) ? '#6C63FF40' : 'var(--crm-border)'}`, backgroundColor: editAreaIds.includes(a.id) ? '#6C63FF10' : 'transparent' }}>
+                      <input type="checkbox" checked={editAreaIds.includes(a.id)} onChange={() => toggleEditAreaId(a.id)} style={{ accentColor: 'var(--crm-accent)', width: 14, height: 14 }} />
                       <AreaBadge area={a} size="sm" />
-                      <span style={{ fontSize: 13, color: '#F0F0F5' }}>{a.label_en}</span>
+                      <span style={{ fontSize: 13, color: 'var(--crm-text-primary)' }}>{a.label_en}</span>
                     </label>
                   ))}
                 </div>
@@ -428,8 +428,8 @@ export function UsersManagement() {
                 <div style={{ padding: '8px 12px', backgroundColor: '#3A1A1A', border: '1px solid #EF4444', borderRadius: 6, color: '#F87171', fontSize: 12 }}>{editError}</div>
               )}
               <div style={{ display: 'flex', gap: 10 }}>
-                <Button onClick={() => setEditUser(null)} style={{ flex: 1, backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>Cancel</Button>
-                <Button onClick={handleEditSave} disabled={editSaving} style={{ flex: 1, backgroundColor: '#6C63FF', color: '#FFF' }}>{editSaving ? 'Saving…' : 'Save'}</Button>
+                <Button onClick={() => setEditUser(null)} style={{ flex: 1, backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}>Cancel</Button>
+                <Button onClick={handleEditSave} disabled={editSaving} style={{ flex: 1, backgroundColor: 'var(--crm-accent)', color: '#FFF' }}>{editSaving ? 'Saving…' : 'Save'}</Button>
               </div>
             </div>
           </div>
@@ -441,11 +441,11 @@ export function UsersManagement() {
         <div style={S.modal} onClick={e => { if (e.target === e.currentTarget) setUnassignUser(null) }}>
           <div style={{ ...S.modalCard, maxWidth: 380 }}>
             <h2 style={{ fontSize: 16, fontWeight: 700, color: '#F59E0B', marginBottom: 12 }}>Unassign leads</h2>
-            <p style={{ fontSize: 13, color: '#8B8BA0', lineHeight: 1.6, marginBottom: 20 }}>
-              All leads assigned to <strong style={{ color: '#F0F0F5' }}>{unassignUser.full_name}</strong> will become <strong style={{ color: '#F0F0F5' }}>unassigned</strong>. Leads are not deleted.
+            <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', lineHeight: 1.6, marginBottom: 20 }}>
+              All leads assigned to <strong style={{ color: 'var(--crm-text-primary)' }}>{unassignUser.full_name}</strong> will become <strong style={{ color: 'var(--crm-text-primary)' }}>unassigned</strong>. Leads are not deleted.
             </p>
             <div style={{ display: 'flex', gap: 10 }}>
-              <Button onClick={() => setUnassignUser(null)} style={{ flex: 1, backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>{t('cancel')}</Button>
+              <Button onClick={() => setUnassignUser(null)} style={{ flex: 1, backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}>{t('cancel')}</Button>
               <Button onClick={confirmUnassign} disabled={unassigning} style={{ flex: 1, backgroundColor: '#F59E0B', color: '#000', fontWeight: 700 }}>
                 {unassigning ? 'Unassigning...' : 'Unassign'}
               </Button>
@@ -459,15 +459,15 @@ export function UsersManagement() {
         <div style={S.modal} onClick={e => { if (e.target === e.currentTarget) setDeleteUser(null) }}>
           <div style={{ ...S.modalCard, maxWidth: 380 }}>
             <h2 style={{ fontSize: 16, fontWeight: 700, color: '#EF4444', marginBottom: 12 }}>Delete User</h2>
-            <p style={{ fontSize: 13, color: '#8B8BA0', lineHeight: 1.6, marginBottom: 8 }}>
-              This will <strong style={{ color: '#F0F0F5' }}>permanently delete</strong> <strong style={{ color: '#F0F0F5' }}>{deleteUser.full_name}</strong> from the platform.
+            <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', lineHeight: 1.6, marginBottom: 8 }}>
+              This will <strong style={{ color: 'var(--crm-text-primary)' }}>permanently delete</strong> <strong style={{ color: 'var(--crm-text-primary)' }}>{deleteUser.full_name}</strong> from the platform.
             </p>
-            <p style={{ fontSize: 12, color: '#52526A', marginBottom: 20 }}>
+            <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginBottom: 20 }}>
               {deleteUser.role === 'sdr' ? 'Their leads will become unassigned. ' : ''}This action cannot be undone.
             </p>
             {deleteError && <div style={{ padding: '8px 12px', backgroundColor: '#3A1A1A', border: '1px solid #EF4444', borderRadius: 6, color: '#F87171', fontSize: 12, marginBottom: 14 }}>{deleteError}</div>}
             <div style={{ display: 'flex', gap: 10 }}>
-              <Button onClick={() => setDeleteUser(null)} style={{ flex: 1, backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>{t('cancel')}</Button>
+              <Button onClick={() => setDeleteUser(null)} style={{ flex: 1, backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}>{t('cancel')}</Button>
               <Button onClick={confirmDelete} disabled={deleting} style={{ flex: 1, backgroundColor: '#EF4444', color: '#FFF' }}>
                 <Trash2 size={13} /> {deleting ? 'Deleting...' : 'Delete'}
               </Button>
@@ -481,11 +481,11 @@ export function UsersManagement() {
         <div style={S.modal} onClick={e => { if (e.target === e.currentTarget) setConfirmUser(null) }}>
           <div style={{ ...S.modalCard, maxWidth: 360 }}>
             <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, color: '#EF4444' }}>{t('deactivateTitle')}</h2>
-            <p style={{ fontSize: 13, color: '#8B8BA0', lineHeight: 1.5, marginBottom: 20 }}>
+            <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', lineHeight: 1.5, marginBottom: 20 }}>
               {t('deactivateConfirm', { name: confirmUser.full_name })}
             </p>
             <div style={{ display: 'flex', gap: 10 }}>
-              <Button onClick={() => setConfirmUser(null)} style={{ flex: 1, backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>{t('cancel')}</Button>
+              <Button onClick={() => setConfirmUser(null)} style={{ flex: 1, backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}>{t('cancel')}</Button>
               <Button onClick={confirmDeactivate} disabled={deactivating} style={{ flex: 1, backgroundColor: '#EF4444', color: '#FFF' }}>
                 {deactivating ? t('deactivating') : t('deactivate')}
               </Button>

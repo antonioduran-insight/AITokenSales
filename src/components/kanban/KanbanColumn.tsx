@@ -93,10 +93,10 @@ export function KanbanColumn({ status, label, color, prospects, onCardClick }: P
           <div
             style={{
               textAlign: 'center',
-              color: '#2A2A3A',
+              color: 'var(--crm-border)',
               fontSize: 12,
               padding: '24px 8px',
-              border: '1px dashed #2A2A3A',
+              border: '1px dashed var(--crm-border)',
               borderRadius: 8,
               marginTop: 4,
             }}

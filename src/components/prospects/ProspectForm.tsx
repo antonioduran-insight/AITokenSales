@@ -24,18 +24,18 @@ interface Props {
 
 const SELECT_STYLE = {
   width: '100%', padding: '8px 10px',
-  backgroundColor: '#1C1C27', border: '1px solid #2A2A3A',
-  borderRadius: 6, color: '#F0F0F5', fontSize: 13,
+  backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)',
+  borderRadius: 6, color: 'var(--crm-text-primary)', fontSize: 13,
 }
 
 const INPUT_STYLE = {
-  backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', color: '#F0F0F5', fontSize: 13,
+  backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', color: 'var(--crm-text-primary)', fontSize: 13,
 }
 
 function FormField({ label, children, warn }: { label: string; children: React.ReactNode; warn?: string }) {
   return (
     <div>
-      <Label style={{ color: '#8B8BA0', fontSize: 12, marginBottom: 4, display: 'block' }}>{label}</Label>
+      <Label style={{ color: 'var(--crm-text-secondary)', fontSize: 12, marginBottom: 4, display: 'block' }}>{label}</Label>
       {children}
       {warn && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4, color: '#F59E0B', fontSize: 12 }}>
@@ -181,16 +181,16 @@ export function ProspectForm({ open, onClose, onCreated, defaultAreaId }: Props)
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent
         style={{
-          backgroundColor: '#13131A',
-          border: '1px solid #2A2A3A',
+          backgroundColor: 'var(--crm-surface)',
+          border: '1px solid var(--crm-border)',
           maxWidth: 560,
           maxHeight: '90vh',
           overflowY: 'auto',
-          color: '#F0F0F5',
+          color: 'var(--crm-text-primary)',
         }}
       >
         <DialogHeader>
-          <DialogTitle style={{ color: '#F0F0F5' }}>{t('prospect.new')}</DialogTitle>
+          <DialogTitle style={{ color: 'var(--crm-text-primary)' }}>{t('prospect.new')}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 8 }}>
@@ -330,19 +330,19 @@ export function ProspectForm({ open, onClose, onCreated, defaultAreaId }: Props)
               type="checkbox"
               checked={form.flag_tomorrow}
               onChange={e => set('flag_tomorrow', e.target.checked)}
-              style={{ accentColor: '#6C63FF', width: 16, height: 16 }}
+              style={{ accentColor: 'var(--crm-accent)', width: 16, height: 16 }}
             />
-            <span style={{ fontSize: 13, color: '#8B8BA0' }}>{t('prospect.flagTomorrow')}</span>
+            <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{t('prospect.flagTomorrow')}</span>
           </label>
 
           {/* Actions */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 8, borderTop: '1px solid #2A2A3A' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 8, borderTop: '1px solid var(--crm-border)' }}>
             <Button type="button" variant="outline" onClick={onClose}
-              style={{ backgroundColor: 'transparent', border: '1px solid #2A2A3A', color: '#8B8BA0' }}>
+              style={{ backgroundColor: 'transparent', border: '1px solid var(--crm-border)', color: 'var(--crm-text-secondary)' }}>
               {t('prospect.cancel')}
             </Button>
             <Button type="submit" disabled={saving || !form.name || !form.area_id}
-              style={{ backgroundColor: '#6C63FF', color: '#F0F0F5' }}>
+              style={{ backgroundColor: 'var(--crm-accent)', color: 'var(--crm-text-primary)' }}>
               {saving ? t('prospect.saving') : t('prospect.save')}
             </Button>
           </div>

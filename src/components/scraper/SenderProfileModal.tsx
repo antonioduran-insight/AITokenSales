@@ -20,11 +20,11 @@ const LANGUAGES = [
 
 const S: Record<string, React.CSSProperties> = {
   overlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 },
-  modal:   { backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, width: 520, maxWidth: '100%', maxHeight: '90vh', overflow: 'auto', padding: 28 },
-  label:   { fontSize: 12, fontWeight: 600, color: '#8B8BA0', marginBottom: 6, display: 'block' },
-  input:   { width: '100%', backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 7, color: '#F0F0F5', padding: '8px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box' as const },
-  btn:     { backgroundColor: '#6C63FF', color: '#fff', border: 'none', borderRadius: 7, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  btnGhost:{ backgroundColor: 'transparent', color: '#8B8BA0', border: '1px solid #2A2A3A', borderRadius: 7, padding: '8px 16px', fontSize: 13, cursor: 'pointer' },
+  modal:   { backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, width: 520, maxWidth: '100%', maxHeight: '90vh', overflow: 'auto', padding: 28 },
+  label:   { fontSize: 12, fontWeight: 600, color: 'var(--crm-text-secondary)', marginBottom: 6, display: 'block' },
+  input:   { width: '100%', backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 7, color: 'var(--crm-text-primary)', padding: '8px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box' as const },
+  btn:     { backgroundColor: 'var(--crm-accent)', color: '#fff', border: 'none', borderRadius: 7, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  btnGhost:{ backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', border: '1px solid var(--crm-border)', borderRadius: 7, padding: '8px 16px', fontSize: 13, cursor: 'pointer' },
 }
 
 export function SenderProfileModal({ userId, onClose, onSaved }: Props) {
@@ -113,31 +113,31 @@ export function SenderProfileModal({ userId, onClose, onSaved }: Props) {
       <div style={S.modal}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Sender Profiles</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52526A' }}><X size={16} /></button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)' }}><X size={16} /></button>
         </div>
 
         {!showForm && (
           <>
             {loading ? (
-              <p style={{ color: '#52526A', fontSize: 13, textAlign: 'center', padding: 24 }}>Loading…</p>
+              <p style={{ color: 'var(--crm-text-muted)', fontSize: 13, textAlign: 'center', padding: 24 }}>Loading…</p>
             ) : (
               <>
                 {profiles.length === 0 && (
-                  <p style={{ color: '#52526A', fontSize: 13, textAlign: 'center', padding: 16 }}>No sender profiles yet.</p>
+                  <p style={{ color: 'var(--crm-text-muted)', fontSize: 13, textAlign: 'center', padding: 16 }}>No sender profiles yet.</p>
                 )}
                 {profiles.map(p => (
-                  <div key={p.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 14px', backgroundColor: '#1C1C27', border: `1px solid ${p.is_default ? '#6C63FF40' : '#2A2A3A'}`, borderRadius: 8, marginBottom: 8 }}>
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 14px', backgroundColor: 'var(--crm-surface-raised)', border: `1px solid ${p.is_default ? '#6C63FF40' : 'var(--crm-border)'}`, borderRadius: 8, marginBottom: 8 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#F0F0F5' }}>{p.display_name}</span>
-                        {p.is_default && <span style={{ fontSize: 10, backgroundColor: '#6C63FF20', color: '#6C63FF', border: '1px solid #6C63FF40', borderRadius: 3, padding: '1px 6px' }}>default</span>}
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-primary)' }}>{p.display_name}</span>
+                        {p.is_default && <span style={{ fontSize: 10, backgroundColor: '#6C63FF20', color: 'var(--crm-accent)', border: '1px solid #6C63FF40', borderRadius: 3, padding: '1px 6px' }}>default</span>}
                       </div>
-                      <div style={{ fontSize: 12, color: '#8B8BA0' }}>{p.title} · {p.company}</div>
-                      {p.style_hint && <div style={{ fontSize: 11, color: '#52526A', marginTop: 4, fontStyle: 'italic' }}>"{p.style_hint}"</div>}
+                      <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>{p.title} · {p.company}</div>
+                      {p.style_hint && <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 4, fontStyle: 'italic' }}>"{p.style_hint}"</div>}
                     </div>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <button onClick={() => openEdit(p)} style={{ fontSize: 11, color: '#8B8BA0', border: '1px solid #2A2A3A', padding: '4px 10px', borderRadius: 6, background: 'transparent', cursor: 'pointer' }}>Edit</button>
-                      <button onClick={() => handleDelete(p)} style={{ padding: 5, background: 'none', border: 'none', cursor: 'pointer', color: '#52526A' }}><Trash2 size={13} /></button>
+                      <button onClick={() => openEdit(p)} style={{ fontSize: 11, color: 'var(--crm-text-secondary)', border: '1px solid var(--crm-border)', padding: '4px 10px', borderRadius: 6, background: 'transparent', cursor: 'pointer' }}>Edit</button>
+                      <button onClick={() => handleDelete(p)} style={{ padding: 5, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)' }}><Trash2 size={13} /></button>
                     </div>
                   </div>
                 ))}
@@ -151,7 +151,7 @@ export function SenderProfileModal({ userId, onClose, onSaved }: Props) {
 
         {showForm && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <p style={{ fontSize: 11, fontWeight: 700, color: '#52526A', textTransform: 'uppercase', letterSpacing: '0.07em', margin: 0 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: 0 }}>
               {editing ? 'Edit Profile' : 'New Profile'}
             </p>
 
@@ -204,8 +204,8 @@ export function SenderProfileModal({ userId, onClose, onSaved }: Props) {
               </select>
             </div>
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#F0F0F5' }}>
-              <input type="checkbox" checked={isDefault} onChange={e => setIsDefault(e.target.checked)} style={{ accentColor: '#6C63FF', width: 14, height: 14 }} />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--crm-text-primary)' }}>
+              <input type="checkbox" checked={isDefault} onChange={e => setIsDefault(e.target.checked)} style={{ accentColor: 'var(--crm-accent)', width: 14, height: 14 }} />
               Use as default profile for new runs
             </label>
 

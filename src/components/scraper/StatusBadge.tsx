@@ -13,13 +13,13 @@ const STATUS_LABELS: Record<RunStatus, string> = {
 };
 
 const STATUS_COLORS: Record<RunStatus, string> = {
-  pending:   { bg: '#2A2A3A', color: '#8B8BA0', border: '#3A3A4A' } as unknown as string,
-  running:   { bg: '#6C63FF20', color: '#6C63FF', border: '#6C63FF40' } as unknown as string,
+  pending:   { bg: 'var(--crm-border)', color: 'var(--crm-text-secondary)', border: '#3A3A4A' } as unknown as string,
+  running:   { bg: '#6C63FF20', color: 'var(--crm-accent)', border: '#6C63FF40' } as unknown as string,
   scoring:   { bg: '#F59E0B20', color: '#F59E0B', border: '#F59E0B40' } as unknown as string,
   drafting:  { bg: '#22C55E20', color: '#22C55E', border: '#22C55E40' } as unknown as string,
   completed: { bg: '#22C55E20', color: '#22C55E', border: '#22C55E40' } as unknown as string,
   failed:    { bg: '#EF444420', color: '#EF4444', border: '#EF444440' } as unknown as string,
-  cancelled: { bg: '#52526A20', color: '#52526A', border: '#52526A40' } as unknown as string,
+  cancelled: { bg: '#52526A20', color: 'var(--crm-text-muted)', border: '#52526A40' } as unknown as string,
 };
 
 const PULSE_STATUSES = new Set<RunStatus>(["running", "scoring", "drafting"]);

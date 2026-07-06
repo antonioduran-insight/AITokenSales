@@ -24,23 +24,23 @@ const ADDON_LABELS: Record<string, string> = {
 }
 
 const S: Record<string, React.CSSProperties> = {
-  page:    { padding: '28px 32px', color: '#F0F0F5', maxWidth: 860 },
-  card:    { backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, padding: 24, marginBottom: 24 },
-  label:   { fontSize: 12, fontWeight: 600, color: '#8B8BA0', marginBottom: 6, display: 'block' },
-  input:   { width: '100%', backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 7, color: '#F0F0F5', padding: '8px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box' as const },
-  select:  { width: '100%', backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 7, color: '#F0F0F5', padding: '8px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box' as const },
-  btn:     { backgroundColor: '#6C63FF', color: '#fff', border: 'none', borderRadius: 7, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  btnGhost:{ backgroundColor: 'transparent', color: '#8B8BA0', border: '1px solid #2A2A3A', borderRadius: 7, padding: '8px 16px', fontSize: 13, cursor: 'pointer' },
-  sectionTitle: { fontSize: 11, fontWeight: 700, color: '#52526A', textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: 16 },
+  page:    { padding: '28px 32px', color: 'var(--crm-text-primary)', maxWidth: 860 },
+  card:    { backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 10, padding: 24, marginBottom: 24 },
+  label:   { fontSize: 12, fontWeight: 600, color: 'var(--crm-text-secondary)', marginBottom: 6, display: 'block' },
+  input:   { width: '100%', backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 7, color: 'var(--crm-text-primary)', padding: '8px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box' as const },
+  select:  { width: '100%', backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 7, color: 'var(--crm-text-primary)', padding: '8px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box' as const },
+  btn:     { backgroundColor: 'var(--crm-accent)', color: '#fff', border: 'none', borderRadius: 7, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  btnGhost:{ backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', border: '1px solid var(--crm-border)', borderRadius: 7, padding: '8px 16px', fontSize: 13, cursor: 'pointer' },
+  sectionTitle: { fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: 16 },
 }
 
 // ────────────────────────────────────────────────────────────────────────────
 // Progress bar helper
 // ────────────────────────────────────────────────────────────────────────────
-function Bar({ value, max, color = '#6C63FF' }: { value: number; max: number; color?: string }) {
+function Bar({ value, max, color = 'var(--crm-accent)' }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0
   return (
-    <div style={{ height: 6, backgroundColor: '#2A2A3A', borderRadius: 3, overflow: 'hidden' }}>
+    <div style={{ height: 6, backgroundColor: 'var(--crm-border)', borderRadius: 3, overflow: 'hidden' }}>
       <div style={{ height: '100%', width: `${pct}%`, backgroundColor: color, borderRadius: 3, transition: 'width .4s ease' }} />
     </div>
   )
@@ -110,7 +110,7 @@ function OrgTab() {
     }
   }
 
-  if (!org) return <div style={{ color: '#52526A', padding: 40, textAlign: 'center' }}>Loading…</div>
+  if (!org) return <div style={{ color: 'var(--crm-text-muted)', padding: 40, textAlign: 'center' }}>Loading…</div>
 
   return (
     <div>
@@ -137,7 +137,7 @@ function OrgTab() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               {logoUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={logoUrl} alt="Logo" style={{ height: 44, maxWidth: 120, objectFit: 'contain', borderRadius: 6, border: '1px solid #2A2A3A', backgroundColor: '#1C1C27' }} />
+                <img src={logoUrl} alt="Logo" style={{ height: 44, maxWidth: 120, objectFit: 'contain', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)' }} />
               )}
               <div>
                 <input
@@ -163,7 +163,7 @@ function OrgTab() {
 
       <div style={S.card}>
         <p style={S.sectionTitle}>Domain Blacklist</p>
-        <p style={{ fontSize: 12, color: '#52526A', marginBottom: 12 }}>
+        <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginBottom: 12 }}>
           One domain or company name per line. These will be blocked from CSV imports and manual prospect creation.
         </p>
         <textarea
@@ -295,7 +295,7 @@ function PipelineTab() {
     }
   }
 
-  if (loading) return <div style={{ color: '#52526A', padding: 40, textAlign: 'center' }}>Loading…</div>
+  if (loading) return <div style={{ color: 'var(--crm-text-muted)', padding: 40, textAlign: 'center' }}>Loading…</div>
 
   return (
     <div>
@@ -303,7 +303,7 @@ function PipelineTab() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <p style={{ ...S.sectionTitle, marginBottom: 0 }}>Pipeline Stages</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {saving && <span style={{ fontSize: 11, color: '#52526A' }}>Saving…</span>}
+            {saving && <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>Saving…</span>}
             {saved && !saving && <span style={{ fontSize: 11, color: '#22C55E' }}>✓ Saved</span>}
             <button
               onClick={saveOrder}
@@ -314,7 +314,7 @@ function PipelineTab() {
             </button>
           </div>
         </div>
-        <p style={{ fontSize: 12, color: '#52526A', marginBottom: 16 }}>
+        <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginBottom: 16 }}>
           Drag to reorder. Changes apply to the Kanban immediately.
         </p>
 
@@ -329,13 +329,13 @@ function PipelineTab() {
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '10px 12px',
-                backgroundColor: dragIdx === idx ? '#2A2A3A' : '#1C1C27',
-                border: '1px solid #2A2A3A', borderRadius: 8,
+                backgroundColor: dragIdx === idx ? 'var(--crm-border)' : 'var(--crm-surface-raised)',
+                border: '1px solid var(--crm-border)', borderRadius: 8,
                 cursor: 'grab',
                 transition: 'background .1s',
               }}
             >
-              <GripVertical size={14} color="#52526A" style={{ flexShrink: 0 }} />
+              <GripVertical size={14} color="var(--crm-text-muted)" style={{ flexShrink: 0 }} />
               <input
                 type="color"
                 value={stage.color}
@@ -346,20 +346,20 @@ function PipelineTab() {
               <input
                 value={stage.name}
                 onChange={e => updateStage(idx, 'name', e.target.value)}
-                style={{ flex: 1, backgroundColor: 'transparent', border: 'none', color: '#F0F0F5', fontSize: 13, outline: 'none' }}
+                style={{ flex: 1, backgroundColor: 'transparent', border: 'none', color: 'var(--crm-text-primary)', fontSize: 13, outline: 'none' }}
               />
-              <span style={{ fontSize: 11, color: '#52526A', fontFamily: 'monospace' }}>#{idx}</span>
+              <span style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontFamily: 'monospace' }}>#{idx}</span>
               {!stage.is_default && (
                 <button
                   onClick={() => deleteStage(stage, idx)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52526A', padding: 2 }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', padding: 2 }}
                   title="Delete stage"
                 >
                   <Trash2 size={13} />
                 </button>
               )}
               {stage.is_default && (
-                <span style={{ fontSize: 10, color: '#52526A', border: '1px solid #2A2A3A', borderRadius: 3, padding: '1px 5px' }}>default</span>
+                <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', border: '1px solid var(--crm-border)', borderRadius: 3, padding: '1px 5px' }}>default</span>
               )}
             </div>
           ))}
@@ -425,8 +425,8 @@ function PlanTab() {
       .catch(() => setLoading(false))
   }, [])
 
-  if (loading) return <div style={{ color: '#52526A', padding: 40, textAlign: 'center' }}>Loading…</div>
-  if (!data) return <div style={{ color: '#52526A', padding: 40, textAlign: 'center' }}>No se pudo cargar el plan. Recarga la página.</div>
+  if (loading) return <div style={{ color: 'var(--crm-text-muted)', padding: 40, textAlign: 'center' }}>Loading…</div>
+  if (!data) return <div style={{ color: 'var(--crm-text-muted)', padding: 40, textAlign: 'center' }}>No se pudo cargar el plan. Recarga la página.</div>
 
   const { org, sdrCount, sdrs, leadsCount, periodStart, addons } = data
   const maxSeats = org.max_seats ?? 0
@@ -456,7 +456,7 @@ function PlanTab() {
             {org.plan}
           </span>
           <div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: '#F0F0F5' }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--crm-text-primary)' }}>
               {org.plan === 'enterprise' && org.custom_price
                 ? `$${org.custom_price.toLocaleString()}/mo`
                 : org.plan === 'ultra' ? 'Internal'
@@ -464,7 +464,7 @@ function PlanTab() {
                 : org.plan === 'premium' ? '$2,300/mo'
                 : '$550/mo'}
             </div>
-            <div style={{ fontSize: 12, color: '#52526A' }}>
+            <div style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>
               Billing period: {periodDate.toLocaleDateString()} → {nextPeriod.toLocaleDateString()}
             </div>
           </div>
@@ -483,30 +483,30 @@ function PlanTab() {
         </div>
 
         {seatsUnlimited ? (
-          <p style={{ fontSize: 13, color: '#8B8BA0' }}>Unlimited seats on your plan.</p>
+          <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>Unlimited seats on your plan.</p>
         ) : (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 13, color: '#8B8BA0' }}>{sdrCount} of {maxSeats} seats used</span>
+              <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{sdrCount} of {maxSeats} seats used</span>
               <span style={{ fontSize: 13, fontWeight: 600, color: seatsAtLimit ? '#EF4444' : '#22C55E' }}>
                 {maxSeats - sdrCount} remaining
               </span>
             </div>
-            <Bar value={sdrCount} max={maxSeats} color={seatsAtLimit ? '#EF4444' : '#6C63FF'} />
+            <Bar value={sdrCount} max={maxSeats} color={seatsAtLimit ? '#EF4444' : 'var(--crm-accent)'} />
           </>
         )}
 
         {sdrs.length > 0 && (
           <div style={{ marginTop: 16 }}>
-            <p style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Active SDRs</p>
+            <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Active SDRs</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {sdrs.map(sdr => (
-                <div key={sdr.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', backgroundColor: '#1C1C27', borderRadius: 7 }}>
+                <div key={sdr.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', backgroundColor: 'var(--crm-surface-raised)', borderRadius: 7 }}>
                   <div>
-                    <span style={{ fontSize: 13, fontWeight: 500, color: '#F0F0F5' }}>{sdr.full_name}</span>
-                    <span style={{ fontSize: 12, color: '#52526A', marginLeft: 8 }}>{sdr.email}</span>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--crm-text-primary)' }}>{sdr.full_name}</span>
+                    <span style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginLeft: 8 }}>{sdr.email}</span>
                   </div>
-                  <span style={{ fontSize: 11, color: '#52526A' }}>since {new Date(sdr.created_at).toLocaleDateString()}</span>
+                  <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>since {new Date(sdr.created_at).toLocaleDateString()}</span>
                 </div>
               ))}
             </div>
@@ -524,19 +524,19 @@ function PlanTab() {
         </div>
 
         {leadsUnlimited ? (
-          <p style={{ fontSize: 13, color: '#8B8BA0' }}>Unlimited leads on your plan.</p>
+          <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>Unlimited leads on your plan.</p>
         ) : (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 13, color: '#8B8BA0' }}>{leadsCount.toLocaleString()} of {maxLeads.toLocaleString()} leads</span>
+              <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{leadsCount.toLocaleString()} of {maxLeads.toLocaleString()} leads</span>
               <span style={{ fontSize: 13, fontWeight: 600, color: leadsAtLimit ? '#EF4444' : '#22C55E' }}>
                 {Math.max(0, maxLeads - leadsCount).toLocaleString()} remaining
               </span>
             </div>
-            <Bar value={leadsCount} max={maxLeads} color={leadsAtLimit ? '#EF4444' : '#6C63FF'} />
+            <Bar value={leadsCount} max={maxLeads} color={leadsAtLimit ? '#EF4444' : 'var(--crm-accent)'} />
           </>
         )}
-        <p style={{ fontSize: 11, color: '#52526A', marginTop: 10 }}>
+        <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 10 }}>
           Resets on {nextPeriod.toLocaleDateString()} · Leads are deleted after 3 months. Add Extended Data Retention to keep them.
         </p>
       </div>
@@ -545,17 +545,17 @@ function PlanTab() {
       <div style={S.card}>
         <p style={{ ...S.sectionTitle, marginBottom: 16 }}>Active Add-ons</p>
         {addons.length === 0 ? (
-          <p style={{ fontSize: 13, color: '#52526A' }}>No active add-ons.</p>
+          <p style={{ fontSize: 13, color: 'var(--crm-text-muted)' }}>No active add-ons.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {addons.map(a => (
-              <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: '#1C1C27', borderRadius: 8 }}>
+              <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: 'var(--crm-surface-raised)', borderRadius: 8 }}>
                 <div>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: '#F0F0F5' }}>{ADDON_LABELS[a.addon_type] ?? a.addon_type}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--crm-text-primary)' }}>{ADDON_LABELS[a.addon_type] ?? a.addon_type}</span>
                   <span style={{ display: 'inline-block', marginLeft: 10, fontSize: 10, backgroundColor: '#22C55E20', color: '#22C55E', border: '1px solid #22C55E30', borderRadius: 3, padding: '1px 6px' }}>Active</span>
                 </div>
                 {a.price_monthly && (
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#8B8BA0' }}>${a.price_monthly}/mo</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-secondary)' }}>${a.price_monthly}/mo</span>
                 )}
               </div>
             ))}
@@ -566,9 +566,9 @@ function PlanTab() {
       {/* Buy Seats modal */}
       {showBuySeats && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
-          <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 28, width: 380 }}>
+          <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 28, width: 380 }}>
             <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Buy More Seats</h3>
-            <p style={{ fontSize: 13, color: '#8B8BA0', marginBottom: 20 }}>
+            <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', marginBottom: 20 }}>
               Contact us to add more seats to your plan. We&apos;ll get back to you within one business day.
             </p>
             <div style={{ display: 'flex', gap: 10 }}>
@@ -602,12 +602,12 @@ function SettingsContent() {
   const tab = searchParams.get('tab') ?? 'organization'
 
   if (!user) {
-    return <div style={{ padding: 40, color: '#52526A', textAlign: 'center' }}>Loading…</div>
+    return <div style={{ padding: 40, color: 'var(--crm-text-muted)', textAlign: 'center' }}>Loading…</div>
   }
 
   if (user.role !== 'admin') {
     return (
-      <div style={{ padding: 40, color: '#52526A', textAlign: 'center' }}>
+      <div style={{ padding: 40, color: 'var(--crm-text-muted)', textAlign: 'center' }}>
         <p style={{ fontSize: 15 }}>Settings are only accessible to organization admins.</p>
       </div>
     )
@@ -622,7 +622,7 @@ function SettingsContent() {
       <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 24 }}>Settings</h1>
 
       {/* Tab nav */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: 28, borderBottom: '1px solid #2A2A3A', paddingBottom: 0 }}>
+      <div style={{ display: 'flex', gap: 2, marginBottom: 28, borderBottom: '1px solid var(--crm-border)', paddingBottom: 0 }}>
         {TABS.map(t => (
           <button
             key={t.key}
@@ -631,8 +631,8 @@ function SettingsContent() {
               background: 'none', border: 'none', cursor: 'pointer',
               padding: '8px 18px',
               fontSize: 13, fontWeight: tab === t.key ? 600 : 400,
-              color: tab === t.key ? '#F0F0F5' : '#52526A',
-              borderBottom: tab === t.key ? '2px solid #6C63FF' : '2px solid transparent',
+              color: tab === t.key ? 'var(--crm-text-primary)' : 'var(--crm-text-muted)',
+              borderBottom: tab === t.key ? '2px solid var(--crm-accent)' : '2px solid transparent',
               marginBottom: -1,
               transition: 'color 0.15s',
             }}
@@ -651,7 +651,7 @@ function SettingsContent() {
 
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<div style={{ padding: 40, color: '#52526A', textAlign: 'center' }}>Loading…</div>}>
+    <Suspense fallback={<div style={{ padding: 40, color: 'var(--crm-text-muted)', textAlign: 'center' }}>Loading…</div>}>
       <SettingsContent />
     </Suspense>
   )

@@ -38,30 +38,30 @@ export function ProspectCard({ prospect, onClick, isDragOverlay = false }: Props
     >
       <div
         style={{
-          backgroundColor: '#13131A',
-          border: '1px solid #2A2A3A',
+          backgroundColor: 'var(--crm-surface)',
+          border: '1px solid var(--crm-border)',
           borderRadius: 8,
           padding: '14px',
           marginBottom: 8,
           transition: 'border-color 0.15s',
           boxShadow: isDragOverlay ? '0 8px 24px rgba(0,0,0,0.5)' : undefined,
         }}
-        onMouseEnter={e => !isDragOverlay && ((e.currentTarget as HTMLElement).style.borderColor = '#6C63FF')}
-        onMouseLeave={e => !isDragOverlay && ((e.currentTarget as HTMLElement).style.borderColor = '#2A2A3A')}
+        onMouseEnter={e => !isDragOverlay && ((e.currentTarget as HTMLElement).style.borderColor = 'var(--crm-accent)')}
+        onMouseLeave={e => !isDragOverlay && ((e.currentTarget as HTMLElement).style.borderColor = 'var(--crm-border)')}
       >
         {/* Top row: flag + name */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
           {prospect.flag_tomorrow && (
             <Star size={12} fill="#F59E0B" stroke="#F59E0B" style={{ flexShrink: 0, marginTop: 2 }} />
           )}
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#F0F0F5', lineHeight: 1.3, flex: 1 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--crm-text-primary)', lineHeight: 1.3, flex: 1 }}>
             {prospect.name}
           </span>
         </div>
 
         {/* Company + title */}
         {(prospect.company || prospect.title) && (
-          <div style={{ fontSize: 11, color: '#8B8BA0', marginTop: 3, lineHeight: 1.4 }}>
+          <div style={{ fontSize: 11, color: 'var(--crm-text-secondary)', marginTop: 3, lineHeight: 1.4 }}>
             {prospect.title && <span>{prospect.title}</span>}
             {prospect.title && prospect.company && <span> · </span>}
             {prospect.company && <span>{prospect.company}</span>}
@@ -75,21 +75,21 @@ export function ProspectCard({ prospect, onClick, isDragOverlay = false }: Props
           {prospect.icp_score !== null && (
             <span
               style={{
-                backgroundColor: '#1C1C27',
+                backgroundColor: 'var(--crm-surface-raised)',
                 borderRadius: 4,
                 padding: '2px 5px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 3,
                 fontSize: 10,
-                color: '#52526A',
+                color: 'var(--crm-text-muted)',
               }}
             >
               ICP <ICPScore score={prospect.icp_score} size="sm" />
             </span>
           )}
           {prospect.search_combo && (
-            <span style={{ fontSize: 10, color: '#52526A', backgroundColor: '#1C1C27', padding: '2px 5px', borderRadius: 4 }}>
+            <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', backgroundColor: 'var(--crm-surface-raised)', padding: '2px 5px', borderRadius: 4 }}>
               {prospect.search_combo}
             </span>
           )}

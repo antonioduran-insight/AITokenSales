@@ -19,7 +19,7 @@ export function AreaBadge({ area, size = 'sm' }: Props) {
   const locale = useLocale()
   if (!area) return null
 
-  const style = AREA_STYLES[area.name] ?? { bg: '#1C1C27', color: '#8B8BA0' }
+  const style = AREA_STYLES[area.name] ?? { bg: 'var(--crm-surface-raised)', color: 'var(--crm-text-secondary)' }
   const label = area[`label_${locale}` as keyof Area] as string ?? area.label_en
   const inactive = !area.is_active
 

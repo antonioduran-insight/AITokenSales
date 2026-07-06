@@ -78,11 +78,11 @@ const AREA_COLORS: Record<AreaName, string> = {
 }
 
 const S: Record<string, React.CSSProperties> = {
-  page: { padding: '24px 28px', color: '#F0F0F5', maxWidth: 920, margin: '0 auto' },
-  card: { backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 28 },
-  label: { fontSize: 12, color: '#8B8BA0', display: 'block', marginBottom: 6 },
-  select: { backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 6, color: '#F0F0F5', padding: '7px 10px', fontSize: 13, width: '100%' },
-  divider: { borderTop: '1px solid #2A2A3A', margin: '20px 0' },
+  page: { padding: '24px 28px', color: 'var(--crm-text-primary)', maxWidth: 920, margin: '0 auto' },
+  card: { backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 28 },
+  label: { fontSize: 12, color: 'var(--crm-text-secondary)', display: 'block', marginBottom: 6 },
+  select: { backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 6, color: 'var(--crm-text-primary)', padding: '7px 10px', fontSize: 13, width: '100%' },
+  divider: { borderTop: '1px solid var(--crm-border)', margin: '20px 0' },
 }
 
 export function CSVImportWizard() {
@@ -385,17 +385,17 @@ export function CSVImportWizard() {
                 <div style={{
                   width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 12, fontWeight: 700,
-                  backgroundColor: done ? '#22C55E' : active ? '#6C63FF' : '#2A2A3A',
-                  color: done || active ? '#FFF' : '#52526A',
+                  backgroundColor: done ? '#22C55E' : active ? 'var(--crm-accent)' : 'var(--crm-border)',
+                  color: done || active ? '#FFF' : 'var(--crm-text-muted)',
                   transition: 'all 0.2s',
                 }}>
                   {done ? '✓' : s}
                 </div>
-                <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: active ? '#F0F0F5' : '#52526A' }}>
+                <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: active ? 'var(--crm-text-primary)' : 'var(--crm-text-muted)' }}>
                   {label}
                 </span>
               </div>
-              {i < displaySteps.length - 1 && <div style={{ width: 32, height: 1, backgroundColor: '#2A2A3A', margin: '0 10px' }} />}
+              {i < displaySteps.length - 1 && <div style={{ width: 32, height: 1, backgroundColor: 'var(--crm-border)', margin: '0 10px' }} />}
             </div>
           )
         })}
@@ -406,8 +406,8 @@ export function CSVImportWizard() {
         <div
           style={{
             ...S.card,
-            border: `2px dashed ${dragOver ? '#6C63FF' : '#2A2A3A'}`,
-            backgroundColor: dragOver ? '#6C63FF08' : '#13131A',
+            border: `2px dashed ${dragOver ? 'var(--crm-accent)' : 'var(--crm-border)'}`,
+            backgroundColor: dragOver ? '#6C63FF08' : 'var(--crm-surface)',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             minHeight: 240, cursor: 'pointer', transition: 'all 0.2s',
           }}
@@ -416,9 +416,9 @@ export function CSVImportWizard() {
           onDragLeave={() => setDragOver(false)}
           onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
         >
-          <UploadCloud size={44} color={dragOver ? '#6C63FF' : '#52526A'} />
-          <p style={{ marginTop: 14, fontSize: 16, color: '#F0F0F5', fontWeight: 500 }}>{t('dropzone')}</p>
-          <p style={{ fontSize: 12, color: '#52526A', marginTop: 6 }}>{t('csvOnly')} · {t('maxSize')}</p>
+          <UploadCloud size={44} color={dragOver ? 'var(--crm-accent)' : 'var(--crm-text-muted)'} />
+          <p style={{ marginTop: 14, fontSize: 16, color: 'var(--crm-text-primary)', fontWeight: 500 }}>{t('dropzone')}</p>
+          <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 6 }}>{t('csvOnly')} · {t('maxSize')}</p>
           <input ref={fileInputRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
         </div>
       )}
@@ -427,7 +427,7 @@ export function CSVImportWizard() {
       {step === 2 && (
         <div style={S.card}>
           <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>Which area do these prospects belong to?</h2>
-          <p style={{ fontSize: 13, color: '#52526A', marginBottom: 28 }}>
+          <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', marginBottom: 28 }}>
             The selected area will be applied to all {csvData.length} rows in the CSV.
           </p>
 
@@ -442,9 +442,9 @@ export function CSVImportWizard() {
                     onClick={() => handleAreaSelect(opt.name)}
                     style={{
                       width: '100%', padding: '20px 16px', borderRadius: 10, cursor: opt.disabled ? 'not-allowed' : 'pointer',
-                      border: `2px solid ${isSelected ? color : '#2A2A3A'}`,
-                      backgroundColor: isSelected ? color + '18' : opt.disabled ? '#0A0A0F' : '#1C1C27',
-                      color: opt.disabled ? '#3A3A4A' : isSelected ? color : '#8B8BA0',
+                      border: `2px solid ${isSelected ? color : 'var(--crm-border)'}`,
+                      backgroundColor: isSelected ? color + '18' : opt.disabled ? 'var(--crm-background)' : 'var(--crm-surface-raised)',
+                      color: opt.disabled ? '#3A3A4A' : isSelected ? color : 'var(--crm-text-secondary)',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
                       transition: 'all 0.15s', opacity: opt.disabled ? 0.4 : 1,
                     }}
@@ -465,13 +465,13 @@ export function CSVImportWizard() {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Button onClick={() => setStep(1)} style={{ backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>
+            <Button onClick={() => setStep(1)} style={{ backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}>
               <ChevronLeft size={14} /> {tc('back')}
             </Button>
             <Button
               onClick={() => setStep(3)}
               disabled={!selectedArea || !selectedAreaId}
-              style={{ backgroundColor: selectedArea ? '#6C63FF' : '#2A2A3A', color: '#FFF' }}
+              style={{ backgroundColor: selectedArea ? 'var(--crm-accent)' : 'var(--crm-border)', color: '#FFF' }}
             >
               {tc('next_step')} <ChevronRight size={14} />
             </Button>
@@ -485,7 +485,7 @@ export function CSVImportWizard() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
             <div>
               <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{t('columnMapping')}</h2>
-              <p style={{ fontSize: 12, color: '#52526A' }}>
+              <p style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>
                 {csvData.length} rows · {csvHeaders.length} columns · Area:{' '}
                 <span style={{ color: AREA_COLORS[selectedArea!], fontWeight: 600 }}>
                   {AREA_OPTIONS.find(a => a.name === selectedArea)?.label}
@@ -497,10 +497,10 @@ export function CSVImportWizard() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 }}>
             {csvHeaders.map(col => (
               <div key={col} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ flex: 1, padding: '7px 10px', backgroundColor: '#0A0A0F', border: '1px solid #2A2A3A', borderRadius: 6, fontSize: 13, color: '#8B8BA0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ flex: 1, padding: '7px 10px', backgroundColor: 'var(--crm-background)', border: '1px solid var(--crm-border)', borderRadius: 6, fontSize: 13, color: 'var(--crm-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {col}
                 </div>
-                <span style={{ color: '#52526A', fontSize: 12 }}>→</span>
+                <span style={{ color: 'var(--crm-text-muted)', fontSize: 12 }}>→</span>
                 <select
                   value={mapping[col] ?? ''}
                   onChange={e => setMapping(prev => ({ ...prev, [col]: e.target.value as ProspectFieldKey | '' }))}
@@ -519,15 +519,15 @@ export function CSVImportWizard() {
 
           {/* Preview */}
           <div style={S.divider} />
-          <h3 style={{ fontSize: 13, fontWeight: 600, color: '#8B8BA0', marginBottom: 12 }}>{t('preview')}</h3>
+          <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-secondary)', marginBottom: 12 }}>{t('preview')}</h3>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr>
                   {csvHeaders.slice(0, 6).map(h => (
-                    <th key={h} style={{ textAlign: 'left', padding: '6px 8px', borderBottom: '1px solid #2A2A3A' }}>
+                    <th key={h} style={{ textAlign: 'left', padding: '6px 8px', borderBottom: '1px solid var(--crm-border)' }}>
                       {mapping[h]
-                        ? <span style={{ color: '#8B8BA0' }}>{mapping[h]}</span>
+                        ? <span style={{ color: 'var(--crm-text-secondary)' }}>{mapping[h]}</span>
                         : <span style={{ color: '#3A3A4A', textDecoration: 'line-through' }}>{h}</span>
                       }
                     </th>
@@ -536,9 +536,9 @@ export function CSVImportWizard() {
               </thead>
               <tbody>
                 {csvData.slice(0, 5).map((row, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #1C1C27' }}>
+                  <tr key={i} style={{ borderBottom: '1px solid var(--crm-surface-raised)' }}>
                     {csvHeaders.slice(0, 6).map(h => (
-                      <td key={h} style={{ padding: '6px 8px', color: mapping[h] ? '#F0F0F5' : '#3A3A4A', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <td key={h} style={{ padding: '6px 8px', color: mapping[h] ? 'var(--crm-text-primary)' : '#3A3A4A', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {row[h] || '—'}
                       </td>
                     ))}
@@ -549,13 +549,13 @@ export function CSVImportWizard() {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
-            <Button onClick={() => setStep(isAdmin ? 2 : 1)} style={{ backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>
+            <Button onClick={() => setStep(isAdmin ? 2 : 1)} style={{ backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}>
               <ChevronLeft size={14} /> {tc('back')}
             </Button>
             <Button
               onClick={proceedToReview}
               disabled={checking || !Object.values(mapping).includes('name')}
-              style={{ backgroundColor: '#6C63FF', color: '#FFF' }}
+              style={{ backgroundColor: 'var(--crm-accent)', color: '#FFF' }}
             >
               {checking ? t('checking') : t('proceedToReview')} <ChevronRight size={14} />
             </Button>
@@ -570,7 +570,7 @@ export function CSVImportWizard() {
             <AlertTriangle size={18} color="#F59E0B" />
             <div>
               <h2 style={{ fontSize: 16, fontWeight: 600 }}>{t('duplicateCheck')}</h2>
-              <p style={{ fontSize: 12, color: '#52526A', marginTop: 2 }}>
+              <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 2 }}>
                 {dupCount} {t('duplicates')} · {newCount} {t('new')} {t('willImport').toLowerCase()}
               </p>
             </div>
@@ -579,22 +579,22 @@ export function CSVImportWizard() {
           <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
             <div style={{ padding: '8px 16px', backgroundColor: '#22C55E15', border: '1px solid #22C55E30', borderRadius: 8 }}>
               <span style={{ fontSize: 22, fontWeight: 700, color: '#22C55E' }}>{newCount}</span>
-              <span style={{ fontSize: 12, color: '#8B8BA0', display: 'block' }}>{t('new')} ✓</span>
+              <span style={{ fontSize: 12, color: 'var(--crm-text-secondary)', display: 'block' }}>{t('new')} ✓</span>
             </div>
             <div style={{ padding: '8px 16px', backgroundColor: '#F59E0B15', border: '1px solid #F59E0B40', borderRadius: 8 }}>
               <span style={{ fontSize: 22, fontWeight: 700, color: '#F59E0B' }}>{dupCount}</span>
-              <span style={{ fontSize: 12, color: '#8B8BA0', display: 'block' }}>{t('duplicates')}</span>
+              <span style={{ fontSize: 12, color: 'var(--crm-text-secondary)', display: 'block' }}>{t('duplicates')}</span>
             </div>
             {errorCount > 0 && (
               <div style={{ padding: '8px 16px', backgroundColor: '#EF444415', border: '1px solid #EF444430', borderRadius: 8 }}>
                 <span style={{ fontSize: 22, fontWeight: 700, color: '#EF4444' }}>{errorCount}</span>
-                <span style={{ fontSize: 12, color: '#8B8BA0', display: 'block' }}>{t('errors')}</span>
+                <span style={{ fontSize: 12, color: 'var(--crm-text-secondary)', display: 'block' }}>{t('errors')}</span>
               </div>
             )}
           </div>
 
           <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-            <button onClick={skipAllDuplicates} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #2A2A3A', backgroundColor: 'transparent', color: '#8B8BA0', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <button onClick={skipAllDuplicates} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
               <SkipForward size={11} /> {t('skipAll')}
             </button>
             <button onClick={forceAllDuplicates} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #F59E0B40', backgroundColor: '#F59E0B10', color: '#F59E0B', fontSize: 12, cursor: 'pointer' }}>
@@ -602,14 +602,14 @@ export function CSVImportWizard() {
             </button>
           </div>
 
-          <div style={{ maxHeight: 400, overflowY: 'auto', border: '1px solid #2A2A3A', borderRadius: 8 }}>
+          <div style={{ maxHeight: 400, overflowY: 'auto', border: '1px solid var(--crm-border)', borderRadius: 8 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead style={{ position: 'sticky', top: 0, backgroundColor: '#1C1C27' }}>
+              <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--crm-surface-raised)' }}>
                 <tr>
-                  <th style={{ padding: '8px 12px', textAlign: 'left', color: '#52526A', fontWeight: 500, fontSize: 11 }}>CSV Record</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'left', color: '#52526A', fontWeight: 500, fontSize: 11 }}>Match</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'left', color: '#52526A', fontWeight: 500, fontSize: 11 }}>Already exists as</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'center', color: '#52526A', fontWeight: 500, fontSize: 11 }}>Decision</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--crm-text-muted)', fontWeight: 500, fontSize: 11 }}>CSV Record</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--crm-text-muted)', fontWeight: 500, fontSize: 11 }}>Match</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--crm-text-muted)', fontWeight: 500, fontSize: 11 }}>Already exists as</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--crm-text-muted)', fontWeight: 500, fontSize: 11 }}>Decision</th>
                 </tr>
               </thead>
               <tbody>
@@ -617,9 +617,9 @@ export function CSVImportWizard() {
                   if (row.status !== 'duplicate') return null
                   const willForce = !row.skip
                   return (
-                    <tr key={i} style={{ borderTop: '1px solid #1C1C27', opacity: row.skip ? 0.5 : 1, backgroundColor: willForce ? '#F59E0B08' : 'transparent' }}>
+                    <tr key={i} style={{ borderTop: '1px solid var(--crm-surface-raised)', opacity: row.skip ? 0.5 : 1, backgroundColor: willForce ? '#F59E0B08' : 'transparent' }}>
                       <td style={{ padding: '10px 12px' }}>
-                        <div style={{ fontWeight: 600, color: row.skip ? '#52526A' : '#F0F0F5' }}>{row.mapped.name || '—'}</div>
+                        <div style={{ fontWeight: 600, color: row.skip ? 'var(--crm-text-muted)' : 'var(--crm-text-primary)' }}>{row.mapped.name || '—'}</div>
                         <div style={{ fontSize: 11, color: '#3A3A4A', marginTop: 2 }}>{row.mapped.company || ''}</div>
                       </td>
                       <td style={{ padding: '10px 12px' }}>
@@ -627,7 +627,7 @@ export function CSVImportWizard() {
                           {row.duplicateType}
                         </span>
                       </td>
-                      <td style={{ padding: '10px 12px', color: '#8B8BA0', fontSize: 12 }}>
+                      <td style={{ padding: '10px 12px', color: 'var(--crm-text-secondary)', fontSize: 12 }}>
                         {row.duplicateName || '—'}
                       </td>
                       <td style={{ padding: '10px 12px', textAlign: 'center' }}>
@@ -654,16 +654,16 @@ export function CSVImportWizard() {
             </table>
           </div>
 
-          <p style={{ fontSize: 11, color: '#52526A', marginTop: 10 }}>
+          <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 10 }}>
             {rows.filter(r => r.status === 'duplicate' && r.skip).length} {t('skipped').toLowerCase()} · {rows.filter(r => r.status === 'duplicate' && !r.skip).length} will be imported anyway
             {blacklistedCount > 0 && ` · ${blacklistedCount} blocked by blacklist`}
           </p>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
-            <Button onClick={() => setStep(3)} style={{ backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>
+            <Button onClick={() => setStep(3)} style={{ backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}>
               <ChevronLeft size={14} /> {tc('back')}
             </Button>
-            <Button onClick={runImport} disabled={importing || willImport === 0} style={{ backgroundColor: '#6C63FF', color: '#FFF' }}>
+            <Button onClick={runImport} disabled={importing || willImport === 0} style={{ backgroundColor: 'var(--crm-accent)', color: '#FFF' }}>
               {importing ? t('importing') : `${t('startImport')} (${willImport})`}
             </Button>
           </div>
@@ -673,7 +673,7 @@ export function CSVImportWizard() {
       {/* STEP 5: Results */}
       {step === 5 && results && (
         <div style={{ ...S.card, textAlign: 'center' }}>
-          <CheckCircle size={52} color={results.imported > 0 ? '#22C55E' : '#52526A'} style={{ margin: '0 auto 16px' }} />
+          <CheckCircle size={52} color={results.imported > 0 ? '#22C55E' : 'var(--crm-text-muted)'} style={{ margin: '0 auto 16px' }} />
           <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>{t('importComplete')}</h2>
 
           {importError && (
@@ -688,44 +688,44 @@ export function CSVImportWizard() {
             </div>
           )}
 
-          <div style={{ fontSize: 12, color: '#52526A', marginBottom: 8 }}>{results.totalRows} rows in the CSV</div>
+          <div style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginBottom: 8 }}>{results.totalRows} rows in the CSV</div>
 
           <div style={{ display: 'flex', justifyContent: 'center', gap: 20, margin: '20px 0', flexWrap: 'wrap' }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 34, fontWeight: 700, color: '#22C55E' }}>{results.imported}</div>
-              <div style={{ fontSize: 12, color: '#8B8BA0' }}>{t('imported')}</div>
+              <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>{t('imported')}</div>
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 34, fontWeight: 700, color: '#F59E0B' }}>{results.skipped}</div>
-              <div style={{ fontSize: 12, color: '#8B8BA0' }}>Duplicates skipped</div>
+              <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>Duplicates skipped</div>
             </div>
             {results.blacklisted > 0 && (
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 34, fontWeight: 700, color: '#EF4444' }}>{results.blacklisted}</div>
-                <div style={{ fontSize: 12, color: '#8B8BA0' }}>Blocked by blacklist</div>
+                <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>Blocked by blacklist</div>
               </div>
             )}
             {results.skippedConstraint > 0 && (
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 34, fontWeight: 700, color: '#52526A' }}>{results.skippedConstraint}</div>
-                <div style={{ fontSize: 12, color: '#8B8BA0' }}>Already existed (global)</div>
+                <div style={{ fontSize: 34, fontWeight: 700, color: 'var(--crm-text-muted)' }}>{results.skippedConstraint}</div>
+                <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>Already existed (global)</div>
               </div>
             )}
             {results.errors > 0 && (
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 34, fontWeight: 700, color: '#EF4444' }}>{results.errors}</div>
-                <div style={{ fontSize: 12, color: '#8B8BA0' }}>No name (error)</div>
+                <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>No name (error)</div>
               </div>
             )}
             {results.forced > 0 && (
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 34, fontWeight: 700, color: '#6C63FF' }}>{results.forced}</div>
-                <div style={{ fontSize: 12, color: '#8B8BA0' }}>Forced duplicates</div>
+                <div style={{ fontSize: 34, fontWeight: 700, color: 'var(--crm-accent)' }}>{results.forced}</div>
+                <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>Forced duplicates</div>
               </div>
             )}
           </div>
 
-          <Button onClick={resetWizard} style={{ backgroundColor: '#6C63FF', color: '#FFF' }}>
+          <Button onClick={resetWizard} style={{ backgroundColor: 'var(--crm-accent)', color: '#FFF' }}>
             {t('importAnother')}
           </Button>
         </div>

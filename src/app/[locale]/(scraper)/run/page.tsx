@@ -28,17 +28,17 @@ const PHASE_INFO: Partial<Record<RunStatus, { title: string; icon: React.ReactNo
 };
 
 const S: Record<string, React.CSSProperties> = {
-  page:         { padding: '24px', color: '#F0F0F5', maxWidth: 580 },
-  card:         { backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: '20px 24px' },
-  sectionLabel: { fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.06em', display: 'block', marginBottom: 10 },
+  page:         { padding: '24px', color: 'var(--crm-text-primary)', maxWidth: 580 },
+  card:         { backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: '20px 24px' },
+  sectionLabel: { fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.06em', display: 'block', marginBottom: 10 },
 };
 
 function comboBtn(active: boolean): React.CSSProperties {
   return {
     padding: '8px 12px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'all .15s',
-    border: `1px solid ${active ? '#6C63FF' : '#2A2A3A'}`,
-    backgroundColor: active ? '#6C63FF20' : '#1C1C27',
-    color: active ? '#6C63FF' : '#8B8BA0',
+    border: `1px solid ${active ? 'var(--crm-accent)' : 'var(--crm-border)'}`,
+    backgroundColor: active ? '#6C63FF20' : 'var(--crm-surface-raised)',
+    color: active ? 'var(--crm-accent)' : 'var(--crm-text-secondary)',
     textAlign: 'left' as const,
   };
 }
@@ -46,9 +46,9 @@ function comboBtn(active: boolean): React.CSSProperties {
 function chipBtn(active: boolean): React.CSSProperties {
   return {
     padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer',
-    border: `1px solid ${active ? '#6C63FF' : '#2A2A3A'}`,
-    backgroundColor: active ? '#6C63FF' : '#1C1C27',
-    color: active ? '#FFF' : '#8B8BA0',
+    border: `1px solid ${active ? 'var(--crm-accent)' : 'var(--crm-border)'}`,
+    backgroundColor: active ? 'var(--crm-accent)' : 'var(--crm-surface-raised)',
+    color: active ? '#FFF' : 'var(--crm-text-secondary)',
   };
 }
 
@@ -241,10 +241,10 @@ export default function RunPage() {
         <div>
           <span style={S.sectionLabel}>Search Combos</span>
           {combosLoading ? (
-            <p style={{ fontSize: 13, color: '#52526A' }}>Loading combos…</p>
+            <p style={{ fontSize: 13, color: 'var(--crm-text-muted)' }}>Loading combos…</p>
           ) : activeCombos.length === 0 ? (
-            <p style={{ fontSize: 13, color: '#52526A' }}>
-              No active combos. Enable them in <Link href="/settings?tab=scraper" style={{ color: '#6C63FF', textDecoration: 'none' }}>Settings → Scraper</Link>.
+            <p style={{ fontSize: 13, color: 'var(--crm-text-muted)' }}>
+              No active combos. Enable them in <Link href="/settings?tab=scraper" style={{ color: 'var(--crm-accent)', textDecoration: 'none' }}>Settings → Scraper</Link>.
             </p>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
@@ -269,7 +269,7 @@ export default function RunPage() {
             ))}
           </div>
           {selectedCombos.length > 0 && (
-            <p style={{ fontSize: 12, color: '#52526A', margin: 0 }}>
+            <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: 0 }}>
               {totalLeads} leads total · ~{leadsPerCombo} per combo ({selectedCombos.length} combos selected)
             </p>
           )}
@@ -280,24 +280,24 @@ export default function RunPage() {
           <div>
             <span style={S.sectionLabel}>Assign SDRs</span>
             {sdrs.length === 0 ? (
-              <p style={{ fontSize: 13, color: '#52526A' }}>No SDRs with scraper access enabled.</p>
+              <p style={{ fontSize: 13, color: 'var(--crm-text-muted)' }}>No SDRs with scraper access enabled.</p>
             ) : (
               <>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {sdrs.map(sdr => (
-                    <label key={sdr.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, backgroundColor: selectedSdrIds.includes(sdr.id) ? '#6C63FF15' : '#1C1C27', border: `1px solid ${selectedSdrIds.includes(sdr.id) ? '#6C63FF40' : '#2A2A3A'}`, cursor: 'pointer' }}>
+                    <label key={sdr.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, backgroundColor: selectedSdrIds.includes(sdr.id) ? '#6C63FF15' : 'var(--crm-surface-raised)', border: `1px solid ${selectedSdrIds.includes(sdr.id) ? '#6C63FF40' : 'var(--crm-border)'}`, cursor: 'pointer' }}>
                       <input
                         type="checkbox"
                         checked={selectedSdrIds.includes(sdr.id)}
                         onChange={() => toggleSdr(sdr.id)}
-                        style={{ accentColor: '#6C63FF', width: 14, height: 14 }}
+                        style={{ accentColor: 'var(--crm-accent)', width: 14, height: 14 }}
                       />
-                      <span style={{ fontSize: 13, fontWeight: 500, color: '#F0F0F5' }}>{sdr.full_name}</span>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--crm-text-primary)' }}>{sdr.full_name}</span>
                     </label>
                   ))}
                 </div>
                 {selectedSdrIds.length > 0 && (
-                  <p style={{ fontSize: 12, color: '#52526A', marginTop: 8 }}>
+                  <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 8 }}>
                     {totalLeads} leads → {selectedSdrIds.map((id, i) => {
                       const sdr = sdrs.find(s => s.id === id);
                       return `${sdr?.full_name ?? id}: ${Math.floor(totalLeads / selectedSdrIds.length)}`;
@@ -314,7 +314,7 @@ export default function RunPage() {
             <AlertCircle size={16} color="#EF4444" style={{ flexShrink: 0, marginTop: 2 }} />
             <div>
               <p style={{ fontSize: 13, color: '#EF4444', fontWeight: 600, margin: '0 0 4px' }}>Could not start pipeline</p>
-              <p style={{ fontSize: 12, color: '#8B8BA0', margin: 0, fontFamily: 'monospace', wordBreak: 'break-word' }}>{submitError}</p>
+              <p style={{ fontSize: 12, color: 'var(--crm-text-secondary)', margin: 0, fontFamily: 'monospace', wordBreak: 'break-word' }}>{submitError}</p>
             </div>
           </div>
         )}
@@ -322,7 +322,7 @@ export default function RunPage() {
         <button
           onClick={handleSubmit}
           disabled={submitting || selectedCombos.length === 0 || totalLeads === 0}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', backgroundColor: submitting || !selectedCombos.length ? '#2A2A3A' : '#6C63FF', color: '#FFF', fontSize: 14, fontWeight: 600, cursor: submitting || !selectedCombos.length ? 'default' : 'pointer' }}>
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', backgroundColor: submitting || !selectedCombos.length ? 'var(--crm-border)' : 'var(--crm-accent)', color: '#FFF', fontSize: 14, fontWeight: 600, cursor: submitting || !selectedCombos.length ? 'default' : 'pointer' }}>
           <Play size={15} /> {submitting ? 'Starting…' : 'Run Pipeline'}
         </button>
       </div>
@@ -333,39 +333,39 @@ export default function RunPage() {
   if (step === 'running') {
     const phase = PHASE_INFO[runStatus] ?? PHASE_INFO.pending!;
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32, marginTop: 80, color: '#F0F0F5' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32, marginTop: 80, color: 'var(--crm-text-primary)' }}>
         <div style={{ position: 'relative', width: 96, height: 96 }}>
-          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '3px solid #2A2A3A' }} />
-          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '3px solid transparent', borderTopColor: '#6C63FF', animation: 'spin 1s linear infinite' }} />
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6C63FF' }}>
+          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '3px solid var(--crm-border)' }} />
+          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '3px solid transparent', borderTopColor: 'var(--crm-accent)', animation: 'spin 1s linear infinite' }} />
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--crm-accent)' }}>
             {phase.icon}
           </div>
         </div>
         <div style={{ textAlign: 'center' }}>
           <p style={{ fontSize: 22, fontWeight: 600, margin: '0 0 8px' }}>{phase.title}</p>
-          {leadCount > 0 && <p style={{ fontSize: 13, color: '#52526A', margin: 0 }}>{leadCount} leads found so far</p>}
+          {leadCount > 0 && <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>{leadCount} leads found so far</p>}
         </div>
         <div style={{ width: 320 }}>
-          <div style={{ height: 4, backgroundColor: '#2A2A3A', borderRadius: 2, overflow: 'hidden', marginBottom: 8 }}>
-            <div style={{ height: '100%', backgroundColor: '#6C63FF', borderRadius: 2, width: `${phase.progress}%`, transition: 'width .7s' }} />
+          <div style={{ height: 4, backgroundColor: 'var(--crm-border)', borderRadius: 2, overflow: 'hidden', marginBottom: 8 }}>
+            <div style={{ height: '100%', backgroundColor: 'var(--crm-accent)', borderRadius: 2, width: `${phase.progress}%`, transition: 'width .7s' }} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#52526A' }}>
-            <span style={runStatus === 'running' || runStatus === 'pending' ? { color: '#6C63FF' } : {}}>Scraping</span>
-            <span style={runStatus === 'scoring' ? { color: '#6C63FF' } : {}}>Scoring</span>
-            <span style={runStatus === 'drafting' ? { color: '#6C63FF' } : {}}>Generating</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--crm-text-muted)' }}>
+            <span style={runStatus === 'running' || runStatus === 'pending' ? { color: 'var(--crm-accent)' } : {}}>Scraping</span>
+            <span style={runStatus === 'scoring' ? { color: 'var(--crm-accent)' } : {}}>Scoring</span>
+            <span style={runStatus === 'drafting' ? { color: 'var(--crm-accent)' } : {}}>Generating</span>
           </div>
         </div>
         <div>
           {cancelConfirm ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 12, color: '#8B8BA0' }}>Cancel this run?</span>
+              <span style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>Cancel this run?</span>
               <button onClick={handleCancel} disabled={cancelling} style={{ fontSize: 12, color: '#EF4444', border: '1px solid #EF444430', padding: '5px 12px', borderRadius: 6, cursor: 'pointer', backgroundColor: 'transparent' }}>
                 {cancelling ? 'Cancelling…' : 'Yes, cancel'}
               </button>
-              <button onClick={() => setCancelConfirm(false)} style={{ fontSize: 12, color: '#52526A', background: 'none', border: 'none', cursor: 'pointer' }}>Keep running</button>
+              <button onClick={() => setCancelConfirm(false)} style={{ fontSize: 12, color: 'var(--crm-text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>Keep running</button>
             </div>
           ) : (
-            <button onClick={() => setCancelConfirm(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#52526A', background: 'none', border: 'none', cursor: 'pointer' }}>
+            <button onClick={() => setCancelConfirm(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--crm-text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
               <XCircle size={13} /> Cancel
             </button>
           )}
@@ -376,19 +376,19 @@ export default function RunPage() {
 
   /* ERROR */
   if (step === 'error') return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, marginTop: 80, color: '#F0F0F5' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, marginTop: 80, color: 'var(--crm-text-primary)' }}>
       <div style={{ width: 80, height: 80, borderRadius: '50%', backgroundColor: '#EF444415', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <AlertCircle size={36} color="#EF4444" />
       </div>
       <div style={{ textAlign: 'center' }}>
         <p style={{ fontSize: 20, fontWeight: 600, margin: '0 0 6px' }}>{runStatus === 'cancelled' ? 'Run cancelled' : 'Something went wrong'}</p>
-        <p style={{ fontSize: 13, color: '#52526A', margin: 0 }}>{runStatus === 'cancelled' ? 'The pipeline was cancelled.' : 'Check the logs for details.'}</p>
+        <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>{runStatus === 'cancelled' ? 'The pipeline was cancelled.' : 'Check the logs for details.'}</p>
       </div>
       <div style={{ display: 'flex', gap: 12 }}>
-        <button onClick={resetToForm} style={{ display: 'flex', alignItems: 'center', gap: 6, backgroundColor: '#6C63FF', color: '#FFF', padding: '10px 20px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+        <button onClick={resetToForm} style={{ display: 'flex', alignItems: 'center', gap: 6, backgroundColor: 'var(--crm-accent)', color: '#FFF', padding: '10px 20px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
           <Play size={13} /> Try again
         </button>
-        <Link href="/history" style={{ display: 'flex', alignItems: 'center', gap: 6, backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', color: '#8B8BA0', padding: '10px 20px', borderRadius: 8, textDecoration: 'none', fontSize: 13 }}>
+        <Link href="/history" style={{ display: 'flex', alignItems: 'center', gap: 6, backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', color: 'var(--crm-text-secondary)', padding: '10px 20px', borderRadius: 8, textDecoration: 'none', fontSize: 13 }}>
           View history
         </Link>
       </div>
@@ -397,7 +397,7 @@ export default function RunPage() {
 
   /* RESULT */
   return (
-    <div style={{ padding: '24px', color: '#F0F0F5', maxWidth: 900 }}>
+    <div style={{ padding: '24px', color: 'var(--crm-text-primary)', maxWidth: 900 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <StatusBadge status="completed" />
         <span style={{ fontSize: 16, fontWeight: 600 }}>Pipeline completed</span>
@@ -405,37 +405,37 @@ export default function RunPage() {
       {run && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 20 }}>
           {[
-            { label: 'Total',  value: run.total_leads, color: '#F0F0F5' },
+            { label: 'Total',  value: run.total_leads, color: 'var(--crm-text-primary)' },
             { label: 'HOT',    value: run.hot_count,   color: '#EF4444' },
             { label: 'WARM',   value: run.warm_count,  color: '#F59E0B' },
             { label: 'COLD',   value: run.cold_count,  color: '#60A5FA' },
           ].map(s => (
-            <div key={s.label} style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, padding: '14px', textAlign: 'center' }}>
+            <div key={s.label} style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 10, padding: '14px', textAlign: 'center' }}>
               <p style={{ fontSize: 26, fontWeight: 700, fontFamily: 'monospace', color: s.color, margin: '0 0 4px' }}>{s.value}</p>
-              <p style={{ fontSize: 11, color: '#52526A', margin: 0 }}>{s.label}</p>
+              <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', margin: 0 }}>{s.label}</p>
             </div>
           ))}
         </div>
       )}
       {leads.length > 0 && (
-        <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, overflow: 'auto', marginBottom: 20 }}>
+        <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 10, overflow: 'auto', marginBottom: 20 }}>
           <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid #2A2A3A' }}>
+              <tr style={{ borderBottom: '1px solid var(--crm-border)' }}>
                 {['Name', 'Company', 'Title', 'ICP', 'Temp', 'Message'].map(h => (
-                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, color: '#52526A', fontWeight: 600 }}>{h}</th>
+                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600 }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {leads.slice(0, 20).map((lead, i) => (
-                <tr key={lead.id} style={{ borderTop: i > 0 ? '1px solid #2A2A3A' : undefined }}>
-                  <td style={{ padding: '8px 14px', color: '#F0F0F5', fontWeight: 600 }}>{lead.full_name || '—'}</td>
-                  <td style={{ padding: '8px 14px', color: '#8B8BA0', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.company || '—'}</td>
-                  <td style={{ padding: '8px 14px', color: '#8B8BA0', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.title || '—'}</td>
+                <tr key={lead.id} style={{ borderTop: i > 0 ? '1px solid var(--crm-border)' : undefined }}>
+                  <td style={{ padding: '8px 14px', color: 'var(--crm-text-primary)', fontWeight: 600 }}>{lead.full_name || '—'}</td>
+                  <td style={{ padding: '8px 14px', color: 'var(--crm-text-secondary)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.company || '—'}</td>
+                  <td style={{ padding: '8px 14px', color: 'var(--crm-text-secondary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.title || '—'}</td>
                   <td style={{ padding: '8px 14px' }}><ICPScore score={lead.icp_score ?? 0} size="sm" /></td>
                   <td style={{ padding: '8px 14px' }}>{lead.temperature && <TemperatureBadge temperature={lead.temperature} />}</td>
-                  <td style={{ padding: '8px 14px', color: '#52526A', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>{lead.custom1 || '—'}</td>
+                  <td style={{ padding: '8px 14px', color: 'var(--crm-text-muted)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>{lead.custom1 || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -443,14 +443,14 @@ export default function RunPage() {
         </div>
       )}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-        <Link href={`/leads?run_id=${runId}`} style={{ backgroundColor: '#6C63FF', color: '#FFF', padding: '9px 18px', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>View all leads →</Link>
+        <Link href={`/leads?run_id=${runId}`} style={{ backgroundColor: 'var(--crm-accent)', color: '#FFF', padding: '9px 18px', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>View all leads →</Link>
         {!crmResult && (
           <button onClick={() => setShowCrmForm(f => !f)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, backgroundColor: showCrmForm ? '#2A2A3A' : '#22C55E20', border: `1px solid ${showCrmForm ? '#2A2A3A' : '#22C55E40'}`, color: showCrmForm ? '#8B8BA0' : '#22C55E', padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 6, backgroundColor: showCrmForm ? 'var(--crm-border)' : '#22C55E20', border: `1px solid ${showCrmForm ? 'var(--crm-border)' : '#22C55E40'}`, color: showCrmForm ? 'var(--crm-text-secondary)' : '#22C55E', padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
             <DatabaseZap size={14} />{showCrmForm ? 'Cancel' : 'Import to CRM'}
           </button>
         )}
-        <button onClick={resetToForm} style={{ fontSize: 13, color: '#52526A', background: 'none', border: 'none', cursor: 'pointer', padding: '9px 10px' }}>
+        <button onClick={resetToForm} style={{ fontSize: 13, color: 'var(--crm-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '9px 10px' }}>
           <ChevronLeft size={13} style={{ display: 'inline', marginRight: 4 }} />New run
         </button>
       </div>
@@ -459,27 +459,27 @@ export default function RunPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, backgroundColor: '#14532D20', border: '1px solid #16A34A40', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
           <CheckCircle2 size={16} color="#22C55E" />
           <span style={{ fontSize: 13, color: '#22C55E', fontWeight: 600 }}>Imported: {crmResult.imported}</span>
-          <span style={{ fontSize: 13, color: '#52526A' }}>Duplicates: {crmResult.duplicates}</span>
-          {crmResult.no_name > 0 && <span style={{ fontSize: 13, color: '#52526A' }}>No name: {crmResult.no_name}</span>}
+          <span style={{ fontSize: 13, color: 'var(--crm-text-muted)' }}>Duplicates: {crmResult.duplicates}</span>
+          {crmResult.no_name > 0 && <span style={{ fontSize: 13, color: 'var(--crm-text-muted)' }}>No name: {crmResult.no_name}</span>}
         </div>
       )}
 
       {showCrmForm && !crmResult && (
-        <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, padding: '16px 20px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <p style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', margin: 0, letterSpacing: '0.06em' }}>Import to CRM</p>
+        <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 10, padding: '16px 20px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', margin: 0, letterSpacing: '0.06em' }}>Import to CRM</p>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 180 }}>
-              <label style={{ fontSize: 11, color: '#8B8BA0', display: 'block', marginBottom: 4 }}>Area *</label>
+              <label style={{ fontSize: 11, color: 'var(--crm-text-secondary)', display: 'block', marginBottom: 4 }}>Area *</label>
               <select value={crmAreaId} onChange={e => setCrmAreaId(e.target.value)}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 7, backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', color: '#F0F0F5', fontSize: 12, outline: 'none' }}>
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 7, backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', color: 'var(--crm-text-primary)', fontSize: 12, outline: 'none' }}>
                 <option value="">Select…</option>
                 {areas.filter(a => a.is_active).map(a => <option key={a.id} value={a.id}>{a.label_en}</option>)}
               </select>
             </div>
             <div style={{ flex: 1, minWidth: 180 }}>
-              <label style={{ fontSize: 11, color: '#8B8BA0', display: 'block', marginBottom: 4 }}>Assign to SDR (optional)</label>
+              <label style={{ fontSize: 11, color: 'var(--crm-text-secondary)', display: 'block', marginBottom: 4 }}>Assign to SDR (optional)</label>
               <select value={crmSdrId} onChange={e => setCrmSdrId(e.target.value)}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 7, backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', color: '#F0F0F5', fontSize: 12, outline: 'none' }}>
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 7, backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', color: 'var(--crm-text-primary)', fontSize: 12, outline: 'none' }}>
                 <option value="">Unassigned</option>
                 {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
               </select>
@@ -487,7 +487,7 @@ export default function RunPage() {
           </div>
           {crmError && <p style={{ fontSize: 12, color: '#EF4444', margin: 0 }}>{crmError}</p>}
           <button onClick={handleImportToCRM} disabled={!crmAreaId || crmLoading}
-            style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6, backgroundColor: !crmAreaId || crmLoading ? '#2A2A3A' : '#22C55E', color: '#FFF', padding: '8px 18px', borderRadius: 8, border: 'none', cursor: !crmAreaId || crmLoading ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, opacity: !crmAreaId ? 0.5 : 1 }}>
+            style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6, backgroundColor: !crmAreaId || crmLoading ? 'var(--crm-border)' : '#22C55E', color: '#FFF', padding: '8px 18px', borderRadius: 8, border: 'none', cursor: !crmAreaId || crmLoading ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, opacity: !crmAreaId ? 0.5 : 1 }}>
             <DatabaseZap size={14} />{crmLoading ? 'Importing…' : 'Import to CRM'}
           </button>
         </div>

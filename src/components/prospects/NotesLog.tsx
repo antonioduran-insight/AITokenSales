@@ -67,7 +67,7 @@ export function NotesLog({ prospectId, prospectName }: Props) {
       {/* Notes list */}
       <div style={{ marginBottom: 16 }}>
         {notes.length === 0 ? (
-          <p style={{ color: '#52526A', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>
+          <p style={{ color: 'var(--crm-text-muted)', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>
             {t('noNotes')}
           </p>
         ) : (
@@ -76,24 +76,24 @@ export function NotesLog({ prospectId, prospectName }: Props) {
               <div
                 key={note.id}
                 style={{
-                  backgroundColor: '#1C1C27',
-                  border: '1px solid #2A2A3A',
+                  backgroundColor: 'var(--crm-surface-raised)',
+                  border: '1px solid var(--crm-border)',
                   borderRadius: 8,
                   padding: '10px 12px',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#8B8BA0' }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--crm-text-secondary)' }}>
                     {(note.author as { full_name: string })?.full_name ?? '—'}
                   </span>
                   <span
                     className="font-mono-data"
-                    style={{ fontSize: 11, color: '#52526A' }}
+                    style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}
                   >
                     {format(new Date(note.created_at), 'dd MMM yyyy, HH:mm')}
                   </span>
                 </div>
-                <p style={{ fontSize: 13, color: '#F0F0F5', margin: 0, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                <p style={{ fontSize: 13, color: 'var(--crm-text-primary)', margin: 0, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                   {note.content}
                 </p>
               </div>
@@ -114,11 +114,11 @@ export function NotesLog({ prospectId, prospectName }: Props) {
           }}
           style={{
             flex: 1,
-            backgroundColor: '#1C1C27',
-            border: '1px solid #2A2A3A',
+            backgroundColor: 'var(--crm-surface-raised)',
+            border: '1px solid var(--crm-border)',
             borderRadius: 8,
             padding: '8px 12px',
-            color: '#F0F0F5',
+            color: 'var(--crm-text-primary)',
             fontSize: 13,
             resize: 'vertical',
             outline: 'none',
@@ -132,8 +132,8 @@ export function NotesLog({ prospectId, prospectName }: Props) {
             padding: '8px 12px',
             borderRadius: 8,
             border: 'none',
-            backgroundColor: content.trim() ? '#6C63FF' : '#2A2A3A',
-            color: content.trim() ? '#F0F0F5' : '#52526A',
+            backgroundColor: content.trim() ? 'var(--crm-accent)' : 'var(--crm-border)',
+            color: content.trim() ? 'var(--crm-text-primary)' : 'var(--crm-text-muted)',
             cursor: content.trim() ? 'pointer' : 'not-allowed',
             alignSelf: 'flex-end',
             height: 38,

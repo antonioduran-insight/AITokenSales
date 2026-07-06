@@ -4,6 +4,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { Sidebar } from './Sidebar'
 import { LanguageSwitcher } from './LanguageSwitcher'
+import { ThemeToggle } from './ThemeToggle'
 
 import { UserProvider, type UserWithArea } from '@/contexts/UserContext'
 import { Suspense } from 'react'
@@ -67,20 +68,20 @@ export function AppShell({ children, initialUser, orgPlan }: Props) {
 
   return (
     <UserProvider value={{ user: initialUser, isAdmin: initialUser?.role === 'admin', orgPlan }}>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', backgroundColor: '#0A0A0F' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', backgroundColor: 'var(--crm-background)' }}>
         <Suspense fallback={null}>
           <ImpersonateBanner />
         </Suspense>
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-          <Suspense fallback={<aside style={{ width: 240, minWidth: 240, backgroundColor: '#13131A', borderRight: '1px solid #2A2A3A' }} />}>
+          <Suspense fallback={<aside style={{ width: 240, minWidth: 240, backgroundColor: 'var(--crm-surface)', borderRight: '1px solid var(--crm-border)' }} />}>
             <Sidebar user={initialUser} />
           </Suspense>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: '#0A0A0F' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: 'var(--crm-background)' }}>
             <header
               style={{
                 height: 52,
-                borderBottom: '1px solid #2A2A3A',
-                backgroundColor: '#13131A',
+                borderBottom: '1px solid var(--crm-border)',
+                backgroundColor: 'var(--crm-surface)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'flex-end',
@@ -89,9 +90,10 @@ export function AppShell({ children, initialUser, orgPlan }: Props) {
                 flexShrink: 0,
               }}
             >
+              <ThemeToggle />
               <LanguageSwitcher />
             </header>
-            <main style={{ flex: 1, overflow: 'auto', backgroundColor: '#0A0A0F' }}>
+            <main style={{ flex: 1, overflow: 'auto', backgroundColor: 'var(--crm-background)' }}>
               <div style={{ maxWidth: 1400, margin: '0 auto', width: '100%' }}>
                 {children}
               </div>

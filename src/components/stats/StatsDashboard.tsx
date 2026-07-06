@@ -37,13 +37,13 @@ interface AreaStat {
 }
 
 const STATUS_COLORS: Record<OutreachStatus, string> = {
-  new: '#6C63FF',
+  new: 'var(--crm-accent)',
   connection_sent: '#3B82F6',
   connected: '#22C55E',
   replied: '#F59E0B',
   demo_scheduled: '#EC4899',
   closed: '#10B981',
-  nurture: '#8B8BA0',
+  nurture: 'var(--crm-text-secondary)',
 }
 
 const TEMP_COLORS: Record<string, string> = {
@@ -58,24 +58,24 @@ function convRateColor(rate: number): string {
   return '#EF4444'
 }
 
-function ProgressBar({ value, max, color = '#6C63FF', height = 5 }: { value: number; max: number; color?: string; height?: number }) {
+function ProgressBar({ value, max, color = 'var(--crm-accent)', height = 5 }: { value: number; max: number; color?: string; height?: number }) {
   const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0
   return (
-    <div style={{ flex: 1, height, backgroundColor: '#2A2A3A', borderRadius: height, overflow: 'hidden' }}>
+    <div style={{ flex: 1, height, backgroundColor: 'var(--crm-border)', borderRadius: height, overflow: 'hidden' }}>
       <div style={{ height: '100%', width: `${pct}%`, backgroundColor: color, borderRadius: height, transition: 'width 0.5s ease' }} />
     </div>
   )
 }
 
 const S: Record<string, React.CSSProperties> = {
-  page: { padding: '20px 24px', color: '#F0F0F5', overflowY: 'auto', height: '100%' },
-  card: { backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, padding: 20 },
-  bigCard: { backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 24 },
-  statCard: { backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 },
-  sectionTitle: { fontSize: 13, fontWeight: 600, color: '#52526A', marginBottom: 16, textTransform: 'uppercase' as const, letterSpacing: '0.07em' },
-  sectionLabel: { fontSize: 12, fontWeight: 700, color: '#8B8BA0', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 },
-  th: { padding: '8px 12px', textAlign: 'left' as const, fontSize: 11, fontWeight: 600, color: '#52526A', textTransform: 'uppercase' as const, letterSpacing: '0.05em', borderBottom: '1px solid #2A2A3A' },
-  td: { padding: '9px 12px', borderBottom: '1px solid #1C1C27', fontSize: 13 },
+  page: { padding: '20px 24px', color: 'var(--crm-text-primary)', overflowY: 'auto', height: '100%' },
+  card: { backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 10, padding: 20 },
+  bigCard: { backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 24 },
+  statCard: { backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 10, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 },
+  sectionTitle: { fontSize: 13, fontWeight: 600, color: 'var(--crm-text-muted)', marginBottom: 16, textTransform: 'uppercase' as const, letterSpacing: '0.07em' },
+  sectionLabel: { fontSize: 12, fontWeight: 700, color: 'var(--crm-text-secondary)', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 },
+  th: { padding: '8px 12px', textAlign: 'left' as const, fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.05em', borderBottom: '1px solid var(--crm-border)' },
+  td: { padding: '9px 12px', borderBottom: '1px solid var(--crm-surface-raised)', fontSize: 13 },
 }
 
 const STATS_SELECT = 'id, outreach_status, lead_temperature, area_id, assigned_to, created_at, area:areas(name, label_en), assigned_user:users!assigned_to(id, full_name, area_id)'
@@ -114,7 +114,7 @@ export function StatsDashboard() {
   if (loading) {
     return (
       <div style={{ ...S.page, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: '#52526A' }}>{tc('loading')}</span>
+        <span style={{ color: 'var(--crm-text-muted)' }}>{tc('loading')}</span>
       </div>
     )
   }
@@ -204,13 +204,13 @@ export function StatsDashboard() {
 
           {/* Card 1 — Global */}
           <div style={{ ...S.bigCard, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#52526A', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>
               {t('conversionGlobal')}
             </div>
             <div style={{ fontSize: 56, fontWeight: 800, color: globalConvColor, lineHeight: 1, marginBottom: 8 }}>
               {globalConvRate.toFixed(1)}%
             </div>
-            <div style={{ fontSize: 12, color: '#52526A' }}>
+            <div style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>
               {closedTotal} {t('closedOf')} {total} total
             </div>
             <div style={{ width: '100%', marginTop: 16 }}>
@@ -222,7 +222,7 @@ export function StatsDashboard() {
           <div style={S.bigCard}>
             <div style={S.sectionTitle}>{t('conversionBySdr')}</div>
             {sdrStats.length === 0 ? (
-              <p style={{ color: '#52526A', fontSize: 13 }}>{t('noData')}</p>
+              <p style={{ color: 'var(--crm-text-muted)', fontSize: 13 }}>{t('noData')}</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {sdrStats.map(sdr => {
@@ -231,11 +231,11 @@ export function StatsDashboard() {
                   return (
                     <div key={sdr.id}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-                        <span style={{ fontSize: 13, color: '#F0F0F5', fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                        <span style={{ fontSize: 13, color: 'var(--crm-text-primary)', fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                           {sdr.full_name}
                         </span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, marginLeft: 10 }}>
-                          <span style={{ fontSize: 11, color: '#52526A', fontFamily: 'JetBrains Mono, monospace' }}>
+                          <span style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>
                             {sdr.closed}/{sdr.total}
                           </span>
                           <span style={{ fontSize: 13, fontWeight: 700, color, fontFamily: 'JetBrains Mono, monospace', minWidth: 44, textAlign: 'right' }}>
@@ -255,7 +255,7 @@ export function StatsDashboard() {
           <div style={S.bigCard}>
             <div style={S.sectionTitle}>{t('conversionByArea')}</div>
             {areaStats.length === 0 ? (
-              <p style={{ color: '#52526A', fontSize: 13 }}>{t('noData')}</p>
+              <p style={{ color: 'var(--crm-text-muted)', fontSize: 13 }}>{t('noData')}</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {areaStats.map(a => {
@@ -264,9 +264,9 @@ export function StatsDashboard() {
                   return (
                     <div key={a.label}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <span style={{ fontSize: 13, color: '#F0F0F5', fontWeight: 600 }}>{a.label}</span>
+                        <span style={{ fontSize: 13, color: 'var(--crm-text-primary)', fontWeight: 600 }}>{a.label}</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ fontSize: 11, color: '#52526A', fontFamily: 'JetBrains Mono, monospace' }}>
+                          <span style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>
                             {a.closed}/{a.total}
                           </span>
                           <span style={{ fontSize: 15, fontWeight: 800, color, fontFamily: 'JetBrains Mono, monospace', minWidth: 52, textAlign: 'right' }}>
@@ -288,11 +288,11 @@ export function StatsDashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
         <div style={S.statCard}>
           <div style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#6C63FF20', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Users2 size={20} color="#6C63FF" />
+            <Users2 size={20} color="var(--crm-accent)" />
           </div>
           <div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: '#F0F0F5' }}>{total}</div>
-            <div style={{ fontSize: 12, color: '#8B8BA0' }}>{t('totalLeads')}</div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--crm-text-primary)' }}>{total}</div>
+            <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>{t('totalLeads')}</div>
           </div>
         </div>
 
@@ -301,8 +301,8 @@ export function StatsDashboard() {
             <TrendingUp size={20} color="#22C55E" />
           </div>
           <div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: '#F0F0F5' }}>{thisWeek}</div>
-            <div style={{ fontSize: 12, color: '#8B8BA0' }}>{t('addedThisWeek')}</div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--crm-text-primary)' }}>{thisWeek}</div>
+            <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>{t('addedThisWeek')}</div>
             <div style={{ fontSize: 10, color: '#3A3A4A', fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>
               {format(weekStart, 'MMM d')} – {format(weekEnd, 'MMM d')}
             </div>
@@ -314,8 +314,8 @@ export function StatsDashboard() {
             <Target size={20} color="#F59E0B" />
           </div>
           <div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: '#F0F0F5' }}>{replyRate}%</div>
-            <div style={{ fontSize: 12, color: '#8B8BA0' }}>{t('replyRate')}</div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--crm-text-primary)' }}>{replyRate}%</div>
+            <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>{t('replyRate')}</div>
             <div style={{ fontSize: 10, color: '#3A3A4A', fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>{replied} replied</div>
           </div>
         </div>
@@ -325,8 +325,8 @@ export function StatsDashboard() {
             <Calendar size={20} color="#EC4899" />
           </div>
           <div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: '#F0F0F5' }}>{demos}</div>
-            <div style={{ fontSize: 12, color: '#8B8BA0' }}>{t('demoScheduled')}</div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--crm-text-primary)' }}>{demos}</div>
+            <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>{t('demoScheduled')}</div>
           </div>
         </div>
       </div>
@@ -340,7 +340,7 @@ export function StatsDashboard() {
             {byStatus.map(({ status, count }) => (
               <div key={status}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontSize: 12, color: '#8B8BA0' }}>
+                  <span style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>
                     {status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                   </span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: STATUS_COLORS[status], fontFamily: 'JetBrains Mono, monospace' }}>{count}</span>
@@ -360,14 +360,14 @@ export function StatsDashboard() {
                 <div key={temp} style={{ flex: 1, textAlign: 'center' }}>
                   <div style={{ fontSize: 28, fontWeight: 700, color: TEMP_COLORS[temp] }}>{tempCounts[temp]}</div>
                   <div style={{ fontSize: 11, color: TEMP_COLORS[temp], marginTop: 2, fontWeight: 600 }}>{temp}</div>
-                  <div style={{ fontSize: 10, color: '#52526A', marginTop: 2 }}>
+                  <div style={{ fontSize: 10, color: 'var(--crm-text-muted)', marginTop: 2 }}>
                     {total > 0 ? ((tempCounts[temp] / total) * 100).toFixed(0) : 0}%
                   </div>
                 </div>
               ))}
               <div style={{ flex: 1, textAlign: 'center' }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: '#52526A' }}>{tempCounts['null']}</div>
-                <div style={{ fontSize: 11, color: '#52526A', marginTop: 2, fontWeight: 600 }}>{tc('unset')}</div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--crm-text-muted)' }}>{tempCounts['null']}</div>
+                <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 2, fontWeight: 600 }}>{tc('unset')}</div>
               </div>
             </div>
           </div>
@@ -379,10 +379,10 @@ export function StatsDashboard() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {areaStats.map(a => (
                   <div key={a.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 13, color: '#8B8BA0' }}>{a.label}</span>
+                    <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{a.label}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <ProgressBar value={a.total} max={total} color="#6C63FF" height={4} />
-                      <span style={{ fontSize: 12, fontWeight: 700, color: '#F0F0F5', fontFamily: 'JetBrains Mono, monospace', minWidth: 24, textAlign: 'right' }}>
+                      <ProgressBar value={a.total} max={total} color="var(--crm-accent)" height={4} />
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--crm-text-primary)', fontFamily: 'JetBrains Mono, monospace', minWidth: 24, textAlign: 'right' }}>
                         {a.total}
                       </span>
                     </div>
@@ -415,8 +415,8 @@ export function StatsDashboard() {
                   const color = convRateColor(convRate)
                   return (
                     <tr key={sdr.id}>
-                      <td style={{ ...S.td, color: '#F0F0F5', fontWeight: 500 }}>{sdr.full_name}</td>
-                      <td style={{ ...S.td, fontFamily: 'JetBrains Mono, monospace', color: '#6C63FF' }}>{sdr.total}</td>
+                      <td style={{ ...S.td, color: 'var(--crm-text-primary)', fontWeight: 500 }}>{sdr.full_name}</td>
+                      <td style={{ ...S.td, fontFamily: 'JetBrains Mono, monospace', color: 'var(--crm-accent)' }}>{sdr.total}</td>
                       <td style={{ ...S.td, fontFamily: 'JetBrains Mono, monospace', color: '#F59E0B' }}>{sdr.replied}</td>
                       <td style={{ ...S.td, fontFamily: 'JetBrains Mono, monospace', color: '#10B981' }}>{sdr.closed}</td>
                       <td style={S.td}>

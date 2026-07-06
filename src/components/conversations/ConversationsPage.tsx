@@ -10,11 +10,11 @@ import { MessageSquare, Search, X, RefreshCw } from 'lucide-react'
 import type { Conversation, Area, User, Prospect } from '@/lib/types'
 
 const S: Record<string, React.CSSProperties> = {
-  page: { padding: '20px 24px', color: '#F0F0F5', height: '100%', display: 'flex', flexDirection: 'column' },
+  page: { padding: '20px 24px', color: 'var(--crm-text-primary)', height: '100%', display: 'flex', flexDirection: 'column' },
   header: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' as const },
-  input: { backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 6, color: '#F0F0F5', padding: '7px 10px 7px 32px', fontSize: 13, width: 220, outline: 'none' },
-  select: { backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 6, color: '#F0F0F5', padding: '7px 10px', fontSize: 13 },
-  card: { backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, padding: '16px 18px', cursor: 'pointer', transition: 'border-color 0.15s' },
+  input: { backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 6, color: 'var(--crm-text-primary)', padding: '7px 10px 7px 32px', fontSize: 13, width: 220, outline: 'none' },
+  select: { backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 6, color: 'var(--crm-text-primary)', padding: '7px 10px', fontSize: 13 },
+  card: { backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 10, padding: '16px 18px', cursor: 'pointer', transition: 'border-color 0.15s' },
 }
 
 const CONV_SELECT = '*,author:users!author_id(id,full_name,email,role,area_id,is_active,created_at),prospect:prospects!prospect_id(id,name,company,title,outreach_status,lead_temperature,area_id,assigned_to,linkedin_url,email,icp_score,custom1,custom2,custom3,source,created_at,updated_at,market,search_combo,scrape_date,industry,company_size,flag_tomorrow,created_by,area:areas(*),assigned_user:users!assigned_to(id,full_name,email,role,area_id,is_active,created_at))'
@@ -113,15 +113,15 @@ export function ConversationsPage() {
       {/* Header */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <MessageSquare size={20} color="#6C63FF" />
+          <MessageSquare size={20} color="var(--crm-accent)" />
           <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Conversations</h1>
-          <span style={{ fontSize: 12, color: '#52526A', marginLeft: 4 }}>{total} total</span>
+          <span style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginLeft: 4 }}>{total} total</span>
         </div>
 
         <div style={S.header}>
           {/* Search */}
           <div style={{ position: 'relative' }}>
-            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#52526A' }} />
+            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--crm-text-muted)' }} />
             <input
               style={S.input}
               placeholder="Search by prospect or reason…"
@@ -163,14 +163,14 @@ export function ConversationsPage() {
           />
 
           {hasFilters && (
-            <button onClick={clearFilters} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 6, border: '1px solid #2A2A3A', backgroundColor: 'transparent', color: '#8B8BA0', cursor: 'pointer', fontSize: 12 }}>
+            <button onClick={clearFilters} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer', fontSize: 12 }}>
               <X size={12} /> Clear
             </button>
           )}
 
           <div style={{ flex: 1 }} />
 
-          <button onClick={fetchConversations} disabled={loading} style={{ padding: '7px 8px', borderRadius: 6, border: '1px solid #2A2A3A', backgroundColor: 'transparent', color: '#8B8BA0', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          <button onClick={fetchConversations} disabled={loading} style={{ padding: '7px 8px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
             <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
           </button>
         </div>
@@ -179,10 +179,10 @@ export function ConversationsPage() {
       {/* List */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {loading && (
-          <div style={{ textAlign: 'center', color: '#52526A', padding: 40 }}>Loading…</div>
+          <div style={{ textAlign: 'center', color: 'var(--crm-text-muted)', padding: 40 }}>Loading…</div>
         )}
         {!loading && conversations.length === 0 && (
-          <div style={{ textAlign: 'center', color: '#52526A', padding: 40 }}>No conversations</div>
+          <div style={{ textAlign: 'center', color: 'var(--crm-text-muted)', padding: 40 }}>No conversations</div>
         )}
         {!loading && conversations.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
@@ -195,7 +195,7 @@ export function ConversationsPage() {
                   key={c.id}
                   style={S.card}
                   onMouseEnter={e => (e.currentTarget.style.borderColor = '#6C63FF40')}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = '#2A2A3A')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--crm-border)')}
                 >
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
                     {/* Prospect name */}
@@ -208,37 +208,37 @@ export function ConversationsPage() {
                       }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
                     >
-                      <div style={{ fontSize: 15, fontWeight: 700, color: '#F0F0F5' }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--crm-text-primary)' }}>
                         {prospect?.name ?? '—'}
                       </div>
                       {prospect?.company && (
-                        <div style={{ fontSize: 12, color: '#52526A', marginTop: 2 }}>{prospect.company}</div>
+                        <div style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 2 }}>{prospect.company}</div>
                       )}
                     </button>
 
                     {/* Meta */}
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: 12, color: '#8B8BA0', fontWeight: 500 }}>{author?.full_name ?? '—'}</div>
-                      <div style={{ fontSize: 11, color: '#52526A', fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>
+                      <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)', fontWeight: 500 }}>{author?.full_name ?? '—'}</div>
+                      <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>
                         {format(new Date(c.created_at), 'dd MMM yyyy, HH:mm')}
                       </div>
                     </div>
                   </div>
 
                   {/* Reason */}
-                  <div style={{ fontSize: 12, color: '#6C63FF', fontStyle: 'italic', marginBottom: 8, padding: '4px 8px', backgroundColor: '#6C63FF10', borderRadius: 4, display: 'inline-block' }}>
+                  <div style={{ fontSize: 12, color: 'var(--crm-accent)', fontStyle: 'italic', marginBottom: 8, padding: '4px 8px', backgroundColor: '#6C63FF10', borderRadius: 4, display: 'inline-block' }}>
                     {c.reason}
                   </div>
 
                   {/* Chat preview */}
-                  <div style={{ fontSize: 13, color: '#8B8BA0', lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 13, color: 'var(--crm-text-secondary)', lineHeight: 1.5 }}>
                     {c.chat_content.length > 100 ? c.chat_content.slice(0, 100) + '…' : c.chat_content}
                   </div>
 
                   {c.chat_content.length > 100 && (
                     <button
                       onClick={e => { e.stopPropagation(); setViewFull(c) }}
-                      style={{ marginTop: 8, fontSize: 12, color: '#6C63FF', background: 'none', border: '1px solid #6C63FF30', borderRadius: 5, cursor: 'pointer', padding: '3px 10px' }}
+                      style={{ marginTop: 8, fontSize: 12, color: 'var(--crm-accent)', background: 'none', border: '1px solid #6C63FF30', borderRadius: 5, cursor: 'pointer', padding: '3px 10px' }}
                     >
                       View full
                     </button>
@@ -256,24 +256,24 @@ export function ConversationsPage() {
           style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
           onClick={e => { if (e.target === e.currentTarget) setViewFull(null) }}
         >
-          <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 24, width: 640, maxWidth: '92vw', maxHeight: '85vh', overflowY: 'auto' }}>
+          <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 24, width: 640, maxWidth: '92vw', maxHeight: '85vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12, gap: 12 }}>
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#F0F0F5' }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--crm-text-primary)' }}>
                   {(viewFull.prospect as { name?: string })?.name ?? '—'}
                 </div>
-                <div style={{ fontSize: 12, color: '#52526A', marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 2 }}>
                   {(viewFull.author as User | undefined)?.full_name} · {format(new Date(viewFull.created_at), 'dd MMM yyyy, HH:mm')}
                 </div>
               </div>
-              <button onClick={() => setViewFull(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52526A', flexShrink: 0 }}>
+              <button onClick={() => setViewFull(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', flexShrink: 0 }}>
                 <X size={16} />
               </button>
             </div>
-            <div style={{ fontSize: 12, color: '#6C63FF', fontStyle: 'italic', marginBottom: 14, padding: '6px 10px', backgroundColor: '#6C63FF10', borderRadius: 6 }}>
+            <div style={{ fontSize: 12, color: 'var(--crm-accent)', fontStyle: 'italic', marginBottom: 14, padding: '6px 10px', backgroundColor: '#6C63FF10', borderRadius: 6 }}>
               "{viewFull.reason}"
             </div>
-            <div style={{ fontSize: 13, color: '#F0F0F5', lineHeight: 1.7, whiteSpace: 'pre-wrap', backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 8, padding: '12px 14px' }}>
+            <div style={{ fontSize: 13, color: 'var(--crm-text-primary)', lineHeight: 1.7, whiteSpace: 'pre-wrap', backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '12px 14px' }}>
               {viewFull.chat_content}
             </div>
           </div>

@@ -18,8 +18,8 @@ interface ImportState {
 }
 
 const S: Record<string, React.CSSProperties> = {
-  page: { padding: '24px', color: '#F0F0F5', maxWidth: 900 },
-  row:  { backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, overflow: 'hidden', marginBottom: 8 },
+  page: { padding: '24px', color: 'var(--crm-text-primary)', maxWidth: 900 },
+  row:  { backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 10, overflow: 'hidden', marginBottom: 8 },
 };
 
 export default function HistoryPage() {
@@ -107,8 +107,8 @@ export default function HistoryPage() {
   };
 
   const SELECT: React.CSSProperties = {
-    padding: '7px 10px', borderRadius: 7, backgroundColor: '#1C1C27',
-    border: '1px solid #2A2A3A', color: '#F0F0F5', fontSize: 12, outline: 'none',
+    padding: '7px 10px', borderRadius: 7, backgroundColor: 'var(--crm-surface-raised)',
+    border: '1px solid var(--crm-border)', color: 'var(--crm-text-primary)', fontSize: 12, outline: 'none',
   };
 
   return (
@@ -116,29 +116,29 @@ export default function HistoryPage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Run History</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 12, color: '#52526A' }}>{runs.length} runs</span>
+          <span style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{runs.length} runs</span>
           {clearAllConfirm ? (
             <>
-              <span style={{ fontSize: 11, color: '#8B8BA0' }}>Type <b>DELETE</b>:</span>
+              <span style={{ fontSize: 11, color: 'var(--crm-text-secondary)' }}>Type <b>DELETE</b>:</span>
               <input autoFocus value={clearAllInput} onChange={e => setClearAllInput(e.target.value)} placeholder="DELETE"
-                style={{ width: 80, padding: '4px 8px', fontSize: 11, borderRadius: 6, backgroundColor: '#1C1C27', border: '1px solid #EF444430', color: '#F0F0F5', outline: 'none' }} />
+                style={{ width: 80, padding: '4px 8px', fontSize: 11, borderRadius: 6, backgroundColor: 'var(--crm-surface-raised)', border: '1px solid #EF444430', color: 'var(--crm-text-primary)', outline: 'none' }} />
               <button onClick={handleClearAll} disabled={clearAllInput !== 'DELETE'}
                 style={{ fontSize: 11, backgroundColor: '#EF4444', color: '#FFF', padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', opacity: clearAllInput !== 'DELETE' ? 0.3 : 1 }}>
                 Delete all
               </button>
-              <button onClick={() => { setClearAllConfirm(false); setClearAllInput(''); }} style={{ fontSize: 11, color: '#52526A', background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => { setClearAllConfirm(false); setClearAllInput(''); }} style={{ fontSize: 11, color: 'var(--crm-text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
             </>
           ) : (
             <button onClick={() => runs.length > 0 && setClearAllConfirm(true)} disabled={runs.length === 0}
-              style={{ fontSize: 11, color: '#52526A', border: '1px solid #2A2A3A', padding: '5px 10px', borderRadius: 6, background: 'transparent', cursor: 'pointer', opacity: runs.length === 0 ? 0.3 : 1 }}>
+              style={{ fontSize: 11, color: 'var(--crm-text-muted)', border: '1px solid var(--crm-border)', padding: '5px 10px', borderRadius: 6, background: 'transparent', cursor: 'pointer', opacity: runs.length === 0 ? 0.3 : 1 }}>
               Clear History
             </button>
           )}
         </div>
       </div>
 
-      {loading && <p style={{ color: '#52526A', textAlign: 'center', padding: 40 }}>Loading…</p>}
-      {!loading && runs.length === 0 && <p style={{ color: '#52526A', textAlign: 'center', padding: 40 }}>No runs yet.</p>}
+      {loading && <p style={{ color: 'var(--crm-text-muted)', textAlign: 'center', padding: 40 }}>Loading…</p>}
+      {!loading && runs.length === 0 && <p style={{ color: 'var(--crm-text-muted)', textAlign: 'center', padding: 40 }}>No runs yet.</p>}
 
       {runs.map(run => {
         const isExpanded = expandedId === run.id;
@@ -151,34 +151,34 @@ export default function HistoryPage() {
           <div key={run.id} style={S.row}>
             <div onClick={() => toggleExpand(run.id)}
               style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer' }}>
-              <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#52526A', flexShrink: 0, width: 80 }}>
+              <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--crm-text-muted)', flexShrink: 0, width: 80 }}>
                 {new Date(run.created_at).toLocaleDateString()}
               </span>
               <span style={{ fontSize: 13, fontWeight: 600, minWidth: 80 }}>{run.market}</span>
               <div style={{ flex: 1, display: 'flex', gap: 12, fontSize: 11, flexWrap: 'wrap' }}>
-                <span style={{ color: '#8B8BA0' }}>{run.total_leads_requested} leads req.</span>
+                <span style={{ color: 'var(--crm-text-secondary)' }}>{run.total_leads_requested} leads req.</span>
                 {run.combos?.length > 0 && (
-                  <span style={{ color: '#52526A' }}>{run.combos.join(' · ')}</span>
+                  <span style={{ color: 'var(--crm-text-muted)' }}>{run.combos.join(' · ')}</span>
                 )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <StatusBadge status={run.status as Parameters<typeof StatusBadge>[0]['status']} />
-                {isExpanded ? <ChevronUp size={14} color="#52526A" /> : <ChevronDown size={14} color="#52526A" />}
+                {isExpanded ? <ChevronUp size={14} color="var(--crm-text-muted)" /> : <ChevronDown size={14} color="var(--crm-text-muted)" />}
               </div>
             </div>
 
             {isExpanded && (
-              <div style={{ borderTop: '1px solid #2A2A3A', padding: 16 }}>
+              <div style={{ borderTop: '1px solid var(--crm-border)', padding: 16 }}>
 
                 {/* Run metadata */}
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 12, fontSize: 12, color: '#8B8BA0' }}>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 12, fontSize: 12, color: 'var(--crm-text-secondary)' }}>
                   {run.executor?.full_name && (
-                    <span>Executed by: <span style={{ color: '#F0F0F5', fontWeight: 500 }}>{run.executor.full_name}</span></span>
+                    <span>Executed by: <span style={{ color: 'var(--crm-text-primary)', fontWeight: 500 }}>{run.executor.full_name}</span></span>
                   )}
                   {run.run_sdr_assignments && run.run_sdr_assignments.length > 0 && (
                     <span>
                       SDRs: {run.run_sdr_assignments.map(a => (
-                        <span key={a.sdr_id} style={{ color: '#F0F0F5', fontWeight: 500, marginLeft: 4 }}>
+                        <span key={a.sdr_id} style={{ color: 'var(--crm-text-primary)', fontWeight: 500, marginLeft: 4 }}>
                           {a.user?.full_name ?? a.sdr_id}
                           {a.leads_assigned > 0 ? ` (${a.leads_assigned})` : ''}
                           {a.sender_profile_id ? ' ✦' : ''}
@@ -189,32 +189,32 @@ export default function HistoryPage() {
                 </div>
 
                 {leadsLoad ? (
-                  <p style={{ fontSize: 12, color: '#52526A' }}>Loading leads…</p>
+                  <p style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>Loading leads…</p>
                 ) : leads.length > 0 ? (
-                  <div style={{ border: '1px solid #2A2A3A', borderRadius: 8, overflow: 'auto', marginBottom: 12 }}>
+                  <div style={{ border: '1px solid var(--crm-border)', borderRadius: 8, overflow: 'auto', marginBottom: 12 }}>
                     <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
                       <thead>
-                        <tr style={{ borderBottom: '1px solid #2A2A3A' }}>
+                        <tr style={{ borderBottom: '1px solid var(--crm-border)' }}>
                           {['Name', 'Company', 'Title', 'ICP', 'Temp'].map(h => (
-                            <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 10, color: '#52526A', fontWeight: 600 }}>{h}</th>
+                            <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 10, color: 'var(--crm-text-muted)', fontWeight: 600 }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {leads.slice(0, 15).map((lead, i) => (
-                          <tr key={lead.id} style={{ borderTop: i > 0 ? '1px solid #2A2A3A' : undefined }}>
-                            <td style={{ padding: '6px 12px', color: '#F0F0F5', fontWeight: 600 }}>{lead.full_name || '—'}</td>
-                            <td style={{ padding: '6px 12px', color: '#8B8BA0', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.company || '—'}</td>
-                            <td style={{ padding: '6px 12px', color: '#8B8BA0', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.title || '—'}</td>
+                          <tr key={lead.id} style={{ borderTop: i > 0 ? '1px solid var(--crm-border)' : undefined }}>
+                            <td style={{ padding: '6px 12px', color: 'var(--crm-text-primary)', fontWeight: 600 }}>{lead.full_name || '—'}</td>
+                            <td style={{ padding: '6px 12px', color: 'var(--crm-text-secondary)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.company || '—'}</td>
+                            <td style={{ padding: '6px 12px', color: 'var(--crm-text-secondary)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.title || '—'}</td>
                             <td style={{ padding: '6px 12px' }}><ICPScore score={lead.icp_score ?? 0} size="sm" /></td>
                             <td style={{ padding: '6px 12px' }}>{lead.temperature && <TemperatureBadge temperature={lead.temperature} />}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                    {leads.length > 15 && <p style={{ padding: '6px 12px', fontSize: 11, color: '#52526A', textAlign: 'center', borderTop: '1px solid #2A2A3A', margin: 0 }}>… and {leads.length - 15} more</p>}
+                    {leads.length > 15 && <p style={{ padding: '6px 12px', fontSize: 11, color: 'var(--crm-text-muted)', textAlign: 'center', borderTop: '1px solid var(--crm-border)', margin: 0 }}>… and {leads.length - 15} more</p>}
                   </div>
-                ) : <p style={{ fontSize: 12, color: '#52526A' }}>No leads for this run.</p>}
+                ) : <p style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>No leads for this run.</p>}
 
                 {/* Actions */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -222,19 +222,19 @@ export default function HistoryPage() {
                     {run.status === 'completed' && !imp?.result && (
                       <button
                         onClick={() => showImport ? setImportOpen(null) : openImport(run.id)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, backgroundColor: showImport ? '#2A2A3A' : '#6C63FF', color: '#FFF', padding: '7px 14px', borderRadius: 7, border: 'none', cursor: 'pointer' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, backgroundColor: showImport ? 'var(--crm-border)' : 'var(--crm-accent)', color: '#FFF', padding: '7px 14px', borderRadius: 7, border: 'none', cursor: 'pointer' }}>
                         <DatabaseZap size={13} />{showImport ? 'Cancel' : 'Import to CRM'}
                       </button>
                     )}
-                    <button onClick={() => setExpandedId(null)} style={{ fontSize: 12, color: '#52526A', border: '1px solid #2A2A3A', padding: '7px 14px', borderRadius: 7, background: 'transparent', cursor: 'pointer' }}>Close</button>
+                    <button onClick={() => setExpandedId(null)} style={{ fontSize: 12, color: 'var(--crm-text-muted)', border: '1px solid var(--crm-border)', padding: '7px 14px', borderRadius: 7, background: 'transparent', cursor: 'pointer' }}>Close</button>
                   </div>
 
                   {showImport && run.status === 'completed' && imp && !imp.result && (
-                    <div style={{ backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 8, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <p style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', margin: 0, letterSpacing: '0.06em' }}>Import to CRM</p>
+                    <div style={{ backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', margin: 0, letterSpacing: '0.06em' }}>Import to CRM</p>
                       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                         <div style={{ flex: 1, minWidth: 180 }}>
-                          <label style={{ fontSize: 11, color: '#8B8BA0', display: 'block', marginBottom: 4 }}>Area *</label>
+                          <label style={{ fontSize: 11, color: 'var(--crm-text-secondary)', display: 'block', marginBottom: 4 }}>Area *</label>
                           <select value={imp.area_id} onChange={e => setImportField(run.id, 'area_id', e.target.value)} style={{ ...SELECT, width: '100%' }}>
                             <option value="">Select…</option>
                             {areas.filter(a => a.is_active).map(a => (
@@ -243,7 +243,7 @@ export default function HistoryPage() {
                           </select>
                         </div>
                         <div style={{ flex: 1, minWidth: 180 }}>
-                          <label style={{ fontSize: 11, color: '#8B8BA0', display: 'block', marginBottom: 4 }}>Assign to SDR (optional)</label>
+                          <label style={{ fontSize: 11, color: 'var(--crm-text-secondary)', display: 'block', marginBottom: 4 }}>Assign to SDR (optional)</label>
                           <select value={imp.assigned_to} onChange={e => setImportField(run.id, 'assigned_to', e.target.value)} style={{ ...SELECT, width: '100%' }}>
                             <option value="">Unassigned</option>
                             {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
@@ -254,7 +254,7 @@ export default function HistoryPage() {
                       <button
                         onClick={() => handleImportToCRM(run.id)}
                         disabled={!imp.area_id || imp.loading}
-                        style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, backgroundColor: !imp.area_id || imp.loading ? '#2A2A3A' : '#6C63FF', color: '#FFF', padding: '7px 16px', borderRadius: 7, border: 'none', cursor: !imp.area_id || imp.loading ? 'default' : 'pointer', opacity: !imp.area_id ? 0.5 : 1 }}>
+                        style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, backgroundColor: !imp.area_id || imp.loading ? 'var(--crm-border)' : 'var(--crm-accent)', color: '#FFF', padding: '7px 16px', borderRadius: 7, border: 'none', cursor: !imp.area_id || imp.loading ? 'default' : 'pointer', opacity: !imp.area_id ? 0.5 : 1 }}>
                         <DatabaseZap size={13} />{imp.loading ? 'Importing…' : `Import ${leads.length} leads`}
                       </button>
                     </div>
@@ -265,8 +265,8 @@ export default function HistoryPage() {
                       <CheckCircle2 size={16} color="#22C55E" />
                       <div style={{ fontSize: 13 }}>
                         <span style={{ color: '#22C55E', fontWeight: 600 }}>Imported: {imp.result.imported}</span>
-                        <span style={{ color: '#52526A', marginLeft: 12 }}>Duplicates: {imp.result.duplicates}</span>
-                        {imp.result.no_name > 0 && <span style={{ color: '#52526A', marginLeft: 12 }}>No name: {imp.result.no_name}</span>}
+                        <span style={{ color: 'var(--crm-text-muted)', marginLeft: 12 }}>Duplicates: {imp.result.duplicates}</span>
+                        {imp.result.no_name > 0 && <span style={{ color: 'var(--crm-text-muted)', marginLeft: 12 }}>No name: {imp.result.no_name}</span>}
                       </div>
                     </div>
                   )}

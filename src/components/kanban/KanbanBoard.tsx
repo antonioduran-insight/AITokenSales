@@ -233,12 +233,12 @@ export function KanbanBoard() {
       <div
         style={{
           padding: '14px 20px',
-          borderBottom: '1px solid #2A2A3A',
+          borderBottom: '1px solid var(--crm-border)',
           display: 'flex',
           alignItems: 'center',
           gap: 12,
           flexShrink: 0,
-          backgroundColor: '#13131A',
+          backgroundColor: 'var(--crm-surface)',
         }}
       >
         {showAreaFilter ? (
@@ -247,9 +247,9 @@ export function KanbanBoard() {
               onClick={() => setSelectedAreaId(null)}
               style={{
                 padding: '4px 10px', borderRadius: 6, border: '1px solid',
-                borderColor: selectedAreaId === null ? '#6C63FF' : '#2A2A3A',
+                borderColor: selectedAreaId === null ? 'var(--crm-accent)' : 'var(--crm-border)',
                 backgroundColor: selectedAreaId === null ? '#6C63FF20' : 'transparent',
-                color: selectedAreaId === null ? '#6C63FF' : '#8B8BA0',
+                color: selectedAreaId === null ? 'var(--crm-accent)' : 'var(--crm-text-secondary)',
                 fontSize: 12, fontWeight: 600, cursor: 'pointer',
               }}
             >
@@ -261,9 +261,9 @@ export function KanbanBoard() {
                 onClick={() => setSelectedAreaId(area.id)}
                 style={{
                   padding: '4px 10px', borderRadius: 6, border: '1px solid',
-                  borderColor: selectedAreaId === area.id ? '#6C63FF' : '#2A2A3A',
+                  borderColor: selectedAreaId === area.id ? 'var(--crm-accent)' : 'var(--crm-border)',
                   backgroundColor: selectedAreaId === area.id ? '#6C63FF20' : 'transparent',
-                  color: selectedAreaId === area.id ? '#6C63FF' : '#8B8BA0',
+                  color: selectedAreaId === area.id ? 'var(--crm-accent)' : 'var(--crm-text-secondary)',
                   fontSize: 12, fontWeight: 600, cursor: area.is_active ? 'pointer' : 'not-allowed',
                   opacity: area.is_active ? 1 : 0.4,
                 }}
@@ -283,8 +283,8 @@ export function KanbanBoard() {
           onClick={fetchProspects}
           disabled={loading}
           style={{
-            padding: '6px 8px', borderRadius: 6, border: '1px solid #2A2A3A',
-            backgroundColor: 'transparent', color: '#8B8BA0', cursor: 'pointer',
+            padding: '6px 8px', borderRadius: 6, border: '1px solid var(--crm-border)',
+            backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer',
             display: 'flex', alignItems: 'center',
           }}
         >
@@ -294,7 +294,7 @@ export function KanbanBoard() {
         {!isImpersonating && (
           <Button
             onClick={() => setFormOpen(true)}
-            style={{ backgroundColor: '#6C63FF', color: '#F0F0F5', fontSize: 13, height: 34, gap: 6, display: 'flex', alignItems: 'center' }}
+            style={{ backgroundColor: 'var(--crm-accent)', color: 'var(--crm-text-primary)', fontSize: 13, height: 34, gap: 6, display: 'flex', alignItems: 'center' }}
           >
             <Plus size={14} />
             {t('prospect.new')}

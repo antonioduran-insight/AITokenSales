@@ -42,7 +42,7 @@ export function PremiumFeature({ children, plan, requiredPlan, featureName }: Pr
       }}>
         <div style={{ fontSize: 28 }}>🔒</div>
         <p style={{
-          color: '#F0F0F5',
+          color: 'var(--crm-text-primary)',
           fontSize: 14,
           fontWeight: 600,
           textAlign: 'center',
@@ -51,13 +51,13 @@ export function PremiumFeature({ children, plan, requiredPlan, featureName }: Pr
         }}>
           {featureName}
         </p>
-        <p style={{ color: '#8B8BA0', fontSize: 12, textAlign: 'center', margin: 0 }}>
+        <p style={{ color: 'var(--crm-text-secondary)', fontSize: 12, textAlign: 'center', margin: 0 }}>
           Available from {requiredPlan === 'premium' ? 'Premium' : 'Enterprise'} plan
         </p>
         <a
           href={`/${locale}/settings?tab=plan`}
           style={{
-            background: '#6C63FF',
+            background: 'var(--crm-accent)',
             color: 'white',
             padding: '8px 20px',
             borderRadius: 6,

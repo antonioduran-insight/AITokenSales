@@ -33,12 +33,12 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 const S: Record<string, React.CSSProperties> = {
-  page: { padding: '24px', color: '#F0F0F5', maxWidth: 900 },
-  card: { backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 10, padding: 20, marginBottom: 12 },
-  input: { backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 7, color: '#F0F0F5', padding: '8px 12px', fontSize: 13, width: '100%', outline: 'none', boxSizing: 'border-box' as const },
-  label: { fontSize: 12, color: '#8B8BA0', fontWeight: 600, display: 'block', marginBottom: 6 },
-  btn: { backgroundColor: '#6C63FF', color: '#fff', border: 'none', borderRadius: 7, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  btnGhost: { backgroundColor: 'transparent', color: '#8B8BA0', border: '1px solid #2A2A3A', borderRadius: 7, padding: '7px 14px', fontSize: 13, cursor: 'pointer' },
+  page: { padding: '24px', color: 'var(--crm-text-primary)', maxWidth: 900 },
+  card: { backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 10, padding: 20, marginBottom: 12 },
+  input: { backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 7, color: 'var(--crm-text-primary)', padding: '8px 12px', fontSize: 13, width: '100%', outline: 'none', boxSizing: 'border-box' as const },
+  label: { fontSize: 12, color: 'var(--crm-text-secondary)', fontWeight: 600, display: 'block', marginBottom: 6 },
+  btn: { backgroundColor: 'var(--crm-accent)', color: '#fff', border: 'none', borderRadius: 7, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  btnGhost: { backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', border: '1px solid var(--crm-border)', borderRadius: 7, padding: '7px 14px', fontSize: 13, cursor: 'pointer' },
 }
 
 function Badge({ label, color }: { label: string; color: string }) {
@@ -187,7 +187,7 @@ export default function SupportPage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>Support</h1>
-          <p style={{ fontSize: 13, color: '#52526A', margin: 0 }}>
+          <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
             {isAdmin
               ? `${openCount} open ticket${openCount !== 1 ? 's' : ''} across your organization`
               : 'Submit and track your support requests'}
@@ -221,27 +221,27 @@ export default function SupportPage() {
             <option value="medium">Medium</option>
             <option value="low">Low</option>
           </select>
-          <span style={{ fontSize: 12, color: '#52526A', alignSelf: 'center' }}>{filtered.length} ticket{filtered.length !== 1 ? 's' : ''}</span>
+          <span style={{ fontSize: 12, color: 'var(--crm-text-muted)', alignSelf: 'center' }}>{filtered.length} ticket{filtered.length !== 1 ? 's' : ''}</span>
         </div>
       )}
 
       {/* Table header */}
       {filtered.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1fr 100px 100px 140px 80px' : '1fr 100px 100px 80px', gap: 12, padding: '8px 16px', marginBottom: 4 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#52526A', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Subject</span>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#52526A', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Priority</span>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#52526A', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</span>
-          {isAdmin && <span style={{ fontSize: 11, fontWeight: 600, color: '#52526A', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Created by</span>}
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#52526A', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Subject</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Priority</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</span>
+          {isAdmin && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Created by</span>}
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</span>
         </div>
       )}
 
       {loading && (
-        <div style={{ textAlign: 'center', color: '#52526A', padding: 48 }}>Loading tickets…</div>
+        <div style={{ textAlign: 'center', color: 'var(--crm-text-muted)', padding: 48 }}>Loading tickets…</div>
       )}
 
       {!loading && filtered.length === 0 && (
-        <div style={{ textAlign: 'center', color: '#52526A', padding: 48, fontSize: 14 }}>
+        <div style={{ textAlign: 'center', color: 'var(--crm-text-muted)', padding: 48, fontSize: 14 }}>
           {tickets.length === 0 ? 'No tickets yet. Everything is good! 🎉' : 'No tickets match the current filters.'}
         </div>
       )}
@@ -262,21 +262,21 @@ export default function SupportPage() {
               onClick={() => setExpandedId(isExpanded ? null : ticket.id)}
             >
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#F0F0F5' }}>{ticket.subject}</div>
-                <div style={{ fontSize: 12, color: '#52526A', marginTop: 2 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--crm-text-primary)' }}>{ticket.subject}</div>
+                <div style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 2 }}>
                   {ticket.messages.length} message{ticket.messages.length !== 1 ? 's' : ''}
                 </div>
               </div>
               <Badge label={ticket.priority} color={PRIORITY_COLORS[ticket.priority] ?? '#6B7280'} />
-              <Badge label={ticket.status.replace('_', ' ')} color={STATUS_COLORS[ticket.status] ?? '#52526A'} />
-              {isAdmin && <span style={{ fontSize: 13, color: '#8B8BA0' }}>{createdByName}</span>}
-              <span style={{ fontSize: 12, color: '#52526A' }}>{new Date(ticket.created_at).toLocaleDateString()}</span>
-              {isExpanded ? <ChevronUp size={14} color="#52526A" /> : <ChevronDown size={14} color="#52526A" />}
+              <Badge label={ticket.status.replace('_', ' ')} color={STATUS_COLORS[ticket.status] ?? 'var(--crm-text-muted)'} />
+              {isAdmin && <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{createdByName}</span>}
+              <span style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{new Date(ticket.created_at).toLocaleDateString()}</span>
+              {isExpanded ? <ChevronUp size={14} color="var(--crm-text-muted)" /> : <ChevronDown size={14} color="var(--crm-text-muted)" />}
             </div>
 
             {/* Expanded thread */}
             {isExpanded && (
-              <div style={{ borderTop: '1px solid #2A2A3A', marginTop: 16, paddingTop: 16 }}>
+              <div style={{ borderTop: '1px solid var(--crm-border)', marginTop: 16, paddingTop: 16 }}>
                 {ticket.status !== 'closed' && (
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: '#22C55E', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
@@ -286,8 +286,8 @@ export default function SupportPage() {
                   </div>
                 )}
                 {/* Description */}
-                <div style={{ backgroundColor: '#1C1C27', borderRadius: 8, padding: '12px 14px', marginBottom: 12, fontSize: 13, color: '#8B8BA0', lineHeight: 1.6 }}>
-                  <div style={{ fontSize: 11, color: '#52526A', fontWeight: 600, marginBottom: 6 }}>ORIGINAL REQUEST</div>
+                <div style={{ backgroundColor: 'var(--crm-surface-raised)', borderRadius: 8, padding: '12px 14px', marginBottom: 12, fontSize: 13, color: 'var(--crm-text-secondary)', lineHeight: 1.6 }}>
+                  <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, marginBottom: 6 }}>ORIGINAL REQUEST</div>
                   {ticket.description}
                 </div>
 
@@ -295,11 +295,11 @@ export default function SupportPage() {
                 {ticket.messages.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
                     {ticket.messages.map(msg => (
-                      <div key={msg.id} style={{ backgroundColor: msg.created_by === user?.id ? '#6C63FF12' : '#1C1C27', border: `1px solid ${msg.created_by === user?.id ? '#6C63FF30' : '#2A2A3A'}`, borderRadius: 8, padding: '10px 14px' }}>
-                        <div style={{ fontSize: 11, color: '#52526A', marginBottom: 6, fontWeight: 600 }}>
+                      <div key={msg.id} style={{ backgroundColor: msg.created_by === user?.id ? '#6C63FF12' : 'var(--crm-surface-raised)', border: `1px solid ${msg.created_by === user?.id ? '#6C63FF30' : 'var(--crm-border)'}`, borderRadius: 8, padding: '10px 14px' }}>
+                        <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginBottom: 6, fontWeight: 600 }}>
                           {msg.created_by === user?.id ? 'You' : (isAdmin ? getUserName(msg.created_by) : 'Support')} · {new Date(msg.created_at).toLocaleString()}
                         </div>
-                        <div style={{ fontSize: 13, color: '#F0F0F5', lineHeight: 1.6 }}>{msg.content}</div>
+                        <div style={{ fontSize: 13, color: 'var(--crm-text-primary)', lineHeight: 1.6 }}>{msg.content}</div>
                       </div>
                     ))}
                   </div>
@@ -329,13 +329,13 @@ export default function SupportPage() {
                 {/* Status controls — only for support/admin_global roles */}
                 {(user?.role === 'support' || user?.role === 'admin_global') && (
                   <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 12, color: '#52526A', alignSelf: 'center' }}>Change status:</span>
+                    <span style={{ fontSize: 12, color: 'var(--crm-text-muted)', alignSelf: 'center' }}>Change status:</span>
                     {(['open', 'in_progress', 'closed'] as const).map(s => (
                       <button key={s} onClick={() => updateStatus(ticket.id, s)}
                         style={{
                           padding: '4px 12px', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
-                          backgroundColor: ticket.status === s ? STATUS_COLORS[s] : '#1C1C27',
-                          color: ticket.status === s ? '#fff' : '#8B8BA0',
+                          backgroundColor: ticket.status === s ? STATUS_COLORS[s] : 'var(--crm-surface-raised)',
+                          color: ticket.status === s ? '#fff' : 'var(--crm-text-secondary)',
                         }}>
                         {s.replace('_', ' ')}
                       </button>
@@ -351,10 +351,10 @@ export default function SupportPage() {
       {/* New Ticket Modal */}
       {showNew && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 28, width: 480, maxWidth: '92vw' }}>
+          <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 28, width: 480, maxWidth: '92vw' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
               <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>New Support Ticket</h3>
-              <button onClick={() => setShowNew(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52526A' }}><X size={16} /></button>
+              <button onClick={() => setShowNew(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)' }}><X size={16} /></button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

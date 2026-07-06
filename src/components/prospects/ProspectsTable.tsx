@@ -18,17 +18,17 @@ import { OUTREACH_STATUSES, LEAD_TEMPERATURES } from '@/lib/types'
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250]
 
 const STATUS_COLORS: Record<OutreachStatus, string> = {
-  new: '#6C63FF',
+  new: 'var(--crm-accent)',
   connection_sent: '#3B82F6',
   connected: '#22C55E',
   replied: '#F59E0B',
   demo_scheduled: '#EC4899',
   closed: '#10B981',
-  nurture: '#8B8BA0',
+  nurture: 'var(--crm-text-secondary)',
 }
 
 function icpColor(score: number | null): string {
-  if (score === null) return '#52526A'
+  if (score === null) return 'var(--crm-text-muted)'
   if (score <= 40) return '#EF4444'
   if (score <= 70) return '#F59E0B'
   return '#22C55E'
@@ -40,12 +40,12 @@ function truncate(s: string | null | undefined, n = 40): string {
 }
 
 const S: Record<string, React.CSSProperties> = {
-  page: { padding: '20px 24px', color: '#F0F0F5', height: '100%', display: 'flex', flexDirection: 'column' },
+  page: { padding: '20px 24px', color: 'var(--crm-text-primary)', height: '100%', display: 'flex', flexDirection: 'column' },
   header: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' },
-  input: { backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 6, color: '#F0F0F5', padding: '7px 10px 7px 32px', fontSize: 13, width: 200, outline: 'none' },
-  select: { backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 6, color: '#F0F0F5', padding: '7px 10px', fontSize: 13 },
-  th: { padding: '10px 14px', textAlign: 'left' as const, fontSize: 11, fontWeight: 600, color: '#52526A', textTransform: 'uppercase' as const, letterSpacing: '0.05em', borderBottom: '1px solid #2A2A3A', whiteSpace: 'nowrap' as const },
-  td: { padding: '10px 14px', borderBottom: '1px solid #1C1C27', fontSize: 13, verticalAlign: 'middle' as const },
+  input: { backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 6, color: 'var(--crm-text-primary)', padding: '7px 10px 7px 32px', fontSize: 13, width: 200, outline: 'none' },
+  select: { backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 6, color: 'var(--crm-text-primary)', padding: '7px 10px', fontSize: 13 },
+  th: { padding: '10px 14px', textAlign: 'left' as const, fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.05em', borderBottom: '1px solid var(--crm-border)', whiteSpace: 'nowrap' as const },
+  td: { padding: '10px 14px', borderBottom: '1px solid var(--crm-surface-raised)', fontSize: 13, verticalAlign: 'middle' as const },
 }
 
 const PROSPECT_SELECT = '*, area:areas(*), assigned_user:users!assigned_to(id, full_name, email, role, area_id, is_active, created_at)'
@@ -281,7 +281,7 @@ export function ProspectsTable() {
         <div style={S.header}>
           {/* Search */}
           <div style={{ position: 'relative' }}>
-            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#52526A' }} />
+            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--crm-text-muted)' }} />
             <input
               style={S.input}
               placeholder={t('common.search')}
@@ -320,7 +320,7 @@ export function ProspectsTable() {
           </select>
 
           {hasFilters && (
-            <button onClick={clearFilters} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #2A2A3A', backgroundColor: 'transparent', color: '#8B8BA0', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+            <button onClick={clearFilters} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
               <X size={12} /> {t('common.clearFilters')}
             </button>
           )}
@@ -338,25 +338,25 @@ export function ProspectsTable() {
           {isAdmin && !isImpersonating && (
             <button
               onClick={() => setSdrReassignOpen(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 6, border: '1px solid #6C63FF40', backgroundColor: '#6C63FF15', color: '#6C63FF', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 6, border: '1px solid #6C63FF40', backgroundColor: '#6C63FF15', color: 'var(--crm-accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
             >
               <Users size={13} /> Reassign SDR
             </button>
           )}
 
-          <button onClick={fetchProspects} disabled={loading} style={{ padding: '7px 8px', borderRadius: 6, border: '1px solid #2A2A3A', backgroundColor: 'transparent', color: '#8B8BA0', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          <button onClick={fetchProspects} disabled={loading} style={{ padding: '7px 8px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
             <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
           </button>
 
-          <span style={{ fontSize: 12, color: '#52526A' }}>{t('common.leadsCount', { count: total })}</span>
+          <span style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{t('common.leadsCount', { count: total })}</span>
         </div>
 
       </div>
 
       {/* Table */}
-      <div style={{ flex: 1, overflow: 'auto', border: '1px solid #2A2A3A', borderRadius: 10, backgroundColor: '#13131A' }}>
+      <div style={{ flex: 1, overflow: 'auto', border: '1px solid var(--crm-border)', borderRadius: 10, backgroundColor: 'var(--crm-surface)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead style={{ position: 'sticky', top: 0, backgroundColor: '#13131A', zIndex: 1 }}>
+          <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--crm-surface)', zIndex: 1 }}>
             <tr>
               {isAdmin && (
                 <th style={{ ...S.th, width: 40 }}>
@@ -364,7 +364,7 @@ export function ProspectsTable() {
                     type="checkbox"
                     checked={allSelected}
                     onChange={toggleSelectAll}
-                    style={{ accentColor: '#6C63FF', cursor: 'pointer' }}
+                    style={{ accentColor: 'var(--crm-accent)', cursor: 'pointer' }}
                   />
                 </th>
               )}
@@ -386,14 +386,14 @@ export function ProspectsTable() {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={isAdmin ? 14 : 12} style={{ ...S.td, textAlign: 'center', color: '#52526A', padding: 40 }}>
+                <td colSpan={isAdmin ? 14 : 12} style={{ ...S.td, textAlign: 'center', color: 'var(--crm-text-muted)', padding: 40 }}>
                   {t('common.loading')}
                 </td>
               </tr>
             )}
             {!loading && prospects.length === 0 && (
               <tr>
-                <td colSpan={isAdmin ? 14 : 12} style={{ ...S.td, textAlign: 'center', color: '#52526A', padding: 40 }}>
+                <td colSpan={isAdmin ? 14 : 12} style={{ ...S.td, textAlign: 'center', color: 'var(--crm-text-muted)', padding: 40 }}>
                   {t('common.noData')}
                 </td>
               </tr>
@@ -403,7 +403,7 @@ export function ProspectsTable() {
                 key={p.id}
                 onClick={() => { setDrawerProspect(p); setDrawerOpen(true) }}
                 style={{ cursor: 'pointer', transition: 'background 0.1s' }}
-                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#1C1C27')}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--crm-surface-raised)')}
                 onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
               >
                 {isAdmin && (
@@ -412,15 +412,15 @@ export function ProspectsTable() {
                       type="checkbox"
                       checked={selected.has(p.id)}
                       onChange={() => toggleSelect(p.id)}
-                      style={{ accentColor: '#6C63FF', cursor: 'pointer' }}
+                      style={{ accentColor: 'var(--crm-accent)', cursor: 'pointer' }}
                     />
                   </td>
                 )}
                 <td style={S.td}>
-                  <div style={{ fontWeight: 500, color: '#F0F0F5' }}>{p.name}</div>
-                  {p.title && <div style={{ fontSize: 11, color: '#52526A', marginTop: 2 }}>{p.title}</div>}
+                  <div style={{ fontWeight: 500, color: 'var(--crm-text-primary)' }}>{p.name}</div>
+                  {p.title && <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 2 }}>{p.title}</div>}
                 </td>
-                <td style={{ ...S.td, color: '#8B8BA0' }}>{p.company ?? '—'}</td>
+                <td style={{ ...S.td, color: 'var(--crm-text-secondary)' }}>{p.company ?? '—'}</td>
                 <td style={S.td}>
                   <span style={{
                     display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
@@ -431,35 +431,35 @@ export function ProspectsTable() {
                   </span>
                 </td>
                 <td style={S.td}>
-                  {p.lead_temperature ? <TemperatureBadge temperature={p.lead_temperature} /> : <span style={{ color: '#52526A' }}>—</span>}
+                  {p.lead_temperature ? <TemperatureBadge temperature={p.lead_temperature} /> : <span style={{ color: 'var(--crm-text-muted)' }}>—</span>}
                 </td>
                 <td style={{ ...S.td, fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 700, color: icpColor(p.icp_score) }}>
                   {p.icp_score !== null ? p.icp_score : '—'}
                 </td>
                 {isAdmin && (
                   <td style={S.td}>
-                    {p.area ? <AreaBadge area={p.area} size="sm" /> : <span style={{ color: '#52526A' }}>—</span>}
+                    {p.area ? <AreaBadge area={p.area} size="sm" /> : <span style={{ color: 'var(--crm-text-muted)' }}>—</span>}
                   </td>
                 )}
-                <td style={{ ...S.td, color: '#8B8BA0', fontSize: 12 }}>
-                  {p.assigned_user?.full_name ?? <span style={{ color: '#52526A' }}>{t('common.unassigned')}</span>}
+                <td style={{ ...S.td, color: 'var(--crm-text-secondary)', fontSize: 12 }}>
+                  {p.assigned_user?.full_name ?? <span style={{ color: 'var(--crm-text-muted)' }}>{t('common.unassigned')}</span>}
                 </td>
-                <td style={{ ...S.td, color: '#52526A', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}>
+                <td style={{ ...S.td, color: 'var(--crm-text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}>
                   {format(new Date(p.created_at), 'MMM d, yy')}
                 </td>
-                <td style={{ ...S.td, color: '#8B8BA0', fontSize: 12 }}>
-                  {p.search_combo ?? <span style={{ color: '#52526A' }}>—</span>}
+                <td style={{ ...S.td, color: 'var(--crm-text-secondary)', fontSize: 12 }}>
+                  {p.search_combo ?? <span style={{ color: 'var(--crm-text-muted)' }}>—</span>}
                 </td>
-                <td style={{ ...S.td, color: '#52526A', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}>
+                <td style={{ ...S.td, color: 'var(--crm-text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}>
                   {p.scrape_date ?? '—'}
                 </td>
-                <td style={{ ...S.td, color: '#8B8BA0', fontSize: 12 }}>
-                  {p.market ?? <span style={{ color: '#52526A' }}>—</span>}
+                <td style={{ ...S.td, color: 'var(--crm-text-secondary)', fontSize: 12 }}>
+                  {p.market ?? <span style={{ color: 'var(--crm-text-muted)' }}>—</span>}
                 </td>
-                <td style={{ ...S.td, color: '#8B8BA0', fontSize: 12 }} title={p.custom1 ?? undefined}>
+                <td style={{ ...S.td, color: 'var(--crm-text-secondary)', fontSize: 12 }} title={p.custom1 ?? undefined}>
                   {truncate(p.custom1)}
                 </td>
-                <td style={{ ...S.td, color: '#8B8BA0', fontSize: 12 }} title={p.custom2 ?? undefined}>
+                <td style={{ ...S.td, color: 'var(--crm-text-secondary)', fontSize: 12 }} title={p.custom2 ?? undefined}>
                   {truncate(p.custom2)}
                 </td>
               </tr>
@@ -474,17 +474,17 @@ export function ProspectsTable() {
           <button
             onClick={() => setPage(p => Math.max(0, p - 1))}
             disabled={page === 0}
-            style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid #2A2A3A', backgroundColor: 'transparent', color: page === 0 ? '#52526A' : '#F0F0F5', cursor: page === 0 ? 'not-allowed' : 'pointer' }}
+            style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: page === 0 ? 'var(--crm-text-muted)' : 'var(--crm-text-primary)', cursor: page === 0 ? 'not-allowed' : 'pointer' }}
           >
             <ChevronLeft size={14} />
           </button>
-          <span style={{ fontSize: 12, color: '#8B8BA0' }}>
+          <span style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>
             {t('common.page')} {page + 1} {t('common.of')} {totalPages}
           </span>
           <button
             onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
             disabled={page >= totalPages - 1}
-            style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid #2A2A3A', backgroundColor: 'transparent', color: page >= totalPages - 1 ? '#52526A' : '#F0F0F5', cursor: page >= totalPages - 1 ? 'not-allowed' : 'pointer' }}
+            style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: page >= totalPages - 1 ? 'var(--crm-text-muted)' : 'var(--crm-text-primary)', cursor: page >= totalPages - 1 ? 'not-allowed' : 'pointer' }}
           >
             <ChevronRight size={14} />
           </button>
@@ -508,15 +508,15 @@ export function ProspectsTable() {
       {confirmDelete && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
           onClick={e => { if (e.target === e.currentTarget) { setConfirmDelete(false); setDeleteError(null) } }}>
-          <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 28, width: 380, maxWidth: '90vw' }}>
+          <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 28, width: 380, maxWidth: '90vw' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
               <div style={{ width: 36, height: 36, borderRadius: '50%', backgroundColor: '#EF444420', border: '1px solid #EF444440', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Trash2 size={16} color="#EF4444" />
               </div>
               <h2 style={{ fontSize: 16, fontWeight: 700, color: '#EF4444' }}>Delete leads</h2>
             </div>
-            <p style={{ fontSize: 13, color: '#8B8BA0', lineHeight: 1.6, marginBottom: 20 }}>
-              Permanently delete <strong style={{ color: '#F0F0F5' }}>{selected.size} lead{selected.size > 1 ? 's' : ''}</strong>? This action cannot be undone.
+            <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', lineHeight: 1.6, marginBottom: 20 }}>
+              Permanently delete <strong style={{ color: 'var(--crm-text-primary)' }}>{selected.size} lead{selected.size > 1 ? 's' : ''}</strong>? This action cannot be undone.
             </p>
             {deleteError && (
               <div style={{ padding: '10px 14px', backgroundColor: '#EF444415', border: '1px solid #EF444440', borderRadius: 8, marginBottom: 16, fontSize: 12, color: '#EF4444' }}>
@@ -524,7 +524,7 @@ export function ProspectsTable() {
               </div>
             )}
             <div style={{ display: 'flex', gap: 10 }}>
-              <Button onClick={() => { setConfirmDelete(false); setDeleteError(null) }} style={{ flex: 1, backgroundColor: '#2A2A3A', color: '#F0F0F5' }}>
+              <Button onClick={() => { setConfirmDelete(false); setDeleteError(null) }} style={{ flex: 1, backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}>
                 {t('common.cancel')}
               </Button>
               <Button
@@ -543,14 +543,14 @@ export function ProspectsTable() {
       {isAdmin && !isImpersonating && selected.size > 0 && (
         <div style={{
           position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40,
-          backgroundColor: '#0D0D14', borderTop: '1px solid #2A2A3A',
+          backgroundColor: '#0D0D14', borderTop: '1px solid var(--crm-border)',
           padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 12,
         }}>
-          <span style={{ fontSize: 13, color: '#F0F0F5', fontWeight: 600 }}>
+          <span style={{ fontSize: 13, color: 'var(--crm-text-primary)', fontWeight: 600 }}>
             {selected.size} lead{selected.size > 1 ? 's' : ''} selected
           </span>
 
-          <div style={{ width: 1, height: 20, backgroundColor: '#2A2A3A' }} />
+          <div style={{ width: 1, height: 20, backgroundColor: 'var(--crm-border)' }} />
 
           <button
             onClick={() => setConfirmDelete(true)}
@@ -561,7 +561,7 @@ export function ProspectsTable() {
 
           <button
             onClick={() => setSelected(new Set())}
-            style={{ marginLeft: 'auto', padding: '5px 10px', borderRadius: 5, border: 'none', backgroundColor: 'transparent', color: '#52526A', cursor: 'pointer', fontSize: 12 }}
+            style={{ marginLeft: 'auto', padding: '5px 10px', borderRadius: 5, border: 'none', backgroundColor: 'transparent', color: 'var(--crm-text-muted)', cursor: 'pointer', fontSize: 12 }}
           >
             {t('common.cancel')}
           </button>
@@ -588,18 +588,18 @@ export function ProspectsTable() {
           style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
           onClick={e => { if (e.target === e.currentTarget) { setSdrReassignOpen(false); setSdrReassignFrom(''); setSdrReassignTo(''); setSdrReassignCount(null); setSdrReassignLimit('') } }}
         >
-          <div style={{ backgroundColor: '#13131A', border: '1px solid #2A2A3A', borderRadius: 12, padding: 28, width: 420, maxWidth: '90vw' }}>
+          <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 28, width: 420, maxWidth: '90vw' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
               <div style={{ width: 36, height: 36, borderRadius: '50%', backgroundColor: '#6C63FF20', border: '1px solid #6C63FF40', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Users size={16} color="#6C63FF" />
+                <Users size={16} color="var(--crm-accent)" />
               </div>
-              <h2 style={{ fontSize: 16, fontWeight: 700, color: '#F0F0F5' }}>Reassign leads between SDRs</h2>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--crm-text-primary)' }}>Reassign leads between SDRs</h2>
             </div>
 
             {/* FROM → TO selects */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>From</label>
+                <label style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>From</label>
                 <select
                   value={sdrReassignFrom}
                   onChange={e => { setSdrReassignFrom(e.target.value); setSdrReassignTo(''); setSdrReassignLimit('') }}
@@ -611,11 +611,11 @@ export function ProspectsTable() {
               </div>
 
               <div style={{ paddingTop: 22 }}>
-                <ArrowRight size={16} color="#52526A" />
+                <ArrowRight size={16} color="var(--crm-text-muted)" />
               </div>
 
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>To</label>
+                <label style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>To</label>
                 <select
                   value={sdrReassignTo}
                   onChange={e => setSdrReassignTo(e.target.value)}
@@ -631,7 +631,7 @@ export function ProspectsTable() {
             {/* Quantity input */}
             {sdrReassignFrom && sdrReassignCount !== null && (
               <div style={{ marginBottom: 16 }}>
-                <label style={{ fontSize: 11, color: '#52526A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
+                <label style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
                   Leads to reassign
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -644,22 +644,22 @@ export function ProspectsTable() {
                     placeholder={`All (${sdrReassignCount})`}
                     style={{ ...S.input, padding: '7px 10px', width: 140, fontFamily: 'JetBrains Mono, monospace' }}
                   />
-                  <span style={{ fontSize: 12, color: '#52526A' }}>of {sdrReassignCount} available</span>
+                  <span style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>of {sdrReassignCount} available</span>
                 </div>
               </div>
             )}
 
             {/* Transfer preview */}
             {sdrReassignFrom && sdrReassignCount !== null && (
-              <div style={{ padding: '10px 14px', backgroundColor: '#6C63FF10', border: '1px solid #6C63FF30', borderRadius: 8, marginBottom: 20, fontSize: 13, color: '#8B8BA0' }}>
+              <div style={{ padding: '10px 14px', backgroundColor: '#6C63FF10', border: '1px solid #6C63FF30', borderRadius: 8, marginBottom: 20, fontSize: 13, color: 'var(--crm-text-secondary)' }}>
                 {(() => {
                   const n = sdrReassignLimit && Number(sdrReassignLimit) > 0
                     ? Math.min(Number(sdrReassignLimit), sdrReassignCount)
                     : sdrReassignCount
                   const toSdr = sdrs.find(s => s.id === sdrReassignTo)
                   return <>
-                    <strong style={{ color: '#6C63FF' }}>{n}</strong> lead{n !== 1 ? 's' : ''} will be reassigned
-                    {toSdr && <> to <strong style={{ color: '#F0F0F5' }}>{toSdr.full_name}</strong></>}
+                    <strong style={{ color: 'var(--crm-accent)' }}>{n}</strong> lead{n !== 1 ? 's' : ''} will be reassigned
+                    {toSdr && <> to <strong style={{ color: 'var(--crm-text-primary)' }}>{toSdr.full_name}</strong></>}
                   </>
                 })()}
               </div>
@@ -668,14 +668,14 @@ export function ProspectsTable() {
             <div style={{ display: 'flex', gap: 10 }}>
               <Button
                 onClick={() => { setSdrReassignOpen(false); setSdrReassignFrom(''); setSdrReassignTo(''); setSdrReassignCount(null); setSdrReassignLimit('') }}
-                style={{ flex: 1, backgroundColor: '#2A2A3A', color: '#F0F0F5' }}
+                style={{ flex: 1, backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}
               >
                 {t('common.cancel')}
               </Button>
               <Button
                 onClick={handleSdrReassign}
                 disabled={!sdrReassignFrom || !sdrReassignTo || sdrReassigning || sdrReassignCount === 0 || (sdrReassignLimit !== '' && Number(sdrReassignLimit) <= 0)}
-                style={{ flex: 1, backgroundColor: '#6C63FF', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                style={{ flex: 1, backgroundColor: 'var(--crm-accent)', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
               >
                 {sdrReassigning ? 'Reassigning...' : 'Confirm reassignment'}
               </Button>
