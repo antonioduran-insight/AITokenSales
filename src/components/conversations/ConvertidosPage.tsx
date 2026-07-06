@@ -166,10 +166,16 @@ export function ConvertidosPage() {
           <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{t('title')}</h1>
           <span style={{ fontSize: 12, color: '#52526A' }}>{prospects.length} total</span>
         </div>
-        <p style={{ fontSize: 13, color: '#F59E0B', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <AlertTriangle size={13} />
-          {t('subtitle')}
-        </p>
+        {isAdmin ? (
+          <p style={{ fontSize: 13, color: '#8B8BA0', margin: '0 0 12px' }}>
+            Closed deals and their conversations from your team. Review your team&apos;s successful outreach.
+          </p>
+        ) : (
+          <p style={{ fontSize: 13, color: '#F59E0B', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <AlertTriangle size={13} />
+            {t('subtitle')}
+          </p>
+        )}
 
         {/* Stats bar */}
         {prospects.length > 0 && (

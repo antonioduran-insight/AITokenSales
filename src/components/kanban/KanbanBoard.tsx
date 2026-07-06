@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core'
 import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
@@ -40,6 +40,7 @@ export function KanbanBoard() {
   const [formOpen, setFormOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [stageMap, setStageMap] = useState<Map<number, PipelineStage>>(new Map())
+  const isInitialMount = useRef(true)
 
   const isSdr = user?.role === 'sdr'
   const sdrAreaIds = sdrAreas.map(a => a.id)
@@ -156,7 +157,8 @@ export function KanbanBoard() {
 
   // Re-fetch when area filter changes (not on initial load — init handles that)
   useEffect(() => {
-    if (selectedAreaId !== null) fetchProspects()
+    if (isInitialMount.current) { isInitialMount.current = false; return }
+    fetchProspects().catch(console.error)
   }, [selectedAreaId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleDragStart({ active }: DragStartEvent) {

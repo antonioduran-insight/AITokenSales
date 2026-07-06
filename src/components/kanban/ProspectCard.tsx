@@ -49,14 +49,14 @@ export function ProspectCard({ prospect, onClick, isDragOverlay = false }: Props
         onMouseEnter={e => !isDragOverlay && ((e.currentTarget as HTMLElement).style.borderColor = '#6C63FF')}
         onMouseLeave={e => !isDragOverlay && ((e.currentTarget as HTMLElement).style.borderColor = '#2A2A3A')}
       >
-        {/* Top row: name + flag */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
+        {/* Top row: flag + name */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+          {prospect.flag_tomorrow && (
+            <Star size={12} fill="#F59E0B" stroke="#F59E0B" style={{ flexShrink: 0, marginTop: 2 }} />
+          )}
           <span style={{ fontSize: 14, fontWeight: 600, color: '#F0F0F5', lineHeight: 1.3, flex: 1 }}>
             {prospect.name}
           </span>
-          {prospect.flag_tomorrow && (
-            <Star size={12} fill="#F59E0B" stroke="#F59E0B" style={{ flexShrink: 0, marginTop: 1 }} />
-          )}
         </div>
 
         {/* Company + title */}

@@ -135,7 +135,7 @@ export function StatsDashboard() {
   const replyRate = total > 0 ? ((replied / total) * 100).toFixed(1) : '0.0'
 
   const globalConvRate = total > 0 ? (closedTotal / total) * 100 : 0
-  const globalConvColor = convRateColor(globalConvRate)
+  const globalConvColor = '#22C55E'
 
   // ── By status ──────────────────────────────────────────────────────────────
   const byStatus = OUTREACH_STATUSES.map(s => ({

@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
     id: authData.user.id,
     full_name,
     email,
-    role: 'sdr',
+    role: body.role === 'admin' ? 'admin' : 'sdr',
     area_id: primaryAreaId,
     organization_id: auth.orgId ?? null,
     is_active: true,
@@ -171,6 +171,29 @@ export async function PATCH(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
+
+  if (action === 'edit') {
+    const { full_name, role, area_ids } = body
+    const updates: Record<string, unknown> = {}
+    if (full_name) updates.full_name = full_name.trim()
+    if (role === 'admin' || role === 'sdr') updates.role = role
+    if (area_ids !== undefined) {
+      if (area_ids.length > 0) updates.area_id = area_ids[0]
+      else updates.area_id = null
+    }
+
+    const { error: updateErr } = await adminClient.from('users').update(updates).eq('id', id)
+    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 400 })
+
+    if (area_ids !== undefined) {
+      await adminClient.from('user_areas').delete().eq('user_id', id)
+      if (area_ids.length > 0) {
+        await adminClient.from('user_areas').insert(area_ids.map((aid: string) => ({ user_id: id, area_id: aid })))
+      }
+    }
+
+    return NextResponse.json({ ok: true })
+  }
 
   if (action === 'unassign') {
     const { count } = await adminClient

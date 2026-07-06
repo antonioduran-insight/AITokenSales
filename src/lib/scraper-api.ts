@@ -55,6 +55,7 @@ export interface Lead {
   email?: string;
   icp_score?: number;
   temperature?: "HOT" | "WARM" | "COLD";
+  market?: string;
   search_combo?: string;
   custom1?: string;
   custom2?: string;
