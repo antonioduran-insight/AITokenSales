@@ -110,28 +110,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: userError.message }, { status: 400 })
   }
 
-  // 4. Insert organization markets
-  if (Array.isArray(markets) && markets.length > 0) {
-    const marketRows = markets
-      .filter((m: string) => MARKET_MAP[m])
-      .map((m: string) => ({
-        organization_id: org.id,
-        continent: MARKET_MAP[m].continent,
-        country: MARKET_MAP[m].country,
-        language: MARKET_MAP[m].language,
-      }))
-
-    if (marketRows.length > 0) {
-      const { error: marketsError } = await admin.from('organization_markets').insert(marketRows)
-      if (marketsError) {
-        await admin.auth.admin.deleteUser(authData.user.id)
-        await admin.from('organizations').delete().eq('id', org.id)
-        return NextResponse.json({ error: `Failed to set markets: ${marketsError.message}` }, { status: 400 })
-      }
-    }
-  }
-
-  // 5. Insert addons if selected
+  // 4. Insert addons if selected
   if (Array.isArray(addons) && addons.length > 0) {
     const addonRows = addons.map((addonType: string) => ({
       organization_id: org.id,

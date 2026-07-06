@@ -49,15 +49,12 @@ export async function GET(
 
   if (error || !org) return NextResponse.json({ error: error?.message ?? 'Not found' }, { status: 404 })
 
-  // Enrich
-  const [adminsRes, sdrsRes, addonsRes, ticketsRes] = await Promise.all([
+  const [adminsRes, sdrsRes, addonsRes] = await Promise.all([
     admin.from('users').select('email').eq('organization_id', id).eq('role', 'admin').eq('is_active', true).limit(1).single(),
     admin.from('users').select('id', { count: 'exact', head: true }).eq('organization_id', id).eq('role', 'sdr').eq('is_active', true),
     admin.from('organization_addons').select('*').eq('organization_id', id).eq('is_active', true),
-    admin.from('support_tickets').select('id', { count: 'exact', head: true }).eq('organization_id', id).in('status', ['open', 'in_progress']),
   ])
 
-  // leads this month — use monthly_lead_counts (prospects has no organization_id column)
   const now = new Date()
   const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const { data: leadCountRow } = await admin
@@ -73,7 +70,6 @@ export async function GET(
     admin_email: adminsRes.data?.email ?? null,
     sdr_count: sdrsRes.count ?? 0,
     addons: addonsRes.data ?? [],
-    open_tickets_count: ticketsRes.count ?? 0,
     leads_this_month: leadsThisMonth,
   })
 }
@@ -124,16 +120,52 @@ export async function DELETE(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  const { data: org } = await admin
-    .from('organizations')
-    .select('slug')
-    .eq('id', id)
-    .single()
-
+  const { data: org } = await admin.from('organizations').select('slug').eq('id', id).single()
   if (org?.slug === 'aitokensales') {
     return NextResponse.json({ error: 'Cannot delete internal organization' }, { status: 403 })
   }
 
+  // Get all user IDs before deleting
+  const { data: orgUsers } = await admin.from('users').select('id').eq('organization_id', id)
+  const userIds = (orgUsers ?? []).map((u: { id: string }) => u.id)
+
+  // Delete in FK-safe order
+  // 1. run_sdr_assignments (references runs and users)
+  const { data: orgRuns } = await admin.from('runs').select('id').eq('organization_id', id)
+  if (orgRuns && orgRuns.length > 0) {
+    const runIds = orgRuns.map((r: { id: string }) => r.id)
+    await admin.from('run_sdr_assignments').delete().in('run_id', runIds)
+  }
+
+  // 2. runs
+  await admin.from('runs').delete().eq('organization_id', id)
+
+  // 3. sender_profiles (by organization_id or user_id)
+  await admin.from('sender_profiles').delete().eq('organization_id', id)
+
+  // 4. org_combos
+  await admin.from('org_combos').delete().eq('organization_id', id)
+
+  // 5. monthly_lead_counts
+  await admin.from('monthly_lead_counts').delete().eq('organization_id', id)
+
+  // 6. organization_addons
+  await admin.from('organization_addons').delete().eq('organization_id', id)
+
+  // 7. support_tickets (may not exist)
+  try { await admin.from('support_tickets').delete().eq('organization_id', id) } catch { /* table may not exist */ }
+
+  // 8. public users row
+  if (userIds.length > 0) {
+    await admin.from('users').delete().in('id', userIds)
+  }
+
+  // 9. auth users
+  for (const uid of userIds) {
+    try { await admin.auth.admin.deleteUser(uid) } catch { /* ignore individual failures */ }
+  }
+
+  // 10. delete organization
   const { error } = await admin.from('organizations').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   return NextResponse.json({ ok: true })

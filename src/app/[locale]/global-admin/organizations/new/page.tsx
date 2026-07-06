@@ -9,12 +9,10 @@ import { createClient } from '@/lib/supabase/client'
 
 const PLAN_PREVIEW: Record<string, string> = {
   basic: '$550/mo · 3 seats · 1,000 leads/mo',
-  premium: '$2,300/mo · 10 seats · 3,000 leads/mo',
+  premium: '$2,300/mo · 7 seats · 3,000 leads/mo',
   enterprise: 'Custom · 15 seats · 10,000 leads/mo',
   ultra: 'Internal · Unlimited',
 }
-
-const MARKETS = ['Taiwan', 'LATAM', 'Vietnam', 'Europe', 'Global']
 
 function generateSlug(name: string): string {
   return name.toLowerCase().trim()
@@ -28,11 +26,7 @@ function generatePassword(): string {
   return `Temp${Math.random().toString(36).slice(2, 10)}!`
 }
 
-interface SuccessData {
-  orgName: string
-  email: string
-  password: string
-}
+interface SuccessData { orgName: string; email: string; password: string }
 
 export default function NewOrganizationPage() {
   const locale = useLocale()
@@ -58,13 +52,10 @@ export default function NewOrganizationPage() {
   const [vendor, setVendor] = useState('direct')
   const [vendorCustom, setVendorCustom] = useState('')
   const [defaultLanguage, setDefaultLanguage] = useState('zh')
-  const [markets, setMarkets] = useState<string[]>([])
   const [internalNotes, setInternalNotes] = useState('')
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set())
   const [apifyToken, setApifyToken] = useState('')
   const [anthropicKey, setAnthropicKey] = useState('')
-
-  // Temp org id for logo upload before create (use timestamp)
   const [orgTempId] = useState(() => `new-${Date.now()}`)
 
   useEffect(() => {
@@ -85,10 +76,6 @@ export default function NewOrganizationPage() {
     if (defaults) { setMaxSeats(defaults.max_seats); setMaxLeads(defaults.max_leads_per_month) }
   }
 
-  function toggleMarket(market: string) {
-    setMarkets(prev => prev.includes(market) ? prev.filter(m => m !== market) : [...prev, market])
-  }
-
   function toggleAddon(addonType: string) {
     setSelectedAddons(prev => {
       const next = new Set(prev)
@@ -106,9 +93,7 @@ export default function NewOrganizationPage() {
       const supabase = createClient()
       const ext = file.name.split('.').pop()
       const fileName = `org-logos/${orgTempId}-${Date.now()}.${ext}`
-      const { error: uploadError } = await supabase.storage
-        .from('logos')
-        .upload(fileName, file, { upsert: true })
+      const { error: uploadError } = await supabase.storage.from('logos').upload(fileName, file, { upsert: true })
       if (uploadError) throw uploadError
       const { data: urlData } = supabase.storage.from('logos').getPublicUrl(fileName)
       setLogoUrl(urlData.publicUrl)
@@ -136,9 +121,7 @@ export default function NewOrganizationPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name,
-        slug,
-        plan,
+        name, slug, plan,
         logo_url: logoUrl || null,
         admin_name: adminName,
         admin_email: adminEmail,
@@ -148,7 +131,6 @@ export default function NewOrganizationPage() {
         custom_price: plan === 'enterprise' ? customPrice : null,
         vendor: effectiveVendor,
         default_language: defaultLanguage,
-        markets,
         internal_notes: internalNotes || null,
         addons: Array.from(selectedAddons),
         apify_token: apifyToken,
@@ -172,15 +154,9 @@ export default function NewOrganizationPage() {
     color: colors.textPrimary, borderRadius: 6, padding: '8px 12px',
     fontSize: 14, width: '100%', boxSizing: 'border-box', outline: 'none',
   }
-
   const labelStyle: React.CSSProperties = {
     fontSize: 12, color: colors.textSecondary, fontWeight: 600, display: 'block', marginBottom: 6,
   }
-
-  const fieldStyle: React.CSSProperties = {
-    display: 'flex', flexDirection: 'column', gap: 4,
-  }
-
   const cardStyle: React.CSSProperties = {
     backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 20,
   }
@@ -207,19 +183,12 @@ export default function NewOrganizationPage() {
           </div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
             <button
-              onClick={() => {
-                navigator.clipboard.writeText(`Email: ${success.email}\nPassword: ${success.password}`)
-                setCopied(true)
-                setTimeout(() => setCopied(false), 2000)
-              }}
+              onClick={() => { navigator.clipboard.writeText(`Email: ${success.email}\nPassword: ${success.password}`); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
               style={{ backgroundColor: colors.accent, color: '#fff', border: 'none', borderRadius: 6, padding: '10px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
             >
               {copied ? 'Copied!' : 'Copy credentials'}
             </button>
-            <a
-              href={`/${locale}/global-admin/organizations`}
-              style={{ backgroundColor: colors.surfaceRaised, color: colors.textSecondary, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '10px 20px', fontSize: 13, fontWeight: 600, textDecoration: 'none', display: 'inline-block' }}
-            >
+            <a href={`/${locale}/global-admin/organizations`} style={{ backgroundColor: colors.surfaceRaised, color: colors.textSecondary, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '10px 20px', fontSize: 13, fontWeight: 600, textDecoration: 'none', display: 'inline-block' }}>
               Go to Organizations
             </a>
           </div>
@@ -229,8 +198,8 @@ export default function NewOrganizationPage() {
   }
 
   return (
-    <div style={{ maxWidth: 900 }}>
-      <div style={{ marginBottom: 24 }}>
+    <div>
+      <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: colors.textPrimary, marginBottom: 4 }}>{t('newOrganization')}</h1>
         <p style={{ color: colors.textMuted, fontSize: 13, margin: 0 }}>Creates the organization and an admin user account.</p>
       </div>
@@ -241,44 +210,44 @@ export default function NewOrganizationPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
-        {/* 2-column layout */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+      <form onSubmit={handleSubmit} autoComplete="off">
+        {/* Row 1: Org Info + Admin Account */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
           {/* Left: Org info */}
           <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 14 }}>
             <h2 style={{ fontSize: 13, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>Organization Info</h2>
 
             {/* Logo upload */}
-            <div style={fieldStyle}>
+            <div>
               <label style={labelStyle}>Logo</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 {logoPreview ? (
-                  <img src={logoPreview} alt="Logo" style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover', border: `1px solid ${colors.border}` }} />
+                  <img src={logoPreview} alt="Logo" style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', border: `1px solid ${colors.border}` }} />
                 ) : (
-                  <div style={{ width: 48, height: 48, borderRadius: 8, backgroundColor: colors.surfaceRaised, border: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: colors.textMuted }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: colors.surfaceRaised, border: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: colors.textMuted }}>
                     No logo
                   </div>
                 )}
                 <label style={{ cursor: 'pointer' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 12px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 13, color: colors.textSecondary }}>
-                    {logoUploading ? 'Uploading...' : 'Upload Logo'}
+                    {logoUploading ? 'Uploading...' : 'Upload'}
                   </span>
                   <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
                 </label>
               </div>
             </div>
 
-            <div style={fieldStyle}>
+            <div>
               <label style={labelStyle}>{t('name')} *</label>
-              <input value={name} onChange={e => handleNameChange(e.target.value)} required placeholder="Acme Corp" style={inputStyle} />
+              <input value={name} onChange={e => handleNameChange(e.target.value)} required placeholder="Acme Corp" style={inputStyle} autoComplete="off" />
             </div>
 
-            <div style={fieldStyle}>
+            <div>
               <label style={labelStyle}>{t('slug')} *</label>
-              <input value={slug} onChange={e => setSlug(e.target.value)} required placeholder="acme-corp" style={inputStyle} />
+              <input value={slug} onChange={e => setSlug(e.target.value)} required placeholder="acme-corp" style={inputStyle} autoComplete="off" />
             </div>
 
-            <div style={fieldStyle}>
+            <div>
               <label style={labelStyle}>{t('plan')} *</label>
               <select value={plan} onChange={e => handlePlanChange(e.target.value as typeof plan)} required style={inputStyle}>
                 <option value="basic">Basic</option>
@@ -292,58 +261,42 @@ export default function NewOrganizationPage() {
             </div>
 
             {plan === 'enterprise' && (
-              <div style={fieldStyle}>
+              <div>
                 <label style={labelStyle}>{t('customPrice')} (USD/mo)</label>
                 <input type="number" value={customPrice ?? ''} onChange={e => setCustomPrice(e.target.value ? Number(e.target.value) : null)} placeholder="0" style={inputStyle} />
               </div>
             )}
-
-            <div style={fieldStyle}>
-              <label style={labelStyle}>{t('markets')}</label>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {MARKETS.map(m => {
-                  const selected = markets.includes(m)
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => toggleMarket(m)}
-                      style={{
-                        padding: '5px 12px', borderRadius: 20,
-                        border: `1px solid ${selected ? colors.accent : colors.border}`,
-                        backgroundColor: selected ? `${colors.accent}20` : 'transparent',
-                        color: selected ? colors.accent : colors.textSecondary,
-                        fontSize: 12, fontWeight: selected ? 600 : 400, cursor: 'pointer',
-                      }}
-                    >
-                      {m}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
           </div>
 
           {/* Right: Admin account */}
           <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 14 }}>
             <h2 style={{ fontSize: 13, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>Admin Account</h2>
 
-            <div style={fieldStyle}>
+            <div>
               <label style={labelStyle}>{t('adminName')} *</label>
-              <input value={adminName} onChange={e => setAdminName(e.target.value)} required placeholder="John Doe" style={inputStyle} />
+              <input value={adminName} onChange={e => setAdminName(e.target.value)} required placeholder="John Doe" style={inputStyle} autoComplete="off" />
             </div>
 
-            <div style={fieldStyle}>
+            <div>
               <label style={labelStyle}>{t('adminEmail')} *</label>
-              <input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} required placeholder="admin@company.com" style={inputStyle} />
+              <input
+                type="email"
+                value={adminEmail}
+                onChange={e => setAdminEmail(e.target.value)}
+                required
+                placeholder="admin@company.com"
+                style={inputStyle}
+                autoComplete="new-password"
+                name="admin-email-field"
+              />
             </div>
 
-            <div style={fieldStyle}>
+            <div>
               <label style={labelStyle}>{t('temporaryPassword')} *</label>
-              <input value={adminPassword} onChange={e => setAdminPassword(e.target.value)} required style={{ ...inputStyle, fontFamily: 'monospace' }} />
+              <input value={adminPassword} onChange={e => setAdminPassword(e.target.value)} required style={{ ...inputStyle, fontFamily: 'monospace' }} autoComplete="new-password" />
             </div>
 
-            <div style={fieldStyle}>
+            <div>
               <label style={labelStyle}>{t('vendor')}</label>
               <select value={vendor} onChange={e => setVendor(e.target.value)} style={inputStyle}>
                 <option value="direct">Direct (no vendor)</option>
@@ -359,11 +312,12 @@ export default function NewOrganizationPage() {
                   value={vendorCustom}
                   onChange={e => setVendorCustom(e.target.value)}
                   style={{ ...inputStyle, marginTop: 6 }}
+                  autoComplete="off"
                 />
               )}
             </div>
 
-            <div style={fieldStyle}>
+            <div>
               <label style={labelStyle}>{t('defaultLanguage')}</label>
               <select value={defaultLanguage} onChange={e => setDefaultLanguage(e.target.value)} style={inputStyle}>
                 <option value="zh">中文</option>
@@ -375,58 +329,61 @@ export default function NewOrganizationPage() {
           </div>
         </div>
 
-        {/* Scraper API Keys — REQUIRED */}
-        <div style={{ ...cardStyle, marginBottom: 20, border: `1px solid ${colors.accent}44` }}>
-          <h2 style={{ fontSize: 13, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>
-            Scraper API Keys <span style={{ color: '#EF4444' }}>*</span>
-          </h2>
-          <p style={{ fontSize: 12, color: colors.textMuted, margin: '0 0 14px' }}>Required for the scraper pipeline.</p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Apify Token *</label>
-              <input type="password" value={apifyToken} onChange={e => setApifyToken(e.target.value)} placeholder="apify_api_…" style={inputStyle} />
-            </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Anthropic API Key *</label>
-              <input type="password" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} placeholder="sk-ant-…" style={inputStyle} />
+        {/* Row 2: Scraper Keys + Add-ons */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          {/* Scraper API Keys — REQUIRED */}
+          <div style={{ ...cardStyle, border: `1px solid ${colors.accent}44` }}>
+            <h2 style={{ fontSize: 13, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+              Scraper API Keys <span style={{ color: '#EF4444' }}>*</span>
+            </h2>
+            <p style={{ fontSize: 12, color: colors.textMuted, margin: '0 0 12px' }}>Required for the scraper pipeline.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Apify Token *</label>
+                <input type="password" value={apifyToken} onChange={e => setApifyToken(e.target.value)} placeholder="apify_api_…" style={inputStyle} autoComplete="new-password" />
+              </div>
+              <div>
+                <label style={labelStyle}>Anthropic API Key *</label>
+                <input type="password" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} placeholder="sk-ant-…" style={inputStyle} autoComplete="new-password" />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Add-ons */}
-        <div style={{ ...cardStyle, marginBottom: 20 }}>
-          <h2 style={{ fontSize: 13, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 14px' }}>{t('addOns')}</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {ADDON_LIST.map(addon => {
-              const isActive = selectedAddons.has(addon.type)
-              return (
-                <label key={addon.type} style={{
-                  display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
-                  padding: '9px 14px', borderRadius: 7,
-                  backgroundColor: isActive ? `${colors.accent}10` : colors.surfaceRaised,
-                  border: `1px solid ${isActive ? colors.accent + '40' : colors.border}`,
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={isActive}
-                    onChange={() => toggleAddon(addon.type)}
-                    style={{ width: 15, height: 15, accentColor: colors.accent, cursor: 'pointer', flexShrink: 0 }}
-                  />
-                  <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, color: colors.textPrimary, flex: 1 }}>{t(addon.labelKey)}</span>
-                  <span style={{ fontSize: 12, color: colors.textMuted }}>{addon.price}</span>
-                </label>
-              )
-            })}
+          {/* Add-ons */}
+          <div style={cardStyle}>
+            <h2 style={{ fontSize: 13, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px' }}>{t('addOns')}</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {ADDON_LIST.map(addon => {
+                const isActive = selectedAddons.has(addon.type)
+                return (
+                  <label key={addon.type} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+                    padding: '8px 12px', borderRadius: 7,
+                    backgroundColor: isActive ? `${colors.accent}10` : colors.surfaceRaised,
+                    border: `1px solid ${isActive ? colors.accent + '40' : colors.border}`,
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={isActive}
+                      onChange={() => toggleAddon(addon.type)}
+                      style={{ width: 14, height: 14, accentColor: colors.accent, cursor: 'pointer', flexShrink: 0 }}
+                    />
+                    <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, color: colors.textPrimary, flex: 1 }}>{t(addon.labelKey)}</span>
+                    <span style={{ fontSize: 11, color: colors.textMuted }}>{addon.price}</span>
+                  </label>
+                )
+              })}
+            </div>
           </div>
         </div>
 
         {/* Internal Notes */}
-        <div style={{ ...cardStyle, marginBottom: 20 }}>
-          <h2 style={{ fontSize: 13, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 14px' }}>{t('internalNotes')}</h2>
+        <div style={{ ...cardStyle, marginBottom: 16 }}>
+          <h2 style={{ fontSize: 13, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px' }}>{t('internalNotes')}</h2>
           <textarea
             value={internalNotes}
             onChange={e => setInternalNotes(e.target.value)}
-            rows={3}
+            rows={2}
             style={{ ...inputStyle, resize: 'vertical' }}
             placeholder="Internal notes (not visible to client)…"
           />
