@@ -8,7 +8,7 @@ import { AreaBadge } from '@/components/ui/AreaBadge'
 import { TemperatureBadge } from '@/components/ui/TemperatureBadge'
 import { ICPScore } from '@/components/ui/ICPScore'
 import { NotesLog } from './NotesLog'
-import { ConversationsLog } from '@/components/conversations/ConversationsLog'
+
 import { useUser } from '@/contexts/UserContext'
 import { useOrgId } from '@/lib/hooks/useOrgId'
 import { ExternalLink, Copy, Check, Star, ChevronDown, CheckCircle, X } from 'lucide-react'
@@ -71,7 +71,7 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
   const { isAdmin, user } = useUser()
   const { isImpersonating } = useOrgId()
   const [prospect, setProspect] = useState(initial)
-  const [tab, setTab] = useState<'info' | 'messages' | 'notes' | 'conversations'>('info')
+  const [tab, setTab] = useState<'info' | 'messages' | 'notes'>('info')
   const [saving, setSaving] = useState(false)
 
   const [sdrsForArea, setSdrsForArea] = useState<User[]>([])
@@ -211,9 +211,9 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
 
           {/* Tabs */}
           <div style={{ display: 'flex', gap: 2 }}>
-            {(['info', 'messages', 'notes', 'conversations'] as const).map(tab_ => (
+            {(['info', 'messages', 'notes'] as const).map(tab_ => (
               <button key={tab_} style={TAB_STYLE(tab === tab_)} onClick={() => setTab(tab_)}>
-                {tab_ === 'info' ? t('prospect.info') : tab_ === 'messages' ? t('prospect.messages') : tab_ === 'notes' ? t('prospect.notes') : t('prospect.chats')}
+                {tab_ === 'info' ? t('prospect.info') : tab_ === 'messages' ? t('prospect.messages') : t('prospect.notes')}
               </button>
             ))}
           </div>
@@ -359,14 +359,6 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
             <NotesLog prospectId={prospect.id} prospectName={prospect.name} />
           )}
 
-          {/* CONVERSATIONS TAB */}
-          {tab === 'conversations' && (
-            <ConversationsLog
-              prospectId={prospect.id}
-              prospectName={prospect.name}
-              isClosed={prospect.outreach_status === 'closed'}
-            />
-          )}
         </div>
 
         {/* Reassign toast */}

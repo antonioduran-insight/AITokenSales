@@ -5,7 +5,17 @@ import { useSearchParams } from 'next/navigation';
 import { scraperApi, type Lead, type Run } from '@/lib/scraper-api';
 import { TemperatureBadge } from '@/components/scraper/TemperatureBadge';
 import { ICPScore } from '@/components/scraper/ICPScore';
-import { X } from 'lucide-react';
+import { Copy, Check, X } from 'lucide-react';
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button onClick={async () => { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#6C63FF', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+      {copied ? <><Check size={11} /> Copied</> : <><Copy size={11} /> Copy</>}
+    </button>
+  );
+}
 
 const selectStyle: React.CSSProperties = {
   padding: '7px 10px', borderRadius: 8, backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', color: '#F0F0F5', fontSize: 13, outline: 'none',
@@ -119,10 +129,11 @@ function LeadsContent() {
               <button onClick={() => setSelectedLead(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52526A', padding: 4 }}><X size={18} /></button>
             </div>
 
-            {/* Profile */}
-            <div>
-              <p style={{ fontSize: 11, color: '#52526A', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 16 }}>Profile</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 32px' }}>
+            {/* 2-column grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+              {/* Left: Profile */}
+              <div>
+                <p style={{ fontSize: 11, color: '#52526A', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>Profile</p>
                 {[
                   { label: 'Company', value: selectedLead.company },
                   { label: 'Title', value: selectedLead.title },
@@ -133,20 +144,37 @@ function LeadsContent() {
                   { label: 'Market', value: selectedLead.market },
                   { label: 'Combo', value: selectedLead.search_combo },
                 ].map(({ label, value }) => value ? (
-                  <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <span style={{ fontSize: 11, color: '#52526A', fontWeight: 600 }}>{label}</span>
-                    <span style={{ fontSize: 13, color: '#F0F0F5' }}>{value}</span>
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, gap: 8 }}>
+                    <span style={{ fontSize: 12, color: '#52526A', flexShrink: 0 }}>{label}</span>
+                    <span style={{ fontSize: 13, color: '#F0F0F5', textAlign: 'right' }}>{value}</span>
+                  </div>
+                ) : null)}
+                {selectedLead.linkedin_url && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, gap: 8 }}>
+                    <span style={{ fontSize: 12, color: '#52526A', flexShrink: 0 }}>LinkedIn</span>
+                    <a href={selectedLead.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: '#6C63FF', textDecoration: 'none', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>Ver perfil →</a>
+                  </div>
+                )}
+              </div>
+
+              {/* Right: Outreach templates */}
+              <div>
+                <p style={{ fontSize: 11, color: '#52526A', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>Outreach Templates</p>
+                {[
+                  { label: 'Connection Request', value: selectedLead.custom1 },
+                  { label: 'Value Message', value: selectedLead.custom2 },
+                ].map(({ label, value }) => value ? (
+                  <div key={label} style={{ marginBottom: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, color: '#8B8BA0', fontWeight: 600 }}>{label}</span>
+                      <CopyButton text={value} />
+                    </div>
+                    <div style={{ backgroundColor: '#1C1C27', border: '1px solid #2A2A3A', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#8B8BA0', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                      {value}
+                    </div>
                   </div>
                 ) : null)}
               </div>
-              {selectedLead.linkedin_url && (
-                <div style={{ marginTop: 12 }}>
-                  <span style={{ fontSize: 11, color: '#52526A', fontWeight: 600 }}>LinkedIn</span>
-                  <div style={{ marginTop: 2 }}>
-                    <a href={selectedLead.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: '#6C63FF', textDecoration: 'none' }}>Ver perfil →</a>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
