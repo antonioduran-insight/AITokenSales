@@ -5,6 +5,7 @@ import { useLocale } from 'next-intl'
 import type { Vendor } from '@/lib/types'
 import { ADDON_LIST, MAX_INT, PLAN_DEFAULTS } from '@/lib/types'
 import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
+import { createClient } from '@/lib/supabase/client'
 
 const PLAN_PREVIEW: Record<string, string> = {
   basic: '$550/mo · 3 seats · 1,000 leads/mo',
@@ -16,7 +17,11 @@ const PLAN_PREVIEW: Record<string, string> = {
 const MARKETS = ['Taiwan', 'LATAM', 'Vietnam', 'Europe', 'Global']
 
 function generateSlug(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+  return name.toLowerCase().trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
 }
 
 function generatePassword(): string {
@@ -42,6 +47,8 @@ export default function NewOrganizationPage() {
   const [slug, setSlug] = useState('')
   const [plan, setPlan] = useState<'basic' | 'premium' | 'enterprise' | 'ultra'>('basic')
   const [logoUrl, setLogoUrl] = useState('')
+  const [logoPreview, setLogoPreview] = useState('')
+  const [logoUploading, setLogoUploading] = useState(false)
   const [adminName, setAdminName] = useState('')
   const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState(generatePassword())
@@ -49,12 +56,16 @@ export default function NewOrganizationPage() {
   const [maxLeads, setMaxLeads] = useState<number>(1000)
   const [customPrice, setCustomPrice] = useState<number | null>(null)
   const [vendor, setVendor] = useState('direct')
+  const [vendorCustom, setVendorCustom] = useState('')
   const [defaultLanguage, setDefaultLanguage] = useState('zh')
   const [markets, setMarkets] = useState<string[]>([])
   const [internalNotes, setInternalNotes] = useState('')
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set())
   const [apifyToken, setApifyToken] = useState('')
   const [anthropicKey, setAnthropicKey] = useState('')
+
+  // Temp org id for logo upload before create (use timestamp)
+  const [orgTempId] = useState(() => `new-${Date.now()}`)
 
   useEffect(() => {
     fetch('/api/global-admin/vendors')
@@ -63,9 +74,10 @@ export default function NewOrganizationPage() {
       .catch(() => {})
   }, [])
 
-  useEffect(() => {
-    setSlug(generateSlug(name))
-  }, [name])
+  function handleNameChange(newName: string) {
+    setName(newName)
+    setSlug(generateSlug(newName))
+  }
 
   function handlePlanChange(newPlan: typeof plan) {
     setPlan(newPlan)
@@ -86,11 +98,40 @@ export default function NewOrganizationPage() {
     })
   }
 
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLogoUploading(true)
+    try {
+      const supabase = createClient()
+      const ext = file.name.split('.').pop()
+      const fileName = `org-logos/${orgTempId}-${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('logos')
+        .upload(fileName, file, { upsert: true })
+      if (uploadError) throw uploadError
+      const { data: urlData } = supabase.storage.from('logos').getPublicUrl(fileName)
+      setLogoUrl(urlData.publicUrl)
+      setLogoPreview(urlData.publicUrl)
+    } catch (err) {
+      console.error('Logo upload failed:', err)
+    } finally {
+      setLogoUploading(false)
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true)
     setError(null)
 
+    if (!apifyToken || !anthropicKey) {
+      setError('Apify Token and Anthropic Key are required')
+      return
+    }
+
+    const effectiveVendor = vendor === 'direct' ? null : vendor === 'other' ? (vendorCustom.trim() || null) : vendor
+
+    setLoading(true)
     const res = await fetch('/api/global-admin/create-org', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -105,13 +146,13 @@ export default function NewOrganizationPage() {
         max_seats: maxSeats,
         max_leads_per_month: maxLeads,
         custom_price: plan === 'enterprise' ? customPrice : null,
-        vendor,
+        vendor: effectiveVendor,
         default_language: defaultLanguage,
         markets,
         internal_notes: internalNotes || null,
         addons: Array.from(selectedAddons),
-        apify_token: apifyToken || null,
-        anthropic_key: anthropicKey || null,
+        apify_token: apifyToken,
+        anthropic_key: anthropicKey,
       }),
     })
 
@@ -127,63 +168,31 @@ export default function NewOrganizationPage() {
   }
 
   const inputStyle: React.CSSProperties = {
-    backgroundColor: colors.surfaceRaised,
-    border: `1px solid ${colors.border}`,
-    color: colors.textPrimary,
-    borderRadius: 6,
-    padding: '8px 12px',
-    fontSize: 14,
-    width: '100%',
-    boxSizing: 'border-box',
-    outline: 'none',
+    backgroundColor: colors.surfaceRaised, border: `1px solid ${colors.border}`,
+    color: colors.textPrimary, borderRadius: 6, padding: '8px 12px',
+    fontSize: 14, width: '100%', boxSizing: 'border-box', outline: 'none',
   }
 
   const labelStyle: React.CSSProperties = {
-    fontSize: 12,
-    color: colors.textSecondary,
-    fontWeight: 600,
-    display: 'block',
-    marginBottom: 6,
+    fontSize: 12, color: colors.textSecondary, fontWeight: 600, display: 'block', marginBottom: 6,
   }
 
   const fieldStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
+    display: 'flex', flexDirection: 'column', gap: 4,
   }
 
   const cardStyle: React.CSSProperties = {
-    backgroundColor: colors.surface,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 10,
-    padding: 20,
+    backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 20,
   }
 
   if (success) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
-        <div style={{
-          backgroundColor: colors.surface,
-          border: `1px solid #22C55E44`,
-          borderRadius: 12,
-          padding: 40,
-          maxWidth: 480,
-          width: '100%',
-          textAlign: 'center',
-        }}>
+        <div style={{ backgroundColor: colors.surface, border: `1px solid #22C55E44`, borderRadius: 12, padding: 40, maxWidth: 480, width: '100%', textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: colors.textPrimary, margin: '0 0 6px' }}>
-            Organization Created
-          </h2>
+          <h2 style={{ fontSize: 22, fontWeight: 700, color: colors.textPrimary, margin: '0 0 6px' }}>Organization Created</h2>
           <div style={{ fontSize: 16, color: '#A78BFA', marginBottom: 24 }}>{success.orgName}</div>
-          <div style={{
-            backgroundColor: colors.surfaceRaised,
-            border: `1px solid ${colors.border}`,
-            borderRadius: 8,
-            padding: 16,
-            marginBottom: 24,
-            textAlign: 'left',
-          }}>
+          <div style={{ backgroundColor: colors.surfaceRaised, border: `1px solid ${colors.border}`, borderRadius: 8, padding: 16, marginBottom: 24, textAlign: 'left' }}>
             <div style={{ fontSize: 11, color: colors.danger, fontWeight: 600, marginBottom: 12, textTransform: 'uppercase' }}>
               Save these credentials — they won&apos;t be shown again
             </div>
@@ -239,9 +248,29 @@ export default function NewOrganizationPage() {
           <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 14 }}>
             <h2 style={{ fontSize: 13, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>Organization Info</h2>
 
+            {/* Logo upload */}
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Logo</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {logoPreview ? (
+                  <img src={logoPreview} alt="Logo" style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover', border: `1px solid ${colors.border}` }} />
+                ) : (
+                  <div style={{ width: 48, height: 48, borderRadius: 8, backgroundColor: colors.surfaceRaised, border: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: colors.textMuted }}>
+                    No logo
+                  </div>
+                )}
+                <label style={{ cursor: 'pointer' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 12px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 13, color: colors.textSecondary }}>
+                    {logoUploading ? 'Uploading...' : 'Upload Logo'}
+                  </span>
+                  <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
+                </label>
+              </div>
+            </div>
+
             <div style={fieldStyle}>
               <label style={labelStyle}>{t('name')} *</label>
-              <input value={name} onChange={e => setName(e.target.value)} required placeholder="Acme Corp" style={inputStyle} />
+              <input value={name} onChange={e => handleNameChange(e.target.value)} required placeholder="Acme Corp" style={inputStyle} />
             </div>
 
             <div style={fieldStyle}>
@@ -280,15 +309,11 @@ export default function NewOrganizationPage() {
                       type="button"
                       onClick={() => toggleMarket(m)}
                       style={{
-                        padding: '5px 12px',
-                        borderRadius: 20,
+                        padding: '5px 12px', borderRadius: 20,
                         border: `1px solid ${selected ? colors.accent : colors.border}`,
                         backgroundColor: selected ? `${colors.accent}20` : 'transparent',
                         color: selected ? colors.accent : colors.textSecondary,
-                        fontSize: 12,
-                        fontWeight: selected ? 600 : 400,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s',
+                        fontSize: 12, fontWeight: selected ? 600 : 400, cursor: 'pointer',
                       }}
                     >
                       {m}
@@ -321,11 +346,21 @@ export default function NewOrganizationPage() {
             <div style={fieldStyle}>
               <label style={labelStyle}>{t('vendor')}</label>
               <select value={vendor} onChange={e => setVendor(e.target.value)} style={inputStyle}>
-                <option value="direct">Direct</option>
+                <option value="direct">Direct (no vendor)</option>
                 {vendors.filter(v => v.is_active).map(v => (
-                  <option key={v.id} value={v.name}>{v.name}</option>
+                  <option key={v.id} value={v.name}>{v.name} ({v.commission_pct}%)</option>
                 ))}
+                <option value="other">Other (type below)</option>
               </select>
+              {vendor === 'other' && (
+                <input
+                  type="text"
+                  placeholder="Vendor name"
+                  value={vendorCustom}
+                  onChange={e => setVendorCustom(e.target.value)}
+                  style={{ ...inputStyle, marginTop: 6 }}
+                />
+              )}
             </div>
 
             <div style={fieldStyle}>
@@ -337,10 +372,23 @@ export default function NewOrganizationPage() {
                 <option value="es">Español</option>
               </select>
             </div>
+          </div>
+        </div>
 
+        {/* Scraper API Keys — REQUIRED */}
+        <div style={{ ...cardStyle, marginBottom: 20, border: `1px solid ${colors.accent}44` }}>
+          <h2 style={{ fontSize: 13, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>
+            Scraper API Keys <span style={{ color: '#EF4444' }}>*</span>
+          </h2>
+          <p style={{ fontSize: 12, color: colors.textMuted, margin: '0 0 14px' }}>Required for the scraper pipeline.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div style={fieldStyle}>
-              <label style={labelStyle}>{t('logoUrl')}</label>
-              <input value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder="https://..." style={inputStyle} />
+              <label style={labelStyle}>Apify Token *</label>
+              <input type="password" value={apifyToken} onChange={e => setApifyToken(e.target.value)} placeholder="apify_api_…" style={inputStyle} />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Anthropic API Key *</label>
+              <input type="password" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} placeholder="sk-ant-…" style={inputStyle} />
             </div>
           </div>
         </div>
@@ -357,7 +405,6 @@ export default function NewOrganizationPage() {
                   padding: '9px 14px', borderRadius: 7,
                   backgroundColor: isActive ? `${colors.accent}10` : colors.surfaceRaised,
                   border: `1px solid ${isActive ? colors.accent + '40' : colors.border}`,
-                  transition: 'all 0.15s',
                 }}>
                   <input
                     type="checkbox"
@@ -370,22 +417,6 @@ export default function NewOrganizationPage() {
                 </label>
               )
             })}
-          </div>
-        </div>
-
-        {/* Scraper API Keys */}
-        <div style={{ ...cardStyle, marginBottom: 20 }}>
-          <h2 style={{ fontSize: 13, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>Scraper API Keys</h2>
-          <p style={{ fontSize: 12, color: colors.textMuted, margin: '0 0 14px' }}>Optional — can be configured later in the org's Settings → Scraper.</p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Apify Token</label>
-              <input type="password" value={apifyToken} onChange={e => setApifyToken(e.target.value)} placeholder="apify_api_…" style={inputStyle} />
-            </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Anthropic API Key</label>
-              <input type="password" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} placeholder="sk-ant-…" style={inputStyle} />
-            </div>
           </div>
         </div>
 

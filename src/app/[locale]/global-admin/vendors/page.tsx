@@ -16,9 +16,19 @@ export default function VendorsPage() {
   const [error, setError] = useState<string | null>(null)
   const [toggling, setToggling] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadVendors()
-  }, [])
+  // Delete
+  const [deleteTarget, setDeleteTarget] = useState<Vendor | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  // Edit
+  const [editTarget, setEditTarget] = useState<Vendor | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editCommission, setEditCommission] = useState(30)
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  useEffect(() => { loadVendors() }, [])
 
   async function loadVendors() {
     setLoading(true)
@@ -38,10 +48,7 @@ export default function VendorsPage() {
       body: JSON.stringify({ name, email: email || null, commission_pct: commissionPct }),
     })
     if (res.ok) {
-      setName('')
-      setEmail('')
-      setCommissionPct(30)
-      setShowForm(false)
+      setName(''); setEmail(''); setCommissionPct(30); setShowForm(false)
       await loadVendors()
     } else {
       const data = await res.json()
@@ -61,33 +68,52 @@ export default function VendorsPage() {
     setToggling(null)
   }
 
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    await fetch(`/api/global-admin/vendors/${deleteTarget.id}`, { method: 'DELETE' })
+    setVendors(prev => prev.filter(v => v.id !== deleteTarget.id))
+    setDeleteTarget(null)
+    setDeleting(false)
+  }
+
+  function openEdit(vendor: Vendor) {
+    setEditTarget(vendor)
+    setEditName(vendor.name)
+    setEditEmail(vendor.email ?? '')
+    setEditCommission(vendor.commission_pct ?? 30)
+    setEditError(null)
+  }
+
+  async function handleEditSave() {
+    if (!editTarget) return
+    setEditSaving(true); setEditError(null)
+    const res = await fetch(`/api/global-admin/vendors/${editTarget.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: editName, email: editEmail || null, commission_pct: editCommission }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setEditError(data.error); setEditSaving(false); return }
+    setVendors(prev => prev.map(v => v.id === editTarget.id ? data : v))
+    setEditTarget(null)
+    setEditSaving(false)
+  }
+
   const inputStyle: React.CSSProperties = {
-    backgroundColor: colors.surfaceRaised,
-    border: `1px solid ${colors.border}`,
-    color: colors.textPrimary,
-    borderRadius: 6,
-    padding: '8px 12px',
-    fontSize: 14,
-    outline: 'none',
+    backgroundColor: colors.surfaceRaised, border: `1px solid ${colors.border}`,
+    color: colors.textPrimary, borderRadius: 6, padding: '8px 12px', fontSize: 14, outline: 'none',
   }
 
   const thStyle: React.CSSProperties = {
-    padding: '10px 14px',
-    textAlign: 'left',
-    fontSize: 11,
-    fontWeight: 600,
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
+    padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600,
+    color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em',
     borderBottom: `1px solid ${colors.border}`,
   }
 
   const tdStyle: React.CSSProperties = {
-    padding: '12px 14px',
-    fontSize: 13,
-    color: colors.textPrimary,
-    borderBottom: `1px solid ${colors.surfaceRaised}`,
-    verticalAlign: 'middle',
+    padding: '12px 14px', fontSize: 13, color: colors.textPrimary,
+    borderBottom: `1px solid ${colors.surfaceRaised}`, verticalAlign: 'middle',
   }
 
   return (
@@ -143,7 +169,7 @@ export default function VendorsPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                {[t('name'), t('email'), t('commissionPct'), 'Orgs', t('status'), t('actions')].map(col => (
+                {[t('name'), t('email'), t('commissionPct'), t('status'), t('actions')].map(col => (
                   <th key={col} style={thStyle}>{col}</th>
                 ))}
               </tr>
@@ -157,7 +183,6 @@ export default function VendorsPage() {
                   <td style={{ ...tdStyle, fontWeight: 600 }}>{vendor.name}</td>
                   <td style={{ ...tdStyle, color: colors.textSecondary }}>{vendor.email ?? '—'}</td>
                   <td style={{ ...tdStyle, color: '#A78BFA', fontWeight: 600 }}>{vendor.commission_pct}%</td>
-                  <td style={{ ...tdStyle, color: colors.textSecondary }}>—</td>
                   <td style={tdStyle}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <div style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: vendor.is_active ? '#22C55E' : colors.textMuted }} />
@@ -166,28 +191,91 @@ export default function VendorsPage() {
                       </span>
                     </div>
                   </td>
-                  <td style={tdStyle}>
-                    <button
-                      onClick={() => toggleActive(vendor)}
-                      disabled={toggling === vendor.id}
-                      style={{
-                        backgroundColor: vendor.is_active ? '#EF444422' : '#22C55E22',
-                        color: vendor.is_active ? '#EF4444' : '#22C55E',
-                        border: `1px solid ${vendor.is_active ? '#EF444444' : '#22C55E44'}`,
-                        borderRadius: 5,
-                        padding: '4px 10px',
-                        fontSize: 12,
-                        cursor: 'pointer',
-                        opacity: toggling === vendor.id ? 0.5 : 1,
-                      }}
-                    >
-                      {toggling === vendor.id ? '…' : vendor.is_active ? t('deactivate') : t('activate')}
-                    </button>
+                  <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        onClick={() => openEdit(vendor)}
+                        style={{ backgroundColor: colors.surfaceRaised, color: colors.textSecondary, border: `1px solid ${colors.border}`, borderRadius: 5, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => toggleActive(vendor)}
+                        disabled={toggling === vendor.id}
+                        style={{
+                          backgroundColor: vendor.is_active ? '#EF444422' : '#22C55E22',
+                          color: vendor.is_active ? '#EF4444' : '#22C55E',
+                          border: `1px solid ${vendor.is_active ? '#EF444444' : '#22C55E44'}`,
+                          borderRadius: 5, padding: '4px 10px', fontSize: 12, cursor: 'pointer',
+                          opacity: toggling === vendor.id ? 0.5 : 1,
+                        }}
+                      >
+                        {toggling === vendor.id ? '…' : vendor.is_active ? t('deactivate') : t('activate')}
+                      </button>
+                      <button
+                        onClick={() => setDeleteTarget(vendor)}
+                        style={{ backgroundColor: '#EF444422', color: '#EF4444', border: '1px solid #EF444444', borderRadius: 5, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Edit modal */}
+      {editTarget && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}>
+          <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 28, width: 420, maxWidth: '94vw' }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: colors.textPrimary, margin: '0 0 20px' }}>Edit Vendor</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: colors.textSecondary, display: 'block', marginBottom: 5 }}>Name *</label>
+                <input value={editName} onChange={e => setEditName(e.target.value)} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: colors.textSecondary, display: 'block', marginBottom: 5 }}>Email</label>
+                <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} placeholder="vendor@email.com" />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: colors.textSecondary, display: 'block', marginBottom: 5 }}>Commission %</label>
+                <input type="number" min={0} max={100} value={editCommission} onChange={e => setEditCommission(Number(e.target.value))} style={{ ...inputStyle, width: 100 }} />
+              </div>
+            </div>
+            {editError && <p style={{ color: '#EF4444', fontSize: 12, margin: '12px 0 0' }}>{editError}</p>}
+            <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+              <button onClick={handleEditSave} disabled={editSaving} style={{ backgroundColor: colors.accent, color: '#fff', border: 'none', borderRadius: 7, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer', flex: 1, opacity: editSaving ? 0.6 : 1 }}>
+                {editSaving ? 'Saving…' : 'Save'}
+              </button>
+              <button onClick={() => setEditTarget(null)} style={{ backgroundColor: 'transparent', color: colors.textSecondary, border: `1px solid ${colors.border}`, borderRadius: 7, padding: '9px 20px', fontSize: 13, cursor: 'pointer', flex: 1 }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm modal */}
+      {deleteTarget && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}>
+          <div style={{ backgroundColor: colors.surface, border: '1px solid #EF444444', borderRadius: 12, padding: 28, width: 380, maxWidth: '94vw' }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#EF4444', margin: '0 0 12px' }}>Delete Vendor</h3>
+            <p style={{ color: colors.textSecondary, fontSize: 14, margin: '0 0 24px' }}>
+              Are you sure you want to delete <strong style={{ color: colors.textPrimary }}>{deleteTarget.name}</strong>? This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => setDeleteTarget(null)} style={{ backgroundColor: 'transparent', color: colors.textSecondary, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '8px 16px', fontSize: 13, cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button onClick={handleDelete} disabled={deleting} style={{ backgroundColor: '#EF4444', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: deleting ? 0.6 : 1 }}>
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

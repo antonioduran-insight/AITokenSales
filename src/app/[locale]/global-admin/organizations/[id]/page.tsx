@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { ArrowLeft } from 'lucide-react'
 import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
+import { createClient } from '@/lib/supabase/client'
 import type { Organization, OrganizationAddon } from '@/lib/types'
 import { ADDON_LIST } from '@/lib/types'
 
@@ -19,11 +20,18 @@ type OrgDetail = Organization & {
   admin_email: string | null
   sdr_count: number
   addons: OrganizationAddon[]
-  open_tickets_count: number
   leads_this_month: number
 }
 
 type AddonType = typeof ADDON_LIST[number]['type']
+
+function generateSlug(name: string) {
+  return name.toLowerCase().trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
 
 export default function OrgDetailPage() {
   const params = useParams()
@@ -43,6 +51,8 @@ export default function OrgDetailPage() {
   const [billingDay, setBillingDay] = useState<number>(10)
   const [defaultLanguage, setDefaultLanguage] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
+  const [logoPreview, setLogoPreview] = useState('')
+  const [logoUploading, setLogoUploading] = useState(false)
   const [internalNotes, setInternalNotes] = useState('')
   const [savingInfo, setSavingInfo] = useState(false)
   const [savedInfo, setSavedInfo] = useState(false)
@@ -53,6 +63,11 @@ export default function OrgDetailPage() {
   const [deactivating, setDeactivating] = useState(false)
   const [confirmDeactivate, setConfirmDeactivate] = useState(false)
   const [confirmReactivate, setConfirmReactivate] = useState(false)
+
+  // Delete org
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   const [apifyToken, setApifyToken] = useState('')
   const [anthropicKey, setAnthropicKey] = useState('')
@@ -72,6 +87,7 @@ export default function OrgDetailPage() {
       setBillingDay(data.billing_day ?? 10)
       setDefaultLanguage(data.default_language ?? 'zh')
       setLogoUrl(data.logo_url ?? '')
+      setLogoPreview(data.logo_url ?? '')
       setInternalNotes(data.internal_notes ?? '')
       setApifyToken(data.apify_token ?? '')
       setAnthropicKey(data.anthropic_key ?? '')
@@ -84,6 +100,33 @@ export default function OrgDetailPage() {
   }, [id])
 
   useEffect(() => { load() }, [load])
+
+  function handleNameChange(newName: string) {
+    setName(newName)
+    setSlug(generateSlug(newName))
+  }
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLogoUploading(true)
+    try {
+      const supabase = createClient()
+      const ext = file.name.split('.').pop()
+      const fileName = `org-logos/${id}-${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('logos')
+        .upload(fileName, file, { upsert: true })
+      if (uploadError) throw uploadError
+      const { data: urlData } = supabase.storage.from('logos').getPublicUrl(fileName)
+      setLogoUrl(urlData.publicUrl)
+      setLogoPreview(urlData.publicUrl)
+    } catch (err) {
+      console.error('Logo upload failed:', err)
+    } finally {
+      setLogoUploading(false)
+    }
+  }
 
   async function saveInfo() {
     setSavingInfo(true)
@@ -150,11 +193,8 @@ export default function OrgDetailPage() {
 
   async function toggleActive() {
     if (!org) return
-    if (!org.is_active) {
-      setConfirmReactivate(true)
-    } else {
-      setConfirmDeactivate(true)
-    }
+    if (!org.is_active) setConfirmReactivate(true)
+    else setConfirmDeactivate(true)
   }
 
   async function doReactivate() {
@@ -179,12 +219,22 @@ export default function OrgDetailPage() {
     if (res.ok) setOrg(prev => prev ? { ...prev, is_active: false } : prev)
   }
 
+  async function handleDeleteOrg() {
+    setDeleting(true)
+    const res = await fetch(`/api/global-admin/organizations/${id}`, { method: 'DELETE' })
+    setDeleting(false)
+    if (res.ok) {
+      router.push(`/${locale}/global-admin/organizations`)
+    } else {
+      const data = await res.json()
+      setError(data.error)
+      setShowDeleteConfirm(false)
+    }
+  }
+
   const card: React.CSSProperties = {
-    backgroundColor: colors.surface,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 10,
-    padding: '20px 24px',
-    marginBottom: 20,
+    backgroundColor: colors.surface, border: `1px solid ${colors.border}`,
+    borderRadius: 10, padding: '20px 24px', marginBottom: 20,
   }
   const inputStyle: React.CSSProperties = {
     width: '100%', backgroundColor: colors.surfaceRaised, border: `1px solid ${colors.border}`,
@@ -202,7 +252,7 @@ export default function OrgDetailPage() {
   if (error || !org) return <div style={{ color: '#EF4444', padding: 40 }}>{error ?? 'Not found'}</div>
 
   return (
-    <div style={{ maxWidth: 800 }}>
+    <div style={{ maxWidth: 800, margin: '0 auto', padding: '0 24px' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
         <button
@@ -252,22 +302,34 @@ export default function OrgDetailPage() {
               {org.leads_this_month} <span style={{ fontSize: 14, color: colors.textMuted }}>/ {!org.max_leads_per_month || org.max_leads_per_month >= 2147483647 ? '∞' : org.max_leads_per_month.toLocaleString()}</span>
             </div>
           </div>
-          <div>
-            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('openTickets')}</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: org.open_tickets_count > 0 ? '#F59E0B' : colors.textPrimary }}>
-              {org.open_tickets_count}
-            </div>
-          </div>
         </div>
       </div>
 
       {/* Info card */}
       <div style={card}>
         <h2 style={sectionTitle}>Organization Info</h2>
+
+        {/* Logo upload */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18 }}>
+          {logoPreview ? (
+            <img src={logoPreview} alt="Logo" style={{ width: 64, height: 64, borderRadius: 8, objectFit: 'cover', border: `1px solid ${colors.border}` }} />
+          ) : (
+            <div style={{ width: 64, height: 64, borderRadius: 8, backgroundColor: colors.surfaceRaised, border: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: colors.textMuted }}>
+              No logo
+            </div>
+          )}
+          <label style={{ cursor: 'pointer' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', border: `1px solid ${colors.border}`, borderRadius: 7, fontSize: 13, color: colors.textSecondary, cursor: 'pointer' }}>
+              {logoUploading ? 'Uploading...' : 'Upload Logo'}
+            </span>
+            <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
+          </label>
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
           <div>
             <label style={labelStyle}>{t('name')}</label>
-            <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
+            <input value={name} onChange={e => handleNameChange(e.target.value)} style={inputStyle} />
           </div>
           <div>
             <label style={labelStyle}>{t('slug')}</label>
@@ -284,20 +346,14 @@ export default function OrgDetailPage() {
             <input type="number" min={1} max={28} value={billingDay} onChange={e => setBillingDay(Number(e.target.value))} style={inputStyle} />
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-          <div>
-            <label style={labelStyle}>{t('defaultLanguage')}</label>
-            <select value={defaultLanguage} onChange={e => setDefaultLanguage(e.target.value)} style={inputStyle}>
-              <option value="zh">中文</option>
-              <option value="en">English</option>
-              <option value="es">Español</option>
-              <option value="vi">Tiếng Việt</option>
-            </select>
-          </div>
-          <div>
-            <label style={labelStyle}>{t('logoUrl')}</label>
-            <input value={logoUrl} onChange={e => setLogoUrl(e.target.value)} style={inputStyle} placeholder="https://..." />
-          </div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={labelStyle}>{t('defaultLanguage')}</label>
+          <select value={defaultLanguage} onChange={e => setDefaultLanguage(e.target.value)} style={inputStyle}>
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+            <option value="es">Español</option>
+            <option value="vi">Tiếng Việt</option>
+          </select>
         </div>
         <button
           onClick={saveInfo}
@@ -321,8 +377,7 @@ export default function OrgDetailPage() {
                 padding: '10px 14px', borderRadius: 8,
                 backgroundColor: isActive ? `${colors.accent}10` : colors.surfaceRaised,
                 border: `1px solid ${isActive ? colors.accent + '40' : colors.border}`,
-                transition: 'all 0.15s',
-                opacity: isToggling ? 0.6 : 1,
+                transition: 'all 0.15s', opacity: isToggling ? 0.6 : 1,
               }}>
                 <input
                   type="checkbox"
@@ -387,54 +442,100 @@ export default function OrgDetailPage() {
       {/* Danger Zone */}
       <div style={{ ...card, border: `1px solid ${colors.danger}33` }}>
         <h2 style={{ ...sectionTitle, color: colors.danger }}>Danger Zone</h2>
-        {org.is_active ? (
-          !confirmDeactivate ? (
-            <button
-              onClick={() => setConfirmDeactivate(true)}
-              style={{
-                backgroundColor: 'transparent', color: colors.danger,
-                border: `1px solid ${colors.danger}`, borderRadius: 7,
-                padding: '8px 16px', fontSize: 13, cursor: 'pointer',
-              }}
-            >
-              {t('deactivate')}
-            </button>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {org.is_active ? (
+            !confirmDeactivate ? (
+              <button
+                onClick={() => setConfirmDeactivate(true)}
+                style={{ backgroundColor: 'transparent', color: colors.danger, border: `1px solid ${colors.danger}`, borderRadius: 7, padding: '8px 16px', fontSize: 13, cursor: 'pointer' }}
+              >
+                {t('deactivate')}
+              </button>
+            ) : (
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: colors.textSecondary }}>Are you sure? This will disable the organization.</span>
+                <button onClick={doDeactivate} disabled={deactivating} style={{ backgroundColor: colors.danger, color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
+                  {deactivating ? 'Deactivating...' : 'Confirm'}
+                </button>
+                <button onClick={() => setConfirmDeactivate(false)} style={{ backgroundColor: 'transparent', color: colors.textSecondary, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
+                  {t('cancel')}
+                </button>
+              </div>
+            )
           ) : (
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <span style={{ fontSize: 13, color: colors.textSecondary }}>Are you sure? This will disable the organization.</span>
-              <button onClick={doDeactivate} disabled={deactivating} style={{ backgroundColor: colors.danger, color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
-                {deactivating ? 'Deactivating...' : 'Confirm'}
+            !confirmReactivate ? (
+              <button
+                onClick={() => setConfirmReactivate(true)}
+                style={{ backgroundColor: 'transparent', color: '#22C55E', border: '1px solid #22C55E', borderRadius: 7, padding: '8px 16px', fontSize: 13, cursor: 'pointer' }}
+              >
+                Reactivate Organization
               </button>
-              <button onClick={() => setConfirmDeactivate(false)} style={{ backgroundColor: 'transparent', color: colors.textSecondary, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
-                {t('cancel')}
-              </button>
-            </div>
-          )
-        ) : (
-          !confirmReactivate ? (
-            <button
-              onClick={() => setConfirmReactivate(true)}
-              style={{
-                backgroundColor: 'transparent', color: '#22C55E',
-                border: '1px solid #22C55E', borderRadius: 7,
-                padding: '8px 16px', fontSize: 13, cursor: 'pointer',
-              }}
-            >
-              Reactivate Organization
-            </button>
-          ) : (
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <span style={{ fontSize: 13, color: colors.textSecondary }}>Reactivate this organization? Users will be able to log in again.</span>
-              <button onClick={doReactivate} style={{ backgroundColor: '#22C55E', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
-                Confirm
-              </button>
-              <button onClick={() => setConfirmReactivate(false)} style={{ backgroundColor: 'transparent', color: colors.textSecondary, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
-                {t('cancel')}
-              </button>
-            </div>
-          )
-        )}
+            ) : (
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: colors.textSecondary }}>Reactivate this organization? Users will be able to log in again.</span>
+                <button onClick={doReactivate} style={{ backgroundColor: '#22C55E', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
+                  Confirm
+                </button>
+                <button onClick={() => setConfirmReactivate(false)} style={{ backgroundColor: 'transparent', color: colors.textSecondary, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
+                  {t('cancel')}
+                </button>
+              </div>
+            )
+          )}
+
+          <button
+            onClick={() => { setShowDeleteConfirm(true); setDeleteConfirmText('') }}
+            style={{ backgroundColor: '#EF444420', color: '#EF4444', border: '1px solid #EF4444', borderRadius: 7, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          >
+            Delete Organization
+          </button>
+        </div>
       </div>
+
+      {/* Delete Organization confirm modal */}
+      {showDeleteConfirm && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ backgroundColor: colors.surface, border: '1px solid #EF4444', borderRadius: 12, padding: 32, maxWidth: 400, width: '90%' }}>
+            <h3 style={{ color: '#EF4444', margin: '0 0 12px', fontSize: 18 }}>Delete Organization</h3>
+            <p style={{ color: colors.textSecondary, marginBottom: 16, fontSize: 14 }}>
+              This will permanently delete the organization and all associated data. This action cannot be undone.
+            </p>
+            <p style={{ color: colors.textSecondary, marginBottom: 12, fontSize: 14 }}>
+              Type <strong style={{ color: colors.textPrimary }}>{org.name}</strong> to confirm:
+            </p>
+            <input
+              value={deleteConfirmText}
+              onChange={e => setDeleteConfirmText(e.target.value)}
+              placeholder={org.name}
+              style={{
+                width: '100%', padding: '8px 12px', backgroundColor: colors.surfaceRaised,
+                border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textPrimary,
+                marginBottom: 16, fontSize: 14, boxSizing: 'border-box', outline: 'none',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{ backgroundColor: 'transparent', color: colors.textSecondary, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '8px 16px', fontSize: 13, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={deleteConfirmText !== org.name || deleting}
+                onClick={handleDeleteOrg}
+                style={{
+                  backgroundColor: deleteConfirmText === org.name ? '#EF4444' : '#EF444440',
+                  color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', fontSize: 13,
+                  fontWeight: 600, cursor: deleteConfirmText === org.name ? 'pointer' : 'not-allowed',
+                  opacity: deleting ? 0.7 : 1,
+                }}
+              >
+                {deleting ? 'Deleting...' : 'Delete permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

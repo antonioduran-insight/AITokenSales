@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
-import { X } from 'lucide-react'
 import type { Organization } from '@/lib/types'
 import { PLAN_PRICES } from '@/lib/types'
 import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
@@ -26,13 +25,6 @@ const PLAN_COLORS: Record<string, string> = {
 
 const MAX_INT = 2147483647
 
-const PLAN_DEFAULTS: Record<string, { max_seats: number; max_leads_per_month: number }> = {
-  basic:      { max_seats: 3,        max_leads_per_month: 1000 },
-  premium:    { max_seats: 10,       max_leads_per_month: 3000 },
-  enterprise: { max_seats: 15,       max_leads_per_month: 10000 },
-  ultra:      { max_seats: MAX_INT,  max_leads_per_month: MAX_INT },
-}
-
 const formatSeats = (org: EnrichedOrg) => {
   if (org.max_seats == null || org.max_seats >= MAX_INT) return '∞'
   return `${org.sdr_count ?? 0}/${org.max_seats}`
@@ -41,164 +33,6 @@ const formatSeats = (org: EnrichedOrg) => {
 const formatLeads = (org: Organization) => {
   if (org.max_leads_per_month == null || org.max_leads_per_month >= MAX_INT) return '∞'
   return org.max_leads_per_month.toLocaleString()
-}
-
-interface EditState {
-  name: string
-  plan: string
-  max_seats: number | ''
-  max_leads_per_month: number | ''
-  billing_day: number | ''
-  custom_price: number | ''
-  vendor: string
-  is_active: boolean
-  internal_notes: string
-}
-
-function EditModal({ org, onClose, onSaved, colors }: {
-  org: Organization
-  onClose: () => void
-  onSaved: (updated: Organization) => void
-  colors: ReturnType<typeof useGlobalAdminTheme>['colors']
-}) {
-  const [form, setForm] = useState<EditState>({
-    name: org.name,
-    plan: org.plan,
-    max_seats: org.max_seats ?? '',
-    max_leads_per_month: org.max_leads_per_month ?? '',
-    billing_day: org.billing_day ?? 10,
-    custom_price: org.custom_price ?? '',
-    vendor: org.vendor ?? '',
-    is_active: org.is_active,
-    internal_notes: org.internal_notes ?? '',
-  })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%', backgroundColor: colors.surfaceRaised, border: `1px solid ${colors.border}`,
-    borderRadius: 7, color: colors.textPrimary, padding: '8px 12px', fontSize: 13,
-    outline: 'none', boxSizing: 'border-box',
-  }
-  const labelStyle: React.CSSProperties = {
-    fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5, display: 'block',
-  }
-
-  function set<K extends keyof EditState>(key: K, value: EditState[K]) {
-    setForm(prev => {
-      const next = { ...prev, [key]: value }
-      if (key === 'plan') {
-        const defaults = PLAN_DEFAULTS[value as string]
-        if (defaults) {
-          next.max_seats = defaults.max_seats
-          next.max_leads_per_month = defaults.max_leads_per_month
-        }
-      }
-      return next
-    })
-  }
-
-  async function save() {
-    setSaving(true); setError(null)
-    const res = await fetch('/api/global-admin/organizations', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: org.id,
-        name: form.name.trim(),
-        plan: form.plan,
-        max_seats: form.max_seats === '' ? null : Number(form.max_seats),
-        max_leads_per_month: form.max_leads_per_month === '' ? null : Number(form.max_leads_per_month),
-        billing_day: form.billing_day === '' ? 1 : Number(form.billing_day),
-        custom_price: form.custom_price === '' ? null : Number(form.custom_price),
-        vendor: form.vendor.trim() || null,
-        is_active: form.is_active,
-        internal_notes: form.internal_notes.trim() || null,
-      }),
-    })
-    const data = await res.json()
-    if (!res.ok) { setError(data.error); setSaving(false); return }
-    onSaved(data as Organization)
-    onClose()
-  }
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}>
-      <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 28, width: 560, maxWidth: '94vw', maxHeight: '90vh', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-          <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: colors.textPrimary }}>Edit Organization</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted }}><X size={17} /></button>
-        </div>
-
-        <div style={{ marginBottom: 14 }}>
-          <label style={labelStyle}>Name</label>
-          <input value={form.name} onChange={e => set('name', e.target.value)} style={inputStyle} />
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-          <div>
-            <label style={labelStyle}>Plan</label>
-            <select value={form.plan} onChange={e => set('plan', e.target.value)} style={inputStyle}>
-              <option value="basic">Basic</option>
-              <option value="premium">Premium</option>
-              <option value="enterprise">Enterprise</option>
-              <option value="ultra">Ultra</option>
-            </select>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-            <label style={{ ...labelStyle, marginBottom: 10 }}>Status</label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: form.is_active ? '#22C55E' : colors.textMuted }}>
-              <input type="checkbox" checked={form.is_active} onChange={e => set('is_active', e.target.checked)}
-                style={{ width: 16, height: 16, accentColor: colors.accent, cursor: 'pointer' }} />
-              {form.is_active ? 'Active' : 'Inactive'}
-            </label>
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-          <div>
-            <label style={labelStyle}>Max Seats</label>
-            <input type="number" min={1} value={form.max_seats} onChange={e => set('max_seats', e.target.value === '' ? '' : Number(e.target.value))} style={inputStyle} placeholder="e.g. 5" />
-          </div>
-          <div>
-            <label style={labelStyle}>Max Leads / Month</label>
-            <input type="number" min={0} value={form.max_leads_per_month} onChange={e => set('max_leads_per_month', e.target.value === '' ? '' : Number(e.target.value))} style={inputStyle} placeholder="blank = unlimited" />
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-          <div>
-            <label style={labelStyle}>Billing Day</label>
-            <input type="number" min={1} max={28} value={form.billing_day} onChange={e => set('billing_day', e.target.value === '' ? '' : Number(e.target.value))} style={inputStyle} />
-          </div>
-          <div>
-            <label style={labelStyle}>Custom Price ($/mo) — Enterprise only</label>
-            <input type="number" min={0} value={form.custom_price} onChange={e => set('custom_price', e.target.value === '' ? '' : Number(e.target.value))} style={inputStyle} placeholder="e.g. 4000" />
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 14 }}>
-          <label style={labelStyle}>Vendor</label>
-          <input value={form.vendor} onChange={e => set('vendor', e.target.value)} style={inputStyle} placeholder="e.g. Partner Name" />
-        </div>
-
-        <div style={{ marginBottom: 14 }}>
-          <label style={labelStyle}>Internal Notes</label>
-          <textarea value={form.internal_notes} onChange={e => set('internal_notes', e.target.value)} rows={3}
-            style={{ ...inputStyle, resize: 'vertical' }} placeholder="Internal notes (not visible to org)" />
-        </div>
-
-        {error && <p style={{ color: '#EF4444', fontSize: 12, marginBottom: 12 }}>{error}</p>}
-
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={save} disabled={saving} style={{ backgroundColor: colors.accent, color: '#fff', border: 'none', borderRadius: 7, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer', flex: 1, opacity: saving ? 0.6 : 1 }}>
-            {saving ? 'Saving…' : 'Save Changes'}
-          </button>
-          <button onClick={onClose} style={{ backgroundColor: 'transparent', color: colors.textSecondary, border: `1px solid ${colors.border}`, borderRadius: 7, padding: '9px 20px', fontSize: 13, cursor: 'pointer', flex: 1 }}>Cancel</button>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 export default function OrganizationsPage() {
@@ -212,7 +46,6 @@ export default function OrganizationsPage() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterVendor, setFilterVendor] = useState('all')
   const [impersonating, setImpersonating] = useState<string | null>(null)
-  const [editingOrg, setEditingOrg] = useState<Organization | null>(null)
 
   useEffect(() => {
     fetch('/api/global-admin/organizations')
@@ -236,38 +69,20 @@ export default function OrganizationsPage() {
     router.push(`/${locale}/kanban?impersonate_org_id=${org.id}&impersonate_org_name=${encodeURIComponent(org.name)}`)
   }
 
-  function handleSaved(updated: Organization) {
-    setOrgs(prev => prev.map(o => o.id === updated.id ? { ...o, ...updated } : o))
-  }
-
   const selectStyle: React.CSSProperties = {
-    backgroundColor: colors.surfaceRaised,
-    border: `1px solid ${colors.border}`,
-    color: colors.textPrimary,
-    borderRadius: 6,
-    padding: '6px 10px',
-    fontSize: 13,
-    cursor: 'pointer',
+    backgroundColor: colors.surfaceRaised, border: `1px solid ${colors.border}`,
+    color: colors.textPrimary, borderRadius: 6, padding: '6px 10px', fontSize: 13, cursor: 'pointer',
   }
 
   const thStyle: React.CSSProperties = {
-    padding: '10px 14px',
-    textAlign: 'left',
-    fontSize: 11,
-    fontWeight: 600,
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-    borderBottom: `1px solid ${colors.border}`,
-    whiteSpace: 'nowrap',
+    padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600,
+    color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em',
+    borderBottom: `1px solid ${colors.border}`, whiteSpace: 'nowrap',
   }
 
   const tdStyle: React.CSSProperties = {
-    padding: '12px 14px',
-    fontSize: 13,
-    color: colors.textPrimary,
-    borderBottom: `1px solid ${colors.surfaceRaised}`,
-    verticalAlign: 'middle',
+    padding: '12px 14px', fontSize: 13, color: colors.textPrimary,
+    borderBottom: `1px solid ${colors.surfaceRaised}`, verticalAlign: 'middle',
   }
 
   return (
@@ -276,16 +91,7 @@ export default function OrganizationsPage() {
         <h1 style={{ fontSize: 22, fontWeight: 700, color: colors.textPrimary, margin: 0 }}>{t('organizations')}</h1>
         <a
           href={`/${locale}/global-admin/organizations/new`}
-          style={{
-            backgroundColor: colors.accent,
-            color: '#fff',
-            borderRadius: 8,
-            padding: '8px 16px',
-            fontSize: 13,
-            fontWeight: 600,
-            textDecoration: 'none',
-            display: 'inline-block',
-          }}
+          style={{ backgroundColor: colors.accent, color: '#fff', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, textDecoration: 'none', display: 'inline-block' }}
         >
           + {t('newOrganization')}
         </a>
@@ -347,9 +153,7 @@ export default function OrganizationsPage() {
                           width: 28, height: 28, borderRadius: 6,
                           backgroundColor: (PLAN_COLORS[org.plan] ?? colors.accent) + '22',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 12, fontWeight: 700,
-                          color: PLAN_COLORS[org.plan] ?? colors.accent,
-                          flexShrink: 0,
+                          fontSize: 12, fontWeight: 700, color: PLAN_COLORS[org.plan] ?? colors.accent, flexShrink: 0,
                         }}>
                           {org.name.charAt(0).toUpperCase()}
                         </div>
@@ -361,11 +165,7 @@ export default function OrganizationsPage() {
                         backgroundColor: (PLAN_COLORS[org.plan] ?? colors.accent) + '22',
                         color: PLAN_COLORS[org.plan] ?? colors.accent,
                         border: `1px solid ${(PLAN_COLORS[org.plan] ?? colors.accent)}44`,
-                        borderRadius: 4,
-                        padding: '2px 8px',
-                        fontSize: 11,
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
+                        borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
                       }}>
                         {org.plan}
                       </span>
@@ -385,48 +185,25 @@ export default function OrganizationsPage() {
                     </td>
                     <td style={tdStyle}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <div style={{
-                          width: 7, height: 7, borderRadius: '50%',
-                          backgroundColor: org.is_active ? '#22C55E' : colors.textMuted,
-                        }} />
+                        <div style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: org.is_active ? '#22C55E' : colors.textMuted }} />
                         <span style={{ color: org.is_active ? '#22C55E' : colors.textMuted, fontSize: 12 }}>
                           {org.is_active ? t('active') : t('inactive')}
                         </span>
                       </div>
                     </td>
                     <td style={{ ...tdStyle, whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button
-                          onClick={() => handleImpersonate(org)}
-                          disabled={impersonating === org.id}
-                          style={{
-                            backgroundColor: colors.accent + '22',
-                            color: '#A78BFA',
-                            border: `1px solid ${colors.accent}44`,
-                            borderRadius: 5,
-                            padding: '4px 10px',
-                            fontSize: 12,
-                            cursor: 'pointer',
-                            opacity: impersonating === org.id ? 0.5 : 1,
-                          }}
-                        >
-                          {impersonating === org.id ? '…' : t('impersonate')}
-                        </button>
-                        <button
-                          onClick={() => setEditingOrg(org)}
-                          style={{
-                            backgroundColor: colors.surfaceRaised,
-                            color: colors.textSecondary,
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: 5,
-                            padding: '4px 10px',
-                            fontSize: 12,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {t('edit')}
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleImpersonate(org)}
+                        disabled={impersonating === org.id}
+                        style={{
+                          backgroundColor: colors.accent + '22', color: '#A78BFA',
+                          border: `1px solid ${colors.accent}44`, borderRadius: 5,
+                          padding: '4px 10px', fontSize: 12, cursor: 'pointer',
+                          opacity: impersonating === org.id ? 0.5 : 1,
+                        }}
+                      >
+                        {impersonating === org.id ? '…' : t('impersonate')}
+                      </button>
                     </td>
                   </tr>
                 )
@@ -434,15 +211,6 @@ export default function OrganizationsPage() {
             </tbody>
           </table>
         </div>
-      )}
-
-      {editingOrg && (
-        <EditModal
-          org={editingOrg}
-          onClose={() => setEditingOrg(null)}
-          onSaved={handleSaved}
-          colors={colors}
-        />
       )}
     </div>
   )

@@ -2,7 +2,6 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
-import { useEffect, useState } from 'react'
 import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
 import { Sun, Moon, LogOut } from 'lucide-react'
 
@@ -11,20 +10,11 @@ export function GlobalAdminNavbar() {
   const router = useRouter()
   const locale = useLocale()
   const { colors, theme, toggleTheme, lang, setLang, t } = useGlobalAdminTheme()
-  const [ticketCount, setTicketCount] = useState(0)
-
-  useEffect(() => {
-    fetch('/api/global-admin/tickets/count')
-      .then(r => r.json())
-      .then(d => setTicketCount(d.count ?? 0))
-      .catch(() => {})
-  }, [])
 
   const navItems = [
     { href: '/global-admin/organizations', label: t('organizations') },
     { href: '/global-admin/revenue', label: t('revenue') },
     { href: '/global-admin/vendors', label: t('vendors') },
-    { href: '/global-admin/support', label: t('support'), badge: ticketCount },
   ]
 
   async function handleLogout() {
@@ -65,12 +55,6 @@ export function GlobalAdminNavbar() {
               borderBottom: isActive ? `2px solid ${colors.accent}` : '2px solid transparent',
             }}>
               {item.label}
-              {item.badge != null && item.badge > 0 && (
-                <span style={{ backgroundColor: '#EF4444', color: '#fff',
-                  borderRadius: 10, padding: '1px 6px', fontSize: 11, fontWeight: 700 }}>
-                  {item.badge}
-                </span>
-              )}
             </Link>
           )
         })}
