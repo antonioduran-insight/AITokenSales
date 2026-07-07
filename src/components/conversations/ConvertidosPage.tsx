@@ -357,7 +357,7 @@ export function ConvertidosPage() {
                 <textarea
                   value={reason}
                   onChange={e => setReason(e.target.value.slice(0, 200))}
-                  placeholder="Contexto adicional..."
+                  placeholder="Additional context..."
                   rows={2}
                   style={S.textarea}
                 />
@@ -368,11 +368,11 @@ export function ConvertidosPage() {
             )}
 
             <div style={{ marginBottom: 20 }}>
-              <label style={S.label}>Chat completo <span style={{ color: '#EF4444' }}>*</span></label>
+              <label style={S.label}>Full conversation <span style={{ color: '#EF4444' }}>*</span></label>
               <textarea
                 value={chatContent}
                 onChange={e => setChatContent(e.target.value)}
-                placeholder="Pegá aquí la conversación completa..."
+                placeholder="Paste the full conversation here..."
                 rows={12}
                 style={S.textarea}
               />

@@ -177,36 +177,34 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
         )}
 
         {/* Header */}
-        <div style={{ padding: '20px 24px 0', borderBottom: '1px solid var(--crm-border)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <button
-                  onClick={toggleFlag}
-                  disabled={isImpersonating}
-                  style={{ background: 'none', border: 'none', cursor: isImpersonating ? 'default' : 'pointer', padding: 0, opacity: isImpersonating ? 0.4 : 1, display: 'flex', alignItems: 'center' }}
-                  title={t('common.flagTomorrow')}
-                >
-                  <Star size={15} fill={prospect.flag_tomorrow ? '#F59E0B' : 'none'} stroke={prospect.flag_tomorrow ? '#F59E0B' : 'var(--crm-text-muted)'} />
-                </button>
-                <h2 style={{ color: 'var(--crm-text-primary)', fontSize: 18, fontWeight: 700, margin: 0 }}>
-                  {prospect.name}
-                </h2>
-                {prospect.area && <AreaBadge area={prospect.area} size="md" />}
-              </div>
-              {prospect.company && (
-                <p style={{ color: 'var(--crm-text-secondary)', fontSize: 13, margin: 0 }}>
-                  {prospect.title && <span>{prospect.title} · </span>}
-                  {prospect.company}
-                </p>
-              )}
+        <div style={{ padding: '20px 24px 0', borderBottom: '1px solid var(--crm-border)', flexShrink: 0, position: 'relative' }}>
+          <button
+            onClick={onClose}
+            style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', padding: 4, display: 'flex', alignItems: 'center', zIndex: 1 }}
+          >
+            <X size={18} />
+          </button>
+          <div style={{ marginBottom: 14, paddingRight: 32 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <button
+                onClick={toggleFlag}
+                disabled={isImpersonating}
+                style={{ background: 'none', border: 'none', cursor: isImpersonating ? 'default' : 'pointer', padding: 0, opacity: isImpersonating ? 0.4 : 1, display: 'flex', alignItems: 'center', flexShrink: 0 }}
+                title={t('common.flagTomorrow')}
+              >
+                <Star size={15} fill={prospect.flag_tomorrow ? '#F59E0B' : 'none'} stroke={prospect.flag_tomorrow ? '#F59E0B' : 'var(--crm-text-muted)'} />
+              </button>
+              <h2 style={{ color: 'var(--crm-text-primary)', fontSize: 18, fontWeight: 700, margin: 0 }}>
+                {prospect.name}
+              </h2>
+              {prospect.area && <AreaBadge area={prospect.area} size="md" />}
             </div>
-            <button
-              onClick={onClose}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', padding: 4, display: 'flex', alignItems: 'center', flexShrink: 0 }}
-            >
-              <X size={18} />
-            </button>
+            {prospect.company && (
+              <p style={{ color: 'var(--crm-text-secondary)', fontSize: 13, margin: 0 }}>
+                {prospect.title && <span>{prospect.title} · </span>}
+                {prospect.company}
+              </p>
+            )}
           </div>
 
           {/* Tabs */}

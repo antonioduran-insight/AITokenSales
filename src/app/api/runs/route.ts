@@ -68,23 +68,47 @@ export async function POST(req: NextRequest) {
 
     // Build SDR assignments
     const isBasic = org.plan === 'basic'
-    let sdrAssignments: { sdr_id: string; sender_profile_id: string | null }[] = []
+    let sdrAssignments: { sdr_id: string; sender_profile_id: string | null; years_experience?: number | null; seniority?: string | null; expertise_area?: string | null }[] = []
 
     if (sdr_ids?.length > 0 && !isBasic) {
       for (const sdrId of sdr_ids as string[]) {
-        const { data: profile } = await supabase
-          .from('sender_profiles')
-          .select('id')
-          .eq('user_id', sdrId)
-          .eq('organization_id', userData.organization_id)
-          .eq('is_default', true)
-          .eq('is_active', true)
-          .maybeSingle()
+        const [{ data: profile }, { data: sdrCtx }] = await Promise.all([
+          supabase
+            .from('sender_profiles')
+            .select('id')
+            .eq('user_id', sdrId)
+            .eq('organization_id', userData.organization_id)
+            .eq('is_default', true)
+            .eq('is_active', true)
+            .maybeSingle(),
+          supabase
+            .from('users')
+            .select('years_experience, seniority, expertise_area')
+            .eq('id', sdrId)
+            .single(),
+        ])
 
-        sdrAssignments.push({ sdr_id: sdrId, sender_profile_id: profile?.id ?? null })
+        sdrAssignments.push({
+          sdr_id: sdrId,
+          sender_profile_id: profile?.id ?? null,
+          years_experience: sdrCtx?.years_experience ?? null,
+          seniority: sdrCtx?.seniority ?? null,
+          expertise_area: sdrCtx?.expertise_area ?? null,
+        })
       }
     } else {
-      sdrAssignments = [{ sdr_id: user.id, sender_profile_id: null }]
+      const { data: selfCtx } = await supabase
+        .from('users')
+        .select('years_experience, seniority, expertise_area')
+        .eq('id', user.id)
+        .single()
+      sdrAssignments = [{
+        sdr_id: user.id,
+        sender_profile_id: null,
+        years_experience: selfCtx?.years_experience ?? null,
+        seniority: selfCtx?.seniority ?? null,
+        expertise_area: selfCtx?.expertise_area ?? null,
+      }]
     }
 
     const admin = adminClient()

@@ -47,6 +47,9 @@ export interface User {
   is_active: boolean
   scraper_access: boolean
   created_at: string
+  years_experience?: number | null
+  seniority?: string | null
+  expertise_area?: string | null
   // Joined
   area?: Area
 }

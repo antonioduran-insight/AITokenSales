@@ -180,7 +180,7 @@ export async function PATCH(req: NextRequest) {
   )
 
   if (action === 'edit') {
-    const { full_name, role, area_ids } = body
+    const { full_name, role, area_ids, years_experience, seniority, expertise_area } = body
     const updates: Record<string, unknown> = {}
     if (full_name) updates.full_name = full_name.trim()
     if (role === 'admin' || role === 'sdr') updates.role = role
@@ -188,6 +188,9 @@ export async function PATCH(req: NextRequest) {
       if (area_ids.length > 0) updates.area_id = area_ids[0]
       else updates.area_id = null
     }
+    if (years_experience !== undefined) updates.years_experience = years_experience
+    if (seniority !== undefined) updates.seniority = seniority || null
+    if (expertise_area !== undefined) updates.expertise_area = expertise_area ? expertise_area.trim() : null
 
     const { error: updateErr } = await adminClient.from('users').update(updates).eq('id', id)
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 400 })
