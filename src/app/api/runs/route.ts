@@ -41,11 +41,13 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { combos, market, total_leads, sdr_ids } = body
+    const { combos, market, markets, total_leads, sdr_ids, sdr_market_assignments } = body
 
-    if (!combos?.length || !market || !total_leads) {
-      return NextResponse.json({ error: 'combos, market and total_leads are required' }, { status: 400 })
+    if (!combos?.length || !total_leads) {
+      return NextResponse.json({ error: 'combos and total_leads are required' }, { status: 400 })
     }
+    const primaryMarket: string = markets?.[0] ?? market ?? 'global'
+    const allMarkets: string[] = markets?.length ? markets : (market ? [market] : [])
 
     // Monthly lead limit check
     const currentMonth = new Date().toISOString().slice(0, 7)
@@ -120,7 +122,8 @@ export async function POST(req: NextRequest) {
         organization_id: userData.organization_id,
         executed_by: user.id,
         combos,
-        market,
+        market: primaryMarket,
+        markets: allMarkets,
         total_leads_requested: total_leads,
         sdr_count: sdrAssignments.length,
         plan: org.plan,
@@ -136,7 +139,12 @@ export async function POST(req: NextRequest) {
     // Create SDR assignment records
     if (sdrAssignments.length > 0) {
       await admin.from('run_sdr_assignments').insert(
-        sdrAssignments.map(a => ({ run_id: run.id, sdr_id: a.sdr_id, sender_profile_id: a.sender_profile_id }))
+        sdrAssignments.map(a => ({
+          run_id: run.id,
+          sdr_id: a.sdr_id,
+          sender_profile_id: a.sender_profile_id,
+          assigned_markets: sdr_market_assignments?.[a.sdr_id] ?? [],
+        }))
       )
     }
 
@@ -149,10 +157,12 @@ export async function POST(req: NextRequest) {
           run_id: run.id,
           organization_id: userData.organization_id,
           plan: org.plan,
-          market,
+          market: primaryMarket,
+          markets: allMarkets,
           combos,
           total_leads,
           sdr_assignments: sdrAssignments,
+          sdr_market_assignments: sdr_market_assignments ?? {},
           apify_token: org.apify_token,
           anthropic_key: org.anthropic_key,
         }),

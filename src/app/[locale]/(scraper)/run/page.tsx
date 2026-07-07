@@ -1,497 +1,435 @@
-'use client';
+'use client'
 
-import { useState, useEffect, useRef } from 'react';
-import { Link } from '@/i18n/navigation';
-import { scraperApi, type Run, type RunLog, type RunStatus } from '@/lib/scraper-api';
-import { createLogSocket } from '@/lib/scraper-websocket';
-import { StatusBadge } from '@/components/scraper/StatusBadge';
-import { TemperatureBadge } from '@/components/scraper/TemperatureBadge';
-import { ICPScore } from '@/components/scraper/ICPScore';
-import { Play, ChevronLeft, AlertCircle, Search, BarChart2, MessageSquare, XCircle, DatabaseZap, CheckCircle2 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
-import { useUser } from '@/contexts/UserContext';
-import type { Area, User, ScraperComboMaster } from '@/lib/types';
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useLocale } from 'next-intl'
+import { Link } from '@/i18n/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { useUser } from '@/contexts/UserContext'
+import { Play, AlertCircle, AlertTriangle } from 'lucide-react'
+import type { Area, User, ScraperComboMaster, SenderProfile } from '@/lib/types'
 
-const MARKETS = ['Taiwan', 'LATAM', 'Vietnam'];
-const LEAD_OPTIONS = [100, 200, 300, 400, 500];
-const ACTIVE_STATUSES: RunStatus[] = ['pending', 'running', 'scoring', 'drafting'];
-
-type Step = 'form' | 'running' | 'result' | 'error';
-
-interface LeadRow { id: string; full_name?: string; company?: string; title?: string; icp_score?: number; temperature?: 'HOT' | 'WARM' | 'COLD'; custom1?: string; }
-
-const PHASE_INFO: Partial<Record<RunStatus, { title: string; icon: React.ReactNode; progress: number }>> = {
-  pending:  { title: 'Starting pipeline...',   icon: <Search size={28} />,       progress: 5 },
-  running:  { title: 'Scraping LinkedIn...',   icon: <Search size={28} />,       progress: 33 },
-  scoring:  { title: 'Scoring leads...',       icon: <BarChart2 size={28} />,    progress: 66 },
-  drafting: { title: 'Generating messages...', icon: <MessageSquare size={28} />, progress: 90 },
-};
-
-const S: Record<string, React.CSSProperties> = {
-  page:         { padding: '24px', color: 'var(--crm-text-primary)', maxWidth: 580 },
-  card:         { backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: '20px 24px' },
-  sectionLabel: { fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.06em', display: 'block', marginBottom: 10 },
-};
-
-function comboBtn(active: boolean): React.CSSProperties {
-  return {
-    padding: '8px 12px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'all .15s',
-    border: `1px solid ${active ? 'var(--crm-accent)' : 'var(--crm-border)'}`,
-    backgroundColor: active ? '#6C63FF20' : 'var(--crm-surface-raised)',
-    color: active ? 'var(--crm-accent)' : 'var(--crm-text-secondary)',
-    textAlign: 'left' as const,
-  };
+const MARKETS = ['Taiwan', 'LATAM', 'Vietnam', 'Global']
+const LEAD_OPTIONS = [100, 200, 300, 400, 500]
+const MAX_INT = 2147483647
+const PLAN_LIMITS: Record<string, number> = {
+  basic: 1000,
+  premium: 3000,
+  enterprise: 10000,
+  ultra: MAX_INT,
 }
 
-function chipBtn(active: boolean): React.CSSProperties {
+interface SdrWithAreas extends User {
+  user_areas: Array<{ area: Area }>
+}
+
+function getSdrMarkets(sdr: SdrWithAreas): string[] {
+  return (sdr.user_areas ?? []).map(ua => ua.area.label_en)
+}
+
+function computeDistribution(
+  selectedSdrIds: string[],
+  selectedMarkets: string[],
+  totalLeads: number,
+  sdrs: SdrWithAreas[]
+): Record<string, number> {
+  if (!selectedSdrIds.length || !selectedMarkets.length || !totalLeads) return {}
+  const leadsPerMarket = Math.floor(totalLeads / selectedMarkets.length)
+  const totals: Record<string, number> = {}
+  for (const market of selectedMarkets) {
+    const inMarket = selectedSdrIds.filter(id => {
+      const sdr = sdrs.find(s => s.id === id)
+      return sdr && getSdrMarkets(sdr).includes(market)
+    })
+    if (!inMarket.length) continue
+    const perSdr = Math.floor(leadsPerMarket / inMarket.length)
+    for (const id of inMarket) totals[id] = (totals[id] ?? 0) + perSdr
+  }
+  return totals
+}
+
+const S: Record<string, React.CSSProperties> = {
+  page:  { padding: '24px', color: 'var(--crm-text-primary)', maxWidth: 720 },
+  card:  { backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: '20px 24px' },
+  label: { fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.06em', display: 'block', marginBottom: 12 },
+}
+
+function chipBtn(active: boolean, disabled = false): React.CSSProperties {
   return {
-    padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer',
+    padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+    cursor: disabled ? 'not-allowed' : 'pointer',
     border: `1px solid ${active ? 'var(--crm-accent)' : 'var(--crm-border)'}`,
     backgroundColor: active ? 'var(--crm-accent)' : 'var(--crm-surface-raised)',
-    color: active ? '#FFF' : 'var(--crm-text-secondary)',
-  };
+    color: active ? '#FFF' : disabled ? 'var(--crm-text-muted)' : 'var(--crm-text-secondary)',
+    opacity: disabled ? 0.4 : 1,
+    transition: 'all .15s',
+  }
 }
 
 export default function RunPage() {
-  const { user, orgPlan } = useUser();
-  const isAdmin = user?.role === 'admin';
+  const { user, orgPlan } = useUser()
+  const isAdmin = user?.role === 'admin'
+  const router = useRouter()
+  const locale = useLocale()
 
-  const [step, setStep] = useState<Step>('form');
-  const [activeCombos, setActiveCombos] = useState<ScraperComboMaster[]>([]);
-  const [combosLoading, setCombosLoading] = useState(true);
-  const [selectedCombos, setSelectedCombos] = useState<string[]>([]);
-  const [market, setMarket] = useState('Taiwan');
-  const [totalLeads, setTotalLeads] = useState(200);
-  const [selectedSdrIds, setSelectedSdrIds] = useState<string[]>([]);
-  const [sdrs, setSdrs] = useState<User[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [selectedMarkets, setSelectedMarkets] = useState<string[]>([])
+  const [activeCombos, setActiveCombos] = useState<ScraperComboMaster[]>([])
+  const [combosLoading, setCombosLoading] = useState(true)
+  const [selectedCombos, setSelectedCombos] = useState<string[]>([])
+  const [totalLeads, setTotalLeads] = useState<number | null>(null)
+  const [sdrs, setSdrs] = useState<SdrWithAreas[]>([])
+  const [selectedSdrIds, setSelectedSdrIds] = useState<string[]>([])
+  const [senderProfiles, setSenderProfiles] = useState<Record<string, SenderProfile>>({})
+  const [monthlyUsed, setMonthlyUsed] = useState(0)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const [runId, setRunId] = useState<string | null>(null);
-  const [runStatus, setRunStatus] = useState<RunStatus>('pending');
-  const [leadCount, setLeadCount] = useState(0);
-  const [cancelling, setCancelling] = useState(false);
-  const [cancelConfirm, setCancelConfirm] = useState(false);
+  // Derived state
+  const showSdrSection = isAdmin && orgPlan !== 'basic' && selectedMarkets.length > 0
+  const maxLeads = PLAN_LIMITS[orgPlan ?? 'basic'] ?? 1000
+  const available = maxLeads >= MAX_INT ? MAX_INT : Math.max(0, maxLeads - monthlyUsed)
+  const leadsPerCombo = selectedCombos.length > 0 && totalLeads ? Math.floor(totalLeads / selectedCombos.length) : 0
+  const distribution = computeDistribution(selectedSdrIds, selectedMarkets, totalLeads ?? 0, sdrs)
 
-  const [run, setRun] = useState<Run | null>(null);
-  const [leads, setLeads] = useState<LeadRow[]>([]);
-  const wsRef = useRef<WebSocket | null>(null);
+  const canRun = (
+    selectedMarkets.length > 0 &&
+    selectedCombos.length > 0 &&
+    totalLeads !== null && totalLeads > 0 &&
+    (!showSdrSection || selectedSdrIds.length > 0) &&
+    (available >= MAX_INT || available >= (totalLeads ?? 0))
+  )
 
-  const [areas, setAreas] = useState<Area[]>([]);
-  const [crmAreaId, setCrmAreaId] = useState('');
-  const [crmSdrId, setCrmSdrId] = useState('');
-  const [crmLoading, setCrmLoading] = useState(false);
-  const [crmResult, setCrmResult] = useState<{ imported: number; duplicates: number; no_name: number } | null>(null);
-  const [crmError, setCrmError] = useState<string | null>(null);
-  const [showCrmForm, setShowCrmForm] = useState(false);
-
-  const showSdrSection = isAdmin && orgPlan !== 'basic';
-  const leadsPerCombo = selectedCombos.length > 0 ? Math.floor(totalLeads / selectedCombos.length) : 0;
-
+  // Load combos
   useEffect(() => {
     fetch('/api/scraper-combos')
       .then(r => r.json())
-      .then((data: ScraperComboMaster[]) => {
-        const active = data.filter(c => c.org_active);
-        setActiveCombos(active);
-        setSelectedCombos(active.slice(0, 2).map(c => c.code));
-      })
+      .then((data: ScraperComboMaster[]) => setActiveCombos(data.filter(c => c.org_active)))
       .catch(() => {})
-      .finally(() => setCombosLoading(false));
+      .finally(() => setCombosLoading(false))
+  }, [])
 
-    const supabase = createClient();
-    supabase.from('areas').select('*').then(({ data }) => { if (data) setAreas(data as Area[]) });
-  }, []);
-
+  // Load monthly usage (admin only; SDRs can't read this table)
   useEffect(() => {
-    if (!showSdrSection) return;
-    const supabase = createClient();
-    supabase
+    if (!isAdmin || !user?.organization_id) return
+    const ym = new Date().toISOString().slice(0, 7)
+    createClient()
+      .from('monthly_lead_counts')
+      .select('count')
+      .eq('organization_id', user.organization_id)
+      .eq('year_month', ym)
+      .maybeSingle()
+      .then(({ data }) => { if (data) setMonthlyUsed(data.count) })
+  }, [isAdmin, user?.organization_id])
+
+  // Load SDRs with their areas
+  useEffect(() => {
+    if (!showSdrSection) { setSdrs([]); return }
+    createClient()
       .from('users')
-      .select('*')
+      .select('*, user_areas(area:areas(*))')
       .eq('role', 'sdr')
       .eq('is_active', true)
       .eq('scraper_access', true)
-      .then(({ data }) => { if (data) setSdrs(data as User[]) });
-  }, [showSdrSection]);
+      .then(({ data }) => { if (data) setSdrs(data as SdrWithAreas[]) })
+  }, [showSdrSection])
 
-  const handleImportToCRM = async () => {
-    if (!crmAreaId || !runId) return;
-    setCrmLoading(true); setCrmError(null); setCrmResult(null);
-    try {
-      const res = await fetch('/api/scraper/to-crm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ run_id: runId, area_id: crmAreaId, assigned_to: crmSdrId || undefined }),
-      });
-      const data = await res.json();
-      if (!res.ok) setCrmError(data.error ?? 'Error al importar');
-      else { setCrmResult(data); setShowCrmForm(false); }
-    } catch (e) {
-      setCrmError(String(e));
-    } finally { setCrmLoading(false); }
-  };
+  // Load sender profiles (premium+ admin only)
+  useEffect(() => {
+    if (!isAdmin || orgPlan === 'basic') return
+    fetch('/api/sender-profiles')
+      .then(r => r.json())
+      .then((profiles: SenderProfile[]) => {
+        const map: Record<string, SenderProfile> = {}
+        profiles.filter(p => p.is_default && p.is_active).forEach(p => { map[p.user_id] = p })
+        setSenderProfiles(map)
+      })
+      .catch(() => {})
+  }, [isAdmin, orgPlan])
 
-  const toggleCombo = (code: string) =>
-    setSelectedCombos(prev => prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]);
+  // Deselect SDRs who no longer match selected markets
+  useEffect(() => {
+    if (!sdrs.length) return
+    setSelectedSdrIds(prev => prev.filter(id => {
+      const sdr = sdrs.find(s => s.id === id)
+      return sdr && getSdrMarkets(sdr).some(m => selectedMarkets.includes(m))
+    }))
+  }, [selectedMarkets, sdrs])
 
-  const toggleSdr = (id: string) =>
-    setSelectedSdrIds(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
+  function toggleMarket(m: string) {
+    setSelectedMarkets(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m])
+    setSubmitError(null)
+  }
 
-  const handleSubmit = async () => {
-    if (!selectedCombos.length) return;
-    setSubmitting(true);
-    setSubmitError(null);
+  function toggleCombo(code: string) {
+    setSelectedCombos(prev => prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code])
+    setSubmitError(null)
+  }
+
+  function toggleSdr(id: string) {
+    setSelectedSdrIds(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id])
+  }
+
+  async function handleSubmit() {
+    if (!canRun || submitting) return
+    setSubmitting(true)
+    setSubmitError(null)
+
+    const sdrMarketAssignments: Record<string, string[]> = {}
+    for (const sdrId of selectedSdrIds) {
+      const sdr = sdrs.find(s => s.id === sdrId)
+      if (!sdr) continue
+      sdrMarketAssignments[sdrId] = getSdrMarkets(sdr)
+        .filter(m => selectedMarkets.includes(m))
+        .map(m => m.toLowerCase())
+    }
+
     try {
       const res = await fetch('/api/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           combos: selectedCombos,
-          market,
+          market: selectedMarkets[0] ?? 'global',
+          markets: selectedMarkets,
           total_leads: totalLeads,
           sdr_ids: selectedSdrIds,
+          sdr_market_assignments: sdrMarketAssignments,
         }),
-      });
-      const data = await res.json();
+      })
+      const data = await res.json()
       if (!res.ok) {
-        const errMsg = typeof data.error === 'string' ? data.error : JSON.stringify(data);
-        setSubmitError(errMsg);
-        return;
+        setSubmitError(typeof data.error === 'string' ? data.error : JSON.stringify(data))
+        return
       }
-      setRunId(data.run_id);
-      setRunStatus('pending');
-      setLeadCount(0);
-      setStep('running');
-
-      const ws = createLogSocket(
-        data.run_id,
-        (log: RunLog) => { const m = log.message.match(/\b(\d+)\s+lead/i); if (m) setLeadCount(parseInt(m[1])); },
-        async (status: string) => {
-          const s = status as RunStatus;
-          setRunStatus(s);
-          if (s === 'completed') {
-            try {
-              const [runData, leadsData] = await Promise.all([
-                scraperApi.get<Run>(`/runs/${data.run_id}`),
-                scraperApi.get<LeadRow[]>(`/leads/?run_id=${data.run_id}&limit=50`),
-              ]);
-              setRun(runData); setLeads(leadsData); setStep('result');
-            } catch { setStep('error'); }
-          } else if (s === 'failed' || s === 'cancelled') { setStep('error'); }
-        }
-      );
-      wsRef.current = ws;
+      router.push(`/${locale}/history`)
     } catch (e) {
-      setSubmitError(e instanceof Error ? e.message : String(e));
-    } finally { setSubmitting(false); }
-  };
+      setSubmitError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
-  useEffect(() => {
-    if (step !== 'running' || !runId) return;
-    const id = setInterval(async () => {
-      try {
-        const r = await scraperApi.get<Run>(`/runs/${runId}`);
-        setRunStatus(r.status);
-        if (r.status === 'completed') {
-          clearInterval(id);
-          const [runData, leadsData] = await Promise.all([
-            scraperApi.get<Run>(`/runs/${runId}`),
-            scraperApi.get<LeadRow[]>(`/leads/?run_id=${runId}&limit=50`),
-          ]);
-          setRun(runData); setLeads(leadsData); setStep('result');
-        } else if (r.status === 'failed' || r.status === 'cancelled') { clearInterval(id); setStep('error'); }
-      } catch { /* backend unavailable */ }
-    }, 3000);
-    return () => clearInterval(id);
-  }, [step, runId]);
+  const showPreview = selectedMarkets.length > 0 && !!totalLeads
 
-  const handleCancel = async () => {
-    if (!runId || cancelling) return;
-    setCancelling(true);
-    try { await scraperApi.post(`/runs/${runId}/cancel`, {}); wsRef.current?.close(); setRunStatus('cancelled'); setStep('error'); }
-    catch { setStep('error'); }
-    finally { setCancelling(false); setCancelConfirm(false); }
-  };
-
-  const resetToForm = () => {
-    wsRef.current?.close();
-    setStep('form'); setRun(null); setLeads([]); setRunId(null);
-    setRunStatus('pending'); setLeadCount(0); setCancelConfirm(false);
-    setCrmResult(null); setShowCrmForm(false);
-  };
-
-  /* FORM */
-  if (step === 'form') return (
+  return (
     <div style={S.page}>
       <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>New Pipeline</h1>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        {/* Market */}
-        <div>
-          <span style={S.sectionLabel}>Market</span>
-          <div style={{ display: 'flex', gap: 8 }}>
+        {/* ── Markets ── */}
+        <div style={S.card}>
+          <span style={S.label}>Markets</span>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {MARKETS.map(m => (
-              <button key={m} onClick={() => setMarket(m)} style={chipBtn(market === m)}>{m}</button>
+              <button key={m} onClick={() => toggleMarket(m)} style={chipBtn(selectedMarkets.includes(m))}>
+                {m}
+              </button>
             ))}
           </div>
+          {selectedMarkets.length > 1 && totalLeads && (
+            <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: '10px 0 0' }}>
+              Leads split equally — ~{Math.floor(totalLeads / selectedMarkets.length)} per market
+            </p>
+          )}
         </div>
 
-        {/* Search Combos */}
-        <div>
-          <span style={S.sectionLabel}>Search Combos</span>
+        {/* ── Search Combos ── */}
+        <div style={S.card}>
+          <span style={S.label}>Search Combos</span>
           {combosLoading ? (
-            <p style={{ fontSize: 13, color: 'var(--crm-text-muted)' }}>Loading combos…</p>
+            <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>Loading…</p>
           ) : activeCombos.length === 0 ? (
-            <p style={{ fontSize: 13, color: 'var(--crm-text-muted)' }}>
-              No active combos. Enable them in <Link href="/settings?tab=scraper" style={{ color: 'var(--crm-accent)', textDecoration: 'none' }}>Settings → Scraper</Link>.
+            <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
+              No active combos.{' '}
+              <Link href="/settings?tab=scraper" style={{ color: 'var(--crm-accent)', textDecoration: 'none' }}>
+                Enable in Settings → Scraper
+              </Link>
             </p>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-              {activeCombos.map(c => (
-                <button key={c.code} onClick={() => toggleCombo(c.code)} style={comboBtn(selectedCombos.includes(c.code))}>
-                  <span style={{ display: 'block', fontWeight: 700, fontSize: 13 }}>
-                    {selectedCombos.includes(c.code) ? '✓ ' : ''}{c.name}
-                  </span>
-                  <span style={{ display: 'block', fontSize: 11, opacity: 0.7, marginTop: 2 }}>{c.description}</span>
-                </button>
-              ))}
+              {activeCombos.map(c => {
+                const active = selectedCombos.includes(c.code)
+                return (
+                  <button key={c.code} onClick={() => toggleCombo(c.code)} style={{
+                    padding: '10px 14px', borderRadius: 8, cursor: 'pointer', textAlign: 'left' as const,
+                    border: `1px solid ${active ? 'var(--crm-accent)' : 'var(--crm-border)'}`,
+                    backgroundColor: active ? '#6C63FF15' : 'var(--crm-surface-raised)',
+                    color: active ? 'var(--crm-accent)' : 'var(--crm-text-secondary)',
+                    transition: 'all .15s',
+                  }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>
+                      {active && <span style={{ marginRight: 4 }}>✓</span>}{c.name}
+                    </div>
+                    {c.description && <div style={{ fontSize: 11, opacity: 0.7 }}>{c.description}</div>}
+                  </button>
+                )
+              })}
             </div>
           )}
-        </div>
-
-        {/* Total Leads */}
-        <div>
-          <span style={S.sectionLabel}>Total Leads</span>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-            {LEAD_OPTIONS.map(n => (
-              <button key={n} onClick={() => setTotalLeads(n)} style={chipBtn(totalLeads === n)}>{n}</button>
-            ))}
-          </div>
           {selectedCombos.length > 0 && (
-            <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: 0 }}>
-              {totalLeads} leads total · ~{leadsPerCombo} per combo ({selectedCombos.length} combos selected)
+            <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: '10px 0 0' }}>
+              {selectedCombos.length} combo{selectedCombos.length !== 1 ? 's' : ''} selected
+              {leadsPerCombo > 0 && ` · ~${leadsPerCombo} leads per combo`}
             </p>
           )}
         </div>
 
-        {/* Assign SDRs (Premium+, admin only) */}
+        {/* ── Total Leads ── */}
+        <div style={S.card}>
+          <span style={S.label}>Total Leads</span>
+          {isAdmin && available < MAX_INT && (
+            <p style={{ fontSize: 12, color: available < 100 ? '#EF4444' : 'var(--crm-text-muted)', margin: '0 0 12px' }}>
+              {monthlyUsed} used this month · <strong style={{ color: available < 100 ? '#EF4444' : 'var(--crm-text-primary)' }}>{available}</strong> remaining
+            </p>
+          )}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {LEAD_OPTIONS.map(n => {
+              const disabled = available < n && available < MAX_INT
+              return (
+                <button key={n} onClick={() => !disabled && setTotalLeads(n)} style={chipBtn(totalLeads === n, disabled)}>
+                  {n}
+                </button>
+              )
+            })}
+          </div>
+          {totalLeads && selectedCombos.length > 0 && selectedMarkets.length > 0 && (
+            <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: '10px 0 0' }}>
+              {totalLeads} leads · {selectedCombos.length} combo{selectedCombos.length !== 1 ? 's' : ''} · {selectedMarkets.length} market{selectedMarkets.length !== 1 ? 's' : ''}
+              {selectedCombos.length > 0 ? ` · ~${leadsPerCombo} per combo` : ''}
+            </p>
+          )}
+        </div>
+
+        {/* ── Assign SDRs ── */}
         {showSdrSection && (
-          <div>
-            <span style={S.sectionLabel}>Assign SDRs</span>
-            {sdrs.length === 0 ? (
-              <p style={{ fontSize: 13, color: 'var(--crm-text-muted)' }}>No SDRs with scraper access enabled.</p>
-            ) : (
-              <>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {sdrs.map(sdr => (
-                    <label key={sdr.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, backgroundColor: selectedSdrIds.includes(sdr.id) ? '#6C63FF15' : 'var(--crm-surface-raised)', border: `1px solid ${selectedSdrIds.includes(sdr.id) ? '#6C63FF40' : 'var(--crm-border)'}`, cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedSdrIds.includes(sdr.id)}
-                        onChange={() => toggleSdr(sdr.id)}
-                        style={{ accentColor: 'var(--crm-accent)', width: 14, height: 14 }}
-                      />
-                      <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--crm-text-primary)' }}>{sdr.full_name}</span>
-                    </label>
-                  ))}
+          <div style={S.card}>
+            <span style={S.label}>Assign SDRs</span>
+            {(() => {
+              const visible = sdrs.filter(sdr => getSdrMarkets(sdr).some(m => selectedMarkets.includes(m)))
+              if (visible.length === 0) return (
+                <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
+                  No SDRs with scraper access match the selected markets.
+                </p>
+              )
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {visible.map(sdr => {
+                    const sdrMarkets = getSdrMarkets(sdr).filter(m => selectedMarkets.includes(m))
+                    const profile = senderProfiles[sdr.id]
+                    const isSelected = selectedSdrIds.includes(sdr.id)
+                    return (
+                      <label key={sdr.id} style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 14px',
+                        borderRadius: 8, cursor: 'pointer',
+                        backgroundColor: isSelected ? '#6C63FF10' : 'var(--crm-surface-raised)',
+                        border: `1px solid ${isSelected ? '#6C63FF40' : 'var(--crm-border)'}`,
+                        transition: 'all .15s',
+                      }}>
+                        <input type="checkbox" checked={isSelected} onChange={() => toggleSdr(sdr.id)}
+                          style={{ accentColor: 'var(--crm-accent)', width: 14, height: 14, flexShrink: 0, marginTop: 2 }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-primary)', marginBottom: 4 }}>
+                            {sdr.full_name}
+                          </div>
+                          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: profile || !profile ? 4 : 0 }}>
+                            {sdrMarkets.map(m => (
+                              <span key={m} style={{ fontSize: 11, padding: '1px 7px', borderRadius: 4, backgroundColor: '#6C63FF20', color: 'var(--crm-accent)' }}>
+                                {m}
+                              </span>
+                            ))}
+                          </div>
+                          {profile ? (
+                            <div style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>
+                              ✦ {profile.display_name}
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#F59E0B' }}>
+                              <AlertTriangle size={10} />
+                              No sender profile — generic messages will be used
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                    )
+                  })}
                 </div>
-                {selectedSdrIds.length > 0 && (
-                  <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 8 }}>
-                    {totalLeads} leads → {selectedSdrIds.map((id, i) => {
-                      const sdr = sdrs.find(s => s.id === id);
-                      return `${sdr?.full_name ?? id}: ${Math.floor(totalLeads / selectedSdrIds.length)}`;
-                    }).join(' · ')}
-                  </p>
-                )}
-              </>
-            )}
+              )
+            })()}
           </div>
         )}
 
+        {/* ── Distribution Preview ── */}
+        {showPreview && (
+          <div style={{ ...S.card, backgroundColor: '#6C63FF08', borderColor: '#6C63FF25' }}>
+            <span style={S.label}>Distribution Preview</span>
+            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--crm-text-primary)', margin: '0 0 12px' }}>
+              {totalLeads} leads across {selectedMarkets.length} market{selectedMarkets.length !== 1 ? 's' : ''}: {selectedMarkets.join(' + ')}
+            </p>
+            {selectedSdrIds.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {selectedSdrIds.map(id => {
+                  const sdr = sdrs.find(s => s.id === id)
+                  if (!sdr) return null
+                  const leads = distribution[id] ?? 0
+                  const sdrMarkets = getSdrMarkets(sdr).filter(m => selectedMarkets.includes(m))
+                  return (
+                    <div key={id} style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '9px 14px', borderRadius: 8,
+                      backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)',
+                    }}>
+                      <div>
+                        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--crm-text-primary)' }}>{sdr.full_name}</span>
+                        {sdrMarkets.length > 0 && (
+                          <span style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginLeft: 6 }}>
+                            ({sdrMarkets.join(' + ')})
+                          </span>
+                        )}
+                      </div>
+                      <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--crm-accent)' }}>{leads} leads</span>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : showSdrSection ? (
+              <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: 0 }}>
+                Select SDRs above to see per-SDR distribution.
+              </p>
+            ) : null}
+          </div>
+        )}
+
+        {/* ── Error ── */}
         {submitError && (
-          <div style={{ display: 'flex', gap: 12, padding: 16, borderRadius: 10, backgroundColor: '#EF444410', border: '1px solid #EF444430' }}>
+          <div style={{ display: 'flex', gap: 12, padding: '14px 16px', borderRadius: 10, backgroundColor: '#EF444410', border: '1px solid #EF444430' }}>
             <AlertCircle size={16} color="#EF4444" style={{ flexShrink: 0, marginTop: 2 }} />
             <div>
               <p style={{ fontSize: 13, color: '#EF4444', fontWeight: 600, margin: '0 0 4px' }}>Could not start pipeline</p>
-              <p style={{ fontSize: 12, color: 'var(--crm-text-secondary)', margin: 0, fontFamily: 'monospace', wordBreak: 'break-word' }}>{submitError}</p>
+              <p style={{ fontSize: 12, color: 'var(--crm-text-secondary)', margin: 0, fontFamily: 'monospace', wordBreak: 'break-word' as const }}>
+                {submitError}
+              </p>
             </div>
           </div>
         )}
 
+        {/* ── Run Button ── */}
         <button
           onClick={handleSubmit}
-          disabled={submitting || selectedCombos.length === 0 || totalLeads === 0}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', backgroundColor: submitting || !selectedCombos.length ? 'var(--crm-border)' : 'var(--crm-accent)', color: '#FFF', fontSize: 14, fontWeight: 600, cursor: submitting || !selectedCombos.length ? 'default' : 'pointer' }}>
-          <Play size={15} /> {submitting ? 'Starting…' : 'Run Pipeline'}
+          disabled={!canRun || submitting}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            padding: '13px', borderRadius: 10, border: 'none', fontSize: 14, fontWeight: 600,
+            backgroundColor: canRun && !submitting ? 'var(--crm-accent)' : 'var(--crm-border)',
+            color: '#FFF',
+            cursor: canRun && !submitting ? 'pointer' : 'not-allowed',
+            transition: 'all .15s',
+          }}
+        >
+          <Play size={15} />
+          {submitting ? 'Starting…' : 'Run Pipeline'}
         </button>
+
       </div>
     </div>
-  );
-
-  /* RUNNING */
-  if (step === 'running') {
-    const phase = PHASE_INFO[runStatus] ?? PHASE_INFO.pending!;
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32, marginTop: 80, color: 'var(--crm-text-primary)' }}>
-        <div style={{ position: 'relative', width: 96, height: 96 }}>
-          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '3px solid var(--crm-border)' }} />
-          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '3px solid transparent', borderTopColor: 'var(--crm-accent)', animation: 'spin 1s linear infinite' }} />
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--crm-accent)' }}>
-            {phase.icon}
-          </div>
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <p style={{ fontSize: 22, fontWeight: 600, margin: '0 0 8px' }}>{phase.title}</p>
-          {leadCount > 0 && <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>{leadCount} leads found so far</p>}
-        </div>
-        <div style={{ width: 320 }}>
-          <div style={{ height: 4, backgroundColor: 'var(--crm-border)', borderRadius: 2, overflow: 'hidden', marginBottom: 8 }}>
-            <div style={{ height: '100%', backgroundColor: 'var(--crm-accent)', borderRadius: 2, width: `${phase.progress}%`, transition: 'width .7s' }} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--crm-text-muted)' }}>
-            <span style={runStatus === 'running' || runStatus === 'pending' ? { color: 'var(--crm-accent)' } : {}}>Scraping</span>
-            <span style={runStatus === 'scoring' ? { color: 'var(--crm-accent)' } : {}}>Scoring</span>
-            <span style={runStatus === 'drafting' ? { color: 'var(--crm-accent)' } : {}}>Generating</span>
-          </div>
-        </div>
-        <div>
-          {cancelConfirm ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>Cancel this run?</span>
-              <button onClick={handleCancel} disabled={cancelling} style={{ fontSize: 12, color: '#EF4444', border: '1px solid #EF444430', padding: '5px 12px', borderRadius: 6, cursor: 'pointer', backgroundColor: 'transparent' }}>
-                {cancelling ? 'Cancelling…' : 'Yes, cancel'}
-              </button>
-              <button onClick={() => setCancelConfirm(false)} style={{ fontSize: 12, color: 'var(--crm-text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>Keep running</button>
-            </div>
-          ) : (
-            <button onClick={() => setCancelConfirm(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--crm-text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
-              <XCircle size={13} /> Cancel
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  /* ERROR */
-  if (step === 'error') return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, marginTop: 80, color: 'var(--crm-text-primary)' }}>
-      <div style={{ width: 80, height: 80, borderRadius: '50%', backgroundColor: '#EF444415', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <AlertCircle size={36} color="#EF4444" />
-      </div>
-      <div style={{ textAlign: 'center' }}>
-        <p style={{ fontSize: 20, fontWeight: 600, margin: '0 0 6px' }}>{runStatus === 'cancelled' ? 'Run cancelled' : 'Something went wrong'}</p>
-        <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>{runStatus === 'cancelled' ? 'The pipeline was cancelled.' : 'Check the logs for details.'}</p>
-      </div>
-      <div style={{ display: 'flex', gap: 12 }}>
-        <button onClick={resetToForm} style={{ display: 'flex', alignItems: 'center', gap: 6, backgroundColor: 'var(--crm-accent)', color: '#FFF', padding: '10px 20px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-          <Play size={13} /> Try again
-        </button>
-        <Link href="/history" style={{ display: 'flex', alignItems: 'center', gap: 6, backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', color: 'var(--crm-text-secondary)', padding: '10px 20px', borderRadius: 8, textDecoration: 'none', fontSize: 13 }}>
-          View history
-        </Link>
-      </div>
-    </div>
-  );
-
-  /* RESULT */
-  return (
-    <div style={{ padding: '24px', color: 'var(--crm-text-primary)', maxWidth: 900 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-        <StatusBadge status="completed" />
-        <span style={{ fontSize: 16, fontWeight: 600 }}>Pipeline completed</span>
-      </div>
-      {run && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 20 }}>
-          {[
-            { label: 'Total',  value: run.total_leads, color: 'var(--crm-text-primary)' },
-            { label: 'HOT',    value: run.hot_count,   color: '#EF4444' },
-            { label: 'WARM',   value: run.warm_count,  color: '#F59E0B' },
-            { label: 'COLD',   value: run.cold_count,  color: '#60A5FA' },
-          ].map(s => (
-            <div key={s.label} style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 10, padding: '14px', textAlign: 'center' }}>
-              <p style={{ fontSize: 26, fontWeight: 700, fontFamily: 'monospace', color: s.color, margin: '0 0 4px' }}>{s.value}</p>
-              <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', margin: 0 }}>{s.label}</p>
-            </div>
-          ))}
-        </div>
-      )}
-      {leads.length > 0 && (
-        <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 10, overflow: 'auto', marginBottom: 20 }}>
-          <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--crm-border)' }}>
-                {['Name', 'Company', 'Title', 'ICP', 'Temp', 'Message'].map(h => (
-                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {leads.slice(0, 20).map((lead, i) => (
-                <tr key={lead.id} style={{ borderTop: i > 0 ? '1px solid var(--crm-border)' : undefined }}>
-                  <td style={{ padding: '8px 14px', color: 'var(--crm-text-primary)', fontWeight: 600 }}>{lead.full_name || '—'}</td>
-                  <td style={{ padding: '8px 14px', color: 'var(--crm-text-secondary)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.company || '—'}</td>
-                  <td style={{ padding: '8px 14px', color: 'var(--crm-text-secondary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.title || '—'}</td>
-                  <td style={{ padding: '8px 14px' }}><ICPScore score={lead.icp_score ?? 0} size="sm" /></td>
-                  <td style={{ padding: '8px 14px' }}>{lead.temperature && <TemperatureBadge temperature={lead.temperature} />}</td>
-                  <td style={{ padding: '8px 14px', color: 'var(--crm-text-muted)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>{lead.custom1 || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-        <Link href={`/leads?run_id=${runId}`} style={{ backgroundColor: 'var(--crm-accent)', color: '#FFF', padding: '9px 18px', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>View all leads →</Link>
-        {!crmResult && (
-          <button onClick={() => setShowCrmForm(f => !f)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, backgroundColor: showCrmForm ? 'var(--crm-border)' : '#22C55E20', border: `1px solid ${showCrmForm ? 'var(--crm-border)' : '#22C55E40'}`, color: showCrmForm ? 'var(--crm-text-secondary)' : '#22C55E', padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-            <DatabaseZap size={14} />{showCrmForm ? 'Cancel' : 'Import to CRM'}
-          </button>
-        )}
-        <button onClick={resetToForm} style={{ fontSize: 13, color: 'var(--crm-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '9px 10px' }}>
-          <ChevronLeft size={13} style={{ display: 'inline', marginRight: 4 }} />New run
-        </button>
-      </div>
-
-      {crmResult && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, backgroundColor: '#14532D20', border: '1px solid #16A34A40', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
-          <CheckCircle2 size={16} color="#22C55E" />
-          <span style={{ fontSize: 13, color: '#22C55E', fontWeight: 600 }}>Imported: {crmResult.imported}</span>
-          <span style={{ fontSize: 13, color: 'var(--crm-text-muted)' }}>Duplicates: {crmResult.duplicates}</span>
-          {crmResult.no_name > 0 && <span style={{ fontSize: 13, color: 'var(--crm-text-muted)' }}>No name: {crmResult.no_name}</span>}
-        </div>
-      )}
-
-      {showCrmForm && !crmResult && (
-        <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 10, padding: '16px 20px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', margin: 0, letterSpacing: '0.06em' }}>Import to CRM</p>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: 180 }}>
-              <label style={{ fontSize: 11, color: 'var(--crm-text-secondary)', display: 'block', marginBottom: 4 }}>Area *</label>
-              <select value={crmAreaId} onChange={e => setCrmAreaId(e.target.value)}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 7, backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', color: 'var(--crm-text-primary)', fontSize: 12, outline: 'none' }}>
-                <option value="">Select…</option>
-                {areas.filter(a => a.is_active).map(a => <option key={a.id} value={a.id}>{a.label_en}</option>)}
-              </select>
-            </div>
-            <div style={{ flex: 1, minWidth: 180 }}>
-              <label style={{ fontSize: 11, color: 'var(--crm-text-secondary)', display: 'block', marginBottom: 4 }}>Assign to SDR (optional)</label>
-              <select value={crmSdrId} onChange={e => setCrmSdrId(e.target.value)}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 7, backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', color: 'var(--crm-text-primary)', fontSize: 12, outline: 'none' }}>
-                <option value="">Unassigned</option>
-                {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
-              </select>
-            </div>
-          </div>
-          {crmError && <p style={{ fontSize: 12, color: '#EF4444', margin: 0 }}>{crmError}</p>}
-          <button onClick={handleImportToCRM} disabled={!crmAreaId || crmLoading}
-            style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6, backgroundColor: !crmAreaId || crmLoading ? 'var(--crm-border)' : '#22C55E', color: '#FFF', padding: '8px 18px', borderRadius: 8, border: 'none', cursor: !crmAreaId || crmLoading ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, opacity: !crmAreaId ? 0.5 : 1 }}>
-            <DatabaseZap size={14} />{crmLoading ? 'Importing…' : 'Import to CRM'}
-          </button>
-        </div>
-      )}
-    </div>
-  );
+  )
 }

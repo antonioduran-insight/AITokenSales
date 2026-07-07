@@ -210,6 +210,7 @@ export interface RunRecord {
   executed_by: string | null
   combos: string[]
   market: string
+  markets?: string[]
   total_leads_requested: number
   sdr_count: number
   plan: string
@@ -227,6 +228,7 @@ export interface RunSdrAssignment {
   sdr_id: string
   sender_profile_id: string | null
   leads_assigned: number
+  assigned_markets?: string[]
   created_at: string
   user?: { full_name: string }
 }

@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { useUser } from '@/contexts/UserContext'
 import { GripVertical, Plus, Trash2, X } from 'lucide-react'
-import type { Organization, PipelineStage, OrganizationAddon } from '@/lib/types'
+import type { Organization, PipelineStage, OrganizationAddon, ScraperComboMaster } from '@/lib/types'
 
 const PLAN_COLORS: Record<string, string> = {
   basic: '#3B82F6',
@@ -585,12 +585,120 @@ function PlanTab() {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Tab 4 — Scraper
+// ────────────────────────────────────────────────────────────────────────────
+function ScraperTab() {
+  const [combos, setCombos] = useState<ScraperComboMaster[]>([])
+  const [loading, setLoading] = useState(true)
+  const [toggling, setToggling] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    fetch('/api/scraper-combos')
+      .then(r => r.json())
+      .then((data: ScraperComboMaster[]) => setCombos(data))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function toggle(code: string, currentActive: boolean) {
+    setToggling(p => ({ ...p, [code]: true }))
+    try {
+      const res = await fetch('/api/scraper-combos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ combo_code: code, is_active: !currentActive }),
+      })
+      if (res.ok) setCombos(prev => prev.map(c => c.code === code ? { ...c, org_active: !currentActive } : c))
+    } catch { /* ignore */ }
+    finally { setToggling(p => ({ ...p, [code]: false })) }
+  }
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--crm-text-muted)' }}>Loading…</div>
+
+  const activeCount = combos.filter(c => c.org_active).length
+
+  return (
+    <div>
+      <div style={S.card}>
+        <p style={S.sectionTitle}>Search Combos</p>
+        <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', marginBottom: 16, marginTop: 0 }}>
+          Enable the search combos your team will use in New Pipeline. {activeCount > 0 && `${activeCount} active.`}
+        </p>
+        {combos.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>No combos available.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {combos.map(c => (
+              <div key={c.code} style={{
+                display: 'flex', alignItems: 'flex-start', gap: 16, padding: '14px 16px',
+                borderRadius: 8, backgroundColor: 'var(--crm-surface-raised)',
+                border: `1px solid ${c.org_active ? '#6C63FF30' : 'var(--crm-border)'}`,
+                opacity: toggling[c.code] ? 0.6 : 1,
+                transition: 'opacity .2s',
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: c.org_active ? 'var(--crm-text-primary)' : 'var(--crm-text-secondary)' }}>
+                      {c.name}
+                    </span>
+                    {c.org_active && (
+                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, backgroundColor: '#6C63FF20', color: 'var(--crm-accent)', fontWeight: 700 }}>
+                        ACTIVE
+                      </span>
+                    )}
+                  </div>
+                  {c.description && (
+                    <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: '0 0 6px' }}>{c.description}</p>
+                  )}
+                  {c.title_keywords.length > 0 && (
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {c.title_keywords.slice(0, 5).map(kw => (
+                        <span key={kw} style={{
+                          fontSize: 10, padding: '2px 7px', borderRadius: 4,
+                          backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)',
+                          color: 'var(--crm-text-muted)',
+                        }}>
+                          {kw}
+                        </span>
+                      ))}
+                      {c.title_keywords.length > 5 && (
+                        <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', padding: '2px 0' }}>
+                          +{c.title_keywords.length - 5} more
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => toggle(c.code, !!c.org_active)}
+                  disabled={toggling[c.code]}
+                  style={{
+                    flexShrink: 0, padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                    cursor: toggling[c.code] ? 'default' : 'pointer', border: 'none',
+                    backgroundColor: c.org_active ? '#22C55E20' : 'var(--crm-border)',
+                    color: c.org_active ? '#22C55E' : 'var(--crm-text-muted)',
+                    transition: 'all .15s',
+                  }}
+                >
+                  {c.org_active ? '● Enabled' : '○ Disabled'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Main Settings page
 // ────────────────────────────────────────────────────────────────────────────
 const TABS = [
   { key: 'organization', label: 'Organization' },
   { key: 'pipeline',     label: 'Pipeline' },
   { key: 'plan',         label: 'Plan & Usage' },
+  { key: 'scraper',      label: 'Scraper' },
 ]
 
 function SettingsContent() {
@@ -645,6 +753,7 @@ function SettingsContent() {
       {tab === 'organization' && <OrgTab />}
       {tab === 'pipeline'     && <PipelineTab />}
       {tab === 'plan'         && <PlanTab />}
+      {tab === 'scraper'      && <ScraperTab />}
     </div>
   )
 }

@@ -154,7 +154,9 @@ export default function HistoryPage() {
               <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--crm-text-muted)', flexShrink: 0, width: 80 }}>
                 {new Date(run.created_at).toLocaleDateString()}
               </span>
-              <span style={{ fontSize: 13, fontWeight: 600, minWidth: 80 }}>{run.market}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, minWidth: 80 }}>
+                {(run.markets?.length ? run.markets : [run.market]).join(' + ')}
+              </span>
               <div style={{ flex: 1, display: 'flex', gap: 12, fontSize: 11, flexWrap: 'wrap' }}>
                 <span style={{ color: 'var(--crm-text-secondary)' }}>{run.total_leads_requested} leads req.</span>
                 {run.combos?.length > 0 && (
@@ -180,7 +182,8 @@ export default function HistoryPage() {
                       SDRs: {run.run_sdr_assignments.map(a => (
                         <span key={a.sdr_id} style={{ color: 'var(--crm-text-primary)', fontWeight: 500, marginLeft: 4 }}>
                           {a.user?.full_name ?? a.sdr_id}
-                          {a.leads_assigned > 0 ? ` (${a.leads_assigned})` : ''}
+                          {a.assigned_markets?.length ? ` (${a.assigned_markets.join(', ')})` : ''}
+                          {a.leads_assigned > 0 ? `: ${a.leads_assigned}` : ''}
                           {a.sender_profile_id ? ' ✦' : ''}
                         </span>
                       ))}
