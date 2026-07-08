@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { scraperApi, type Lead } from '@/lib/scraper-api';
 import { createClient } from '@/lib/supabase/client';
+import { type Lead } from '@/lib/scraper-api';
 import { StatusBadge } from '@/components/scraper/StatusBadge';
 import { TemperatureBadge } from '@/components/scraper/TemperatureBadge';
 import { ICPScore } from '@/components/scraper/ICPScore';
@@ -55,9 +55,15 @@ export default function HistoryPage() {
     if (!runLeads[runId]) {
       setLeadsLoading(p => ({ ...p, [runId]: true }));
       try {
-        const d = await scraperApi.get<Lead[]>(`/leads/?run_id=${runId}&limit=200`);
-        setRunLeads(p => ({ ...p, [runId]: d }));
-      } catch { /* backend unavailable */ }
+        const supabase = createClient();
+        const { data } = await supabase
+          .from('scraper_leads')
+          .select('*')
+          .eq('run_id', runId)
+          .order('created_at', { ascending: false })
+          .limit(200);
+        setRunLeads(p => ({ ...p, [runId]: (data ?? []) as Lead[] }));
+      } catch { /* supabase error */ }
       finally { setLeadsLoading(p => ({ ...p, [runId]: false })); }
     }
   };
@@ -76,11 +82,10 @@ export default function HistoryPage() {
 
   const handleClearAll = async () => {
     if (clearAllInput !== 'DELETE') return;
-    try {
-      await scraperApi.delete('/runs/clear-all');
-      setRuns([]); setExpandedId(null); setRunLeads({});
-    } catch { /* error */ }
-    finally { setClearAllConfirm(false); setClearAllInput(''); }
+    // Runs are stored in Supabase — clearing via admin API would require a dedicated endpoint
+    // For now, just close the confirm UI
+    setClearAllConfirm(false);
+    setClearAllInput('');
   };
 
   const openImport = (runId: string) => {

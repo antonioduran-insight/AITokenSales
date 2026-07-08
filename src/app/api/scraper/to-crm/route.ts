@@ -3,8 +3,6 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 
-const BACKEND = process.env.SCRAPER_API_URL || process.env.NEXT_PUBLIC_SCRAPER_API_URL || 'http://localhost:8000'
-
 async function getCallerProfile() {
   const cookieStore = await cookies()
   const supabase = createServerClient(
@@ -32,15 +30,20 @@ export async function POST(req: NextRequest) {
   const { run_id, area_id, assigned_to } = await req.json()
   if (!run_id || !area_id) return NextResponse.json({ error: 'run_id y area_id requeridos' }, { status: 400 })
 
-  // Fetch leads from Railway (server-side, no CORS)
-  const leadsRes = await fetch(`${BACKEND}/leads/?run_id=${run_id}&limit=500`)
-  if (!leadsRes.ok) return NextResponse.json({ error: 'No se pudieron obtener los leads del scraper' }, { status: 502 })
-  const leads: Record<string, unknown>[] = await leadsRes.json()
-
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
+
+  // Fetch leads from Supabase scraper_leads table
+  const { data: leads, error: leadsError } = await admin
+    .from('scraper_leads')
+    .select('*')
+    .eq('run_id', run_id)
+    .eq('exported_to_crm', false)
+
+  if (leadsError) return NextResponse.json({ error: leadsError.message }, { status: 500 })
+  if (!leads || leads.length === 0) return NextResponse.json({ imported: 0, duplicates: 0, no_name: 0 })
 
   // Fetch existing prospects in area for dedup
   const { data: existing } = await admin
@@ -60,6 +63,7 @@ export async function POST(req: NextRequest) {
   let no_name = 0
 
   const toInsert: Record<string, unknown>[] = []
+  const importedLeadIds: string[] = []
 
   for (const lead of leads) {
     const name = (lead.full_name as string | undefined)?.trim()
@@ -94,8 +98,8 @@ export async function POST(req: NextRequest) {
       organization_id: caller.organization_id ?? null,
       flag_tomorrow: false,
     })
+    importedLeadIds.push(lead.id)
 
-    // Track to avoid intra-batch dupes
     if (email) existingEmails.add(email)
     if (linkedin) existingLinkedins.add(linkedin)
   }
@@ -112,6 +116,11 @@ export async function POST(req: NextRequest) {
         else if (e.code === '23505') { duplicates++ }
       }
     }
+  }
+
+  // Mark leads as exported
+  if (importedLeadIds.length > 0) {
+    await admin.from('scraper_leads').update({ exported_to_crm: true }).in('id', importedLeadIds)
   }
 
   // Increment monthly lead counter

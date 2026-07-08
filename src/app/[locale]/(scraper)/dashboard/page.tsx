@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { Link } from '@/i18n/navigation';
-import { scraperApi, type Run, type RunStatus } from '@/lib/scraper-api';
+import { type RunStatus } from '@/lib/scraper-api';
 import { StatusBadge } from '@/components/scraper/StatusBadge';
 import { Play, Activity } from 'lucide-react';
+import type { RunRecord } from '@/lib/types';
 
 const ACTIVE_STATUSES = new Set<RunStatus>(['pending', 'running', 'scoring', 'drafting']);
 
@@ -16,12 +17,14 @@ const S: Record<string, React.CSSProperties> = {
 };
 
 export default function ScraperDashboard() {
-  const [runs, setRuns] = useState<Run[]>([]);
+  const [runs, setRuns] = useState<RunRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchRuns = async () => {
-    try { setRuns(await scraperApi.get<Run[]>('/run/?limit=10')); }
-    catch { /* backend not running */ }
+    try {
+      const data = await fetch('/api/runs').then(r => r.json());
+      setRuns(Array.isArray(data) ? data : []);
+    } catch { /* backend not running */ }
     finally { setLoading(false); }
   };
 
@@ -32,8 +35,8 @@ export default function ScraperDashboard() {
   }, []);
 
   const latestRun = runs[0] ?? null;
-  const totalLeads = runs.reduce((s, r) => s + (r.total_leads || 0), 0);
-  const activeRun = runs.find(r => ACTIVE_STATUSES.has(r.status));
+  const activeRun = runs.find(r => ACTIVE_STATUSES.has(r.status as RunStatus));
+  const runMarket = (run: RunRecord) => (run.markets?.length ? run.markets : [run.market]).join(' + ');
 
   return (
     <div style={S.page}>
@@ -45,7 +48,7 @@ export default function ScraperDashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 24 }}>
         {[
           { label: 'Total Runs', value: runs.length, icon: <Activity size={16} color="var(--crm-accent)" /> },
-          { label: 'Total Leads', value: totalLeads, icon: <Activity size={16} color="#22C55E" /> },
+          { label: 'Total Leads Requested', value: runs.reduce((s, r) => s + (r.total_leads_requested || 0), 0), icon: <Activity size={16} color="#22C55E" /> },
         ].map(s => (
           <div key={s.label} style={S.card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -62,11 +65,11 @@ export default function ScraperDashboard() {
         <div style={{ borderRadius: 12, border: '1px solid #6C63FF40', backgroundColor: '#6C63FF10', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--crm-accent)', animation: 'pulse 1.5s ease-in-out infinite', flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: 13, color: 'var(--crm-text-primary)', fontWeight: 600, margin: 0 }}>Active run — {activeRun.market}</p>
-            <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeRun.combos.join(', ')}</p>
+            <p style={{ fontSize: 13, color: 'var(--crm-text-primary)', fontWeight: 600, margin: 0 }}>Active run — {runMarket(activeRun)}</p>
+            <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeRun.combos?.join(', ')}</p>
           </div>
-          <StatusBadge status={activeRun.status} />
-          <Link href="/history" style={{ fontSize: 11, color: 'var(--crm-accent)', whiteSpace: 'nowrap' }}>View logs →</Link>
+          <StatusBadge status={activeRun.status as Parameters<typeof StatusBadge>[0]['status']} />
+          <Link href="/history" style={{ fontSize: 11, color: 'var(--crm-accent)', whiteSpace: 'nowrap' }}>View history →</Link>
         </div>
       )}
 
@@ -77,21 +80,20 @@ export default function ScraperDashboard() {
           <div style={S.card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
               <div>
-                <p style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>{latestRun.market}</p>
+                <p style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>{runMarket(latestRun)}</p>
                 <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: '4px 0 0' }}>
-                  {new Date(latestRun.created_at).toLocaleDateString()} · {latestRun.combos.join(', ')}
+                  {new Date(latestRun.created_at).toLocaleDateString()} · {latestRun.combos?.join(', ')}
                 </p>
               </div>
-              <StatusBadge status={latestRun.status} />
+              <StatusBadge status={latestRun.status as Parameters<typeof StatusBadge>[0]['status']} />
             </div>
-            {latestRun.total_leads > 0 && (
+            {(latestRun.total_leads_requested ?? 0) > 0 && (
               <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{latestRun.total_leads} total leads</div>
+                <div style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{latestRun.total_leads_requested} leads requested</div>
               </div>
             )}
             <div style={{ display: 'flex', gap: 8 }}>
-              <Link href={`/leads?run_id=${latestRun.id}`} style={{ fontSize: 12, backgroundColor: 'var(--crm-accent)', color: '#FFF', padding: '6px 14px', borderRadius: 7, textDecoration: 'none', fontWeight: 600 }}>View Leads</Link>
-              <Link href="/history" style={{ fontSize: 12, backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-secondary)', padding: '6px 14px', borderRadius: 7, textDecoration: 'none' }}>History</Link>
+              <Link href="/history" style={{ fontSize: 12, backgroundColor: 'var(--crm-accent)', color: '#FFF', padding: '6px 14px', borderRadius: 7, textDecoration: 'none', fontWeight: 600 }}>View History</Link>
             </div>
           </div>
         </section>
@@ -105,11 +107,10 @@ export default function ScraperDashboard() {
             {runs.slice(1, 6).map((run, i) => (
               <div key={run.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderTop: i > 0 ? '1px solid var(--crm-border)' : undefined }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 13, fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{run.market}</p>
-                  <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', margin: '2px 0 0' }}>{new Date(run.created_at).toLocaleDateString()} · {run.total_leads} leads</p>
+                  <p style={{ fontSize: 13, fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{runMarket(run)}</p>
+                  <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', margin: '2px 0 0' }}>{new Date(run.created_at).toLocaleDateString()} · {run.total_leads_requested} leads req.</p>
                 </div>
-                <StatusBadge status={run.status} />
-                <Link href={`/leads?run_id=${run.id}`} style={{ fontSize: 11, color: 'var(--crm-accent)' }}>→</Link>
+                <StatusBadge status={run.status as Parameters<typeof StatusBadge>[0]['status']} />
               </div>
             ))}
           </div>

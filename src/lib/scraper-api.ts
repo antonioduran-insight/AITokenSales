@@ -12,37 +12,19 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+// Valid backend routes: GET /health, POST /runs, GET /runs/{id}, GET /runs/{id}/logs, DELETE /runs/{id}
 export const scraperApi = {
   get:    <T>(path: string)                => request<T>(path),
   post:   <T>(path: string, body: unknown) => request<T>(path, { method: "POST",   body: JSON.stringify(body) }),
-  patch:  <T>(path: string, body: unknown) => request<T>(path, { method: "PATCH",  body: JSON.stringify(body) }),
   delete: <T>(path: string)               => request<T>(path, { method: "DELETE" }),
 };
 
-export const SCRAPER_API_URL = process.env.NEXT_PUBLIC_SCRAPER_API_URL || "http://localhost:8000";
-
 export type RunStatus = "pending" | "running" | "scoring" | "drafting" | "completed" | "failed" | "cancelled";
-
-export interface Run {
-  id: string;
-  combos: string[];
-  market: string;
-  limit_per_combo: number;
-  status: RunStatus;
-  total_leads: number;
-  hot_count: number;
-  warm_count: number;
-  cold_count: number;
-  error_message?: string;
-  output_csv_path?: string;
-  started_at?: string;
-  completed_at?: string;
-  created_at: string;
-}
 
 export interface Lead {
   id: string;
   run_id: string;
+  sdr_id?: string;
   linkedin_url?: string;
   first_name?: string;
   last_name?: string;

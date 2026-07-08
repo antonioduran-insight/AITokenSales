@@ -2,10 +2,12 @@
 
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { scraperApi, type Lead, type Run } from '@/lib/scraper-api';
+import { createClient } from '@/lib/supabase/client';
+import { type Lead } from '@/lib/scraper-api';
 import { TemperatureBadge } from '@/components/scraper/TemperatureBadge';
 import { ICPScore } from '@/components/scraper/ICPScore';
 import { Copy, Check, X } from 'lucide-react';
+import type { RunRecord } from '@/lib/types';
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -26,7 +28,7 @@ function LeadsContent() {
   const runIdParam = searchParams.get('run_id');
 
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [runs, setRuns] = useState<Run[]>([]);
+  const [runs, setRuns] = useState<RunRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [filterRun, setFilterRun] = useState(runIdParam ?? '');
@@ -35,15 +37,26 @@ function LeadsContent() {
   const fetchLeads = useCallback(async () => {
     setLoading(true);
     try {
-      let url = '/leads/?limit=100';
-      if (filterRun) url += `&run_id=${filterRun}`;
-      if (filterTemp) url += `&temperature=${filterTemp}`;
-      setLeads(await scraperApi.get<Lead[]>(url));
-    } catch { /* backend */ }
+      const supabase = createClient();
+      let query = supabase
+        .from('scraper_leads')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (filterRun) query = query.eq('run_id', filterRun);
+      if (filterTemp) query = query.eq('temperature', filterTemp);
+      const { data } = await query;
+      setLeads((data ?? []) as Lead[]);
+    } catch { /* supabase error */ }
     finally { setLoading(false); }
   }, [filterRun, filterTemp]);
 
-  useEffect(() => { scraperApi.get<Run[]>('/run/?limit=50').then(setRuns).catch(() => {}); }, []);
+  useEffect(() => {
+    fetch('/api/runs').then(r => r.json()).then((data: RunRecord[]) => {
+      setRuns(Array.isArray(data) ? data : []);
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => { fetchLeads(); }, [fetchLeads]);
 
   return (
@@ -55,7 +68,9 @@ function LeadsContent() {
         <select value={filterRun} onChange={e => setFilterRun(e.target.value)} style={selectStyle}>
           <option value="">All Runs</option>
           {runs.map(r => (
-            <option key={r.id} value={r.id}>{r.market} — {new Date(r.created_at).toLocaleDateString()} ({r.total_leads} leads)</option>
+            <option key={r.id} value={r.id}>
+              {(r.markets?.length ? r.markets : [r.market]).join(' + ')} — {new Date(r.created_at).toLocaleDateString()}
+            </option>
           ))}
         </select>
         <select value={filterTemp} onChange={e => setFilterTemp(e.target.value)} style={selectStyle}>
@@ -91,16 +106,12 @@ function LeadsContent() {
                 <td style={{ padding: '8px 14px' }}>{lead.temperature && <TemperatureBadge temperature={lead.temperature} />}</td>
                 <td style={{ padding: '8px 14px', maxWidth: 220 }}>
                   {lead.custom1 ? (
-                    <div title={lead.custom1} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--crm-text-secondary)', fontSize: 12 }}>
-                      {lead.custom1}
-                    </div>
+                    <div title={lead.custom1} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--crm-text-secondary)', fontSize: 12 }}>{lead.custom1}</div>
                   ) : <span style={{ color: 'var(--crm-text-muted)' }}>—</span>}
                 </td>
                 <td style={{ padding: '8px 14px', maxWidth: 220 }}>
                   {lead.custom2 ? (
-                    <div title={lead.custom2} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--crm-text-secondary)', fontSize: 12 }}>
-                      {lead.custom2}
-                    </div>
+                    <div title={lead.custom2} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--crm-text-secondary)', fontSize: 12 }}>{lead.custom2}</div>
                   ) : <span style={{ color: 'var(--crm-text-muted)' }}>—</span>}
                 </td>
               </tr>
@@ -109,14 +120,13 @@ function LeadsContent() {
         </table>
       </div>
 
-      {/* Lead detail modal (centered) */}
+      {/* Lead detail modal */}
       {selectedLead && (
         <div
           style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}
           onClick={e => { if (e.target === e.currentTarget) setSelectedLead(null) }}
         >
           <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 16, padding: 32, maxWidth: 720, width: '90%', maxHeight: '85vh', overflowY: 'auto' }}>
-            {/* Header */}
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
               <div>
                 <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px' }}>{selectedLead.full_name || '—'}</h2>
@@ -128,10 +138,7 @@ function LeadsContent() {
               </div>
               <button onClick={() => setSelectedLead(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', padding: 4 }}><X size={18} /></button>
             </div>
-
-            {/* 2-column grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-              {/* Left: Profile */}
               <div>
                 <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>Profile</p>
                 {[
@@ -156,8 +163,6 @@ function LeadsContent() {
                   </div>
                 )}
               </div>
-
-              {/* Right: Outreach templates */}
               <div>
                 <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>Outreach Templates</p>
                 {[
@@ -169,9 +174,7 @@ function LeadsContent() {
                       <span style={{ fontSize: 11, color: 'var(--crm-text-secondary)', fontWeight: 600 }}>{label}</span>
                       <CopyButton text={value} />
                     </div>
-                    <div style={{ backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: 'var(--crm-text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                      {value}
-                    </div>
+                    <div style={{ backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: 'var(--crm-text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{value}</div>
                   </div>
                 ) : null)}
               </div>
