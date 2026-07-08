@@ -15,6 +15,7 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Auth: verify caller is logged in and get their org
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -28,30 +29,34 @@ export async function DELETE(
   if (!userData?.organization_id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
+  const admin = adminClient()
 
-  // Verify the run belongs to this org
-  const { data: run } = await supabase
+  // Use admin client so RLS never blocks us
+  const { data: run, error: fetchError } = await admin
     .from('runs')
     .select('id, status, organization_id')
     .eq('id', id)
-    .eq('organization_id', userData.organization_id)
     .single()
 
-  if (!run) return NextResponse.json({ error: 'Run not found' }, { status: 404 })
+  if (fetchError || !run) return NextResponse.json({ error: 'Run not found' }, { status: 404 })
+
+  // Org ownership check (manual, since we bypassed RLS)
+  if (run.organization_id !== userData.organization_id && userData.role !== 'admin_global') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   if (run.status !== 'pending' && run.status !== 'running') {
     return NextResponse.json({ error: 'Run is not cancellable' }, { status: 400 })
   }
 
-  // Update Supabase directly — this always works regardless of backend state
-  const admin = adminClient()
-  const { error } = await admin
+  const { error: updateError } = await admin
     .from('runs')
     .update({ status: 'cancelled', updated_at: new Date().toISOString() })
     .eq('id', id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
 
-  // Best-effort: tell the Railway backend to stop processing (ignore errors)
+  // Best-effort: tell Railway to stop processing
   if (SCRAPER_API) {
     fetch(`${SCRAPER_API}/runs/${id}`, { method: 'DELETE' }).catch(() => {})
   }

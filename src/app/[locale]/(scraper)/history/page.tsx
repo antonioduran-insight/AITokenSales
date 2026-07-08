@@ -73,11 +73,15 @@ export default function HistoryPage() {
     setCancellingIds(prev => new Set(prev).add(runId));
     try {
       const res = await fetch(`/api/runs/${runId}`, { method: 'DELETE' });
+      const body = await res.json();
       if (res.ok) {
         setRuns(prev => prev.map(r => r.id === runId ? { ...r, status: 'cancelled' } : r));
+      } else {
+        alert(`Cancel failed: ${body.error ?? res.status}`);
       }
-    } catch { /* ignore */ }
-    finally {
+    } catch (err) {
+      alert(`Cancel error: ${String(err)}`);
+    } finally {
       setCancellingIds(prev => { const s = new Set(prev); s.delete(runId); return s; });
     }
   };
