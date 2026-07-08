@@ -88,10 +88,13 @@ export default function HistoryPage() {
 
   const handleClearAll = async () => {
     if (clearAllInput !== 'DELETE') return;
-    // Runs are stored in Supabase — clearing via admin API would require a dedicated endpoint
-    // For now, just close the confirm UI
-    setClearAllConfirm(false);
-    setClearAllInput('');
+    try {
+      const res = await fetch('/api/runs', { method: 'DELETE' });
+      if (res.ok) {
+        setRuns([]); setExpandedId(null); setRunLeads({});
+      }
+    } catch { /* ignore */ }
+    finally { setClearAllConfirm(false); setClearAllInput(''); }
   };
 
   const openImport = (runId: string) => {
