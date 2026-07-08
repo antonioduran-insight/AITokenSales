@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { StatusBadge } from '@/components/scraper/StatusBadge';
 import { TemperatureBadge } from '@/components/scraper/TemperatureBadge';
 import { ICPScore } from '@/components/scraper/ICPScore';
-import { ChevronDown, ChevronUp, Trash2, DatabaseZap, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, DatabaseZap, CheckCircle2, XCircle } from 'lucide-react';
 import type { Area, User, RunRecord } from '@/lib/types';
 
 interface ImportState {
@@ -30,6 +30,7 @@ export default function HistoryPage() {
   const [leadsLoading, setLeadsLoading] = useState<Record<string, boolean>>({});
   const [clearAllConfirm, setClearAllConfirm] = useState(false);
   const [clearAllInput, setClearAllInput] = useState('');
+  const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
 
   const [areas, setAreas] = useState<Area[]>([]);
   const [sdrs, setSdrs] = useState<User[]>([]);
@@ -58,6 +59,18 @@ export default function HistoryPage() {
         setRunLeads(p => ({ ...p, [runId]: d }));
       } catch { /* backend unavailable */ }
       finally { setLeadsLoading(p => ({ ...p, [runId]: false })); }
+    }
+  };
+
+  const handleCancelRun = async (e: React.MouseEvent, runId: string) => {
+    e.stopPropagation();
+    setCancellingIds(prev => new Set(prev).add(runId));
+    try {
+      await fetch(`/api/scraper/runs/${runId}`, { method: 'DELETE' });
+      setRuns(prev => prev.map(r => r.id === runId ? { ...r, status: 'cancelled' } : r));
+    } catch { /* ignore */ }
+    finally {
+      setCancellingIds(prev => { const s = new Set(prev); s.delete(runId); return s; });
     }
   };
 
@@ -146,6 +159,8 @@ export default function HistoryPage() {
         const leadsLoad = leadsLoading[run.id] ?? false;
         const imp = importState[run.id];
         const showImport = importOpen === run.id;
+        const isActive = run.status === 'pending' || run.status === 'running';
+        const isCancelling = cancellingIds.has(run.id);
 
         return (
           <div key={run.id} style={S.row}>
@@ -165,6 +180,14 @@ export default function HistoryPage() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <StatusBadge status={run.status as Parameters<typeof StatusBadge>[0]['status']} />
+                {isActive && (
+                  <button
+                    onClick={e => handleCancelRun(e, run.id)}
+                    disabled={isCancelling}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#EF4444', background: 'transparent', border: '1px solid #EF444440', borderRadius: 6, padding: '3px 8px', cursor: isCancelling ? 'default' : 'pointer', opacity: isCancelling ? 0.5 : 1, flexShrink: 0 }}>
+                    <XCircle size={12} />{isCancelling ? 'Cancelling…' : 'Cancel'}
+                  </button>
+                )}
                 {isExpanded ? <ChevronUp size={14} color="var(--crm-text-muted)" /> : <ChevronDown size={14} color="var(--crm-text-muted)" />}
               </div>
             </div>
