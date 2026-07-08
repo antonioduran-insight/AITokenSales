@@ -70,14 +70,32 @@ export async function POST(req: NextRequest) {
 
     // Build SDR assignments
     const isBasic = org.plan === 'basic'
-    let sdrAssignments: { sdr_id: string; sender_profile_id: string | null; years_experience?: number | null; seniority?: string | null; expertise_area?: string | null }[] = []
+
+    interface BuiltAssignment {
+      sdr_id: string
+      sender_profile_id: string | null
+      sender_profile: {
+        id: string | null
+        display_name: string
+        title: string
+        company: string
+        style_hint: string | null
+        icp_focus: string[]
+        language: string
+        years_experience: number | null
+        seniority: string | null
+        expertise_area: string | null
+      } | null
+    }
+
+    let sdrAssignments: BuiltAssignment[] = []
 
     if (sdr_ids?.length > 0 && !isBasic) {
       for (const sdrId of sdr_ids as string[]) {
         const [{ data: profile }, { data: sdrCtx }] = await Promise.all([
           supabase
             .from('sender_profiles')
-            .select('id')
+            .select('id, display_name, title, company, style_hint, icp_focus, language')
             .eq('user_id', sdrId)
             .eq('organization_id', userData.organization_id)
             .eq('is_default', true)
@@ -93,9 +111,18 @@ export async function POST(req: NextRequest) {
         sdrAssignments.push({
           sdr_id: sdrId,
           sender_profile_id: profile?.id ?? null,
-          years_experience: sdrCtx?.years_experience ?? null,
-          seniority: sdrCtx?.seniority ?? null,
-          expertise_area: sdrCtx?.expertise_area ?? null,
+          sender_profile: profile ? {
+            id: profile.id,
+            display_name: profile.display_name,
+            title: profile.title,
+            company: profile.company,
+            style_hint: profile.style_hint ?? null,
+            icp_focus: profile.icp_focus ?? [],
+            language: profile.language ?? 'en',
+            years_experience: sdrCtx?.years_experience ?? null,
+            seniority: sdrCtx?.seniority ?? null,
+            expertise_area: sdrCtx?.expertise_area ?? null,
+          } : null,
         })
       }
     } else {
@@ -107,10 +134,23 @@ export async function POST(req: NextRequest) {
       sdrAssignments = [{
         sdr_id: user.id,
         sender_profile_id: null,
-        years_experience: selfCtx?.years_experience ?? null,
-        seniority: selfCtx?.seniority ?? null,
-        expertise_area: selfCtx?.expertise_area ?? null,
+        sender_profile: null,
       }]
+      // attach context to a dummy profile shape if we have it
+      if (selfCtx) {
+        sdrAssignments[0].sender_profile = {
+          id: null,
+          display_name: '',
+          title: '',
+          company: '',
+          style_hint: null,
+          icp_focus: [],
+          language: 'en',
+          years_experience: selfCtx.years_experience ?? null,
+          seniority: selfCtx.seniority ?? null,
+          expertise_area: selfCtx.expertise_area ?? null,
+        }
+      }
     }
 
     const admin = adminClient()
@@ -160,10 +200,8 @@ export async function POST(req: NextRequest) {
         sdr_assignments: sdrAssignments.map(a => ({
           sdr_id: a.sdr_id,
           sender_profile_id: a.sender_profile_id ?? null,
+          sender_profile: a.sender_profile ?? null,
           assigned_markets: sdr_market_assignments?.[a.sdr_id] ?? [],
-          years_experience: a.years_experience ?? null,
-          seniority: a.seniority ?? null,
-          expertise_area: a.expertise_area ?? null,
         })),
         apify_token: org.apify_token,
         anthropic_key: org.anthropic_key,
