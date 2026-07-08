@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { useUser } from '@/contexts/UserContext'
 import { GripVertical, Plus, Trash2, X } from 'lucide-react'
-import type { Organization, PipelineStage, OrganizationAddon, ScraperComboMaster } from '@/lib/types'
+import type { Organization, PipelineStage, OrganizationAddon, ScraperComboMaster, User, SenderProfile } from '@/lib/types'
 
 const PLAN_COLORS: Record<string, string> = {
   basic: '#3B82F6',
@@ -600,6 +600,13 @@ function ScraperTab() {
   const [savedApi, setSavedApi] = useState(false)
   const [apiError, setApiError] = useState<string | null>(null)
 
+  const [sdrs, setSdrs] = useState<User[]>([])
+  const [profilesBySdr, setProfilesBySdr] = useState<Record<string, SenderProfile[]>>({})
+  const [openFormFor, setOpenFormFor] = useState<string | null>(null)
+  const [formFields, setFormFields] = useState({ display_name: '', title: '', company: '', style_hint: '', language: 'en', is_default: true })
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [profileError, setProfileError] = useState<string | null>(null)
+
   useEffect(() => {
     fetch('/api/scraper-combos')
       .then(r => r.json())
@@ -614,6 +621,26 @@ function ScraperTab() {
         if (d.anthropic_base_url) setAnthropicBaseUrl(d.anthropic_base_url)
         if (d.anthropic_model) setAnthropicModel(d.anthropic_model)
         if (d.apify_token) setApifyToken(d.apify_token)
+      })
+      .catch(() => {})
+
+    createClient()
+      .from('users')
+      .select('*')
+      .eq('role', 'sdr')
+      .eq('is_active', true)
+      .eq('scraper_access', true)
+      .then(({ data }) => { if (data) setSdrs(data as User[]) })
+
+    fetch('/api/sender-profiles')
+      .then(r => r.json())
+      .then((profiles: SenderProfile[]) => {
+        const map: Record<string, SenderProfile[]> = {}
+        for (const p of profiles) {
+          if (!map[p.user_id]) map[p.user_id] = []
+          map[p.user_id].push(p)
+        }
+        setProfilesBySdr(map)
       })
       .catch(() => {})
   }, [])
@@ -636,6 +663,52 @@ function ScraperTab() {
       setSavedApi(true)
       setTimeout(() => setSavedApi(false), 2500)
     } catch { setApiError('Network error') } finally { setSavingApi(false) }
+  }
+
+  async function createProfile(sdrId: string) {
+    if (!formFields.display_name || !formFields.title || !formFields.company) {
+      setProfileError('Display name, title and company are required')
+      return
+    }
+    setSavingProfile(true); setProfileError(null)
+    try {
+      const res = await fetch('/api/sender-profiles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formFields, user_id: sdrId }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setProfileError(data.error ?? 'Failed to create'); return }
+      setProfilesBySdr(prev => {
+        const existing = prev[sdrId] ?? []
+        const updated = formFields.is_default
+          ? existing.map(p => ({ ...p, is_default: false }))
+          : existing
+        return { ...prev, [sdrId]: [...updated, data] }
+      })
+      setOpenFormFor(null)
+      setFormFields({ display_name: '', title: '', company: '', style_hint: '', language: 'en', is_default: true })
+    } catch { setProfileError('Network error') } finally { setSavingProfile(false) }
+  }
+
+  async function deleteProfile(sdrId: string, profileId: string) {
+    await fetch(`/api/sender-profiles/${profileId}`, { method: 'DELETE' })
+    setProfilesBySdr(prev => ({
+      ...prev,
+      [sdrId]: (prev[sdrId] ?? []).filter(p => p.id !== profileId),
+    }))
+  }
+
+  async function setDefault(sdrId: string, profileId: string) {
+    await fetch(`/api/sender-profiles/${profileId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_default: true }),
+    })
+    setProfilesBySdr(prev => ({
+      ...prev,
+      [sdrId]: (prev[sdrId] ?? []).map(p => ({ ...p, is_default: p.id === profileId })),
+    }))
   }
 
   async function toggle(code: string, currentActive: boolean) {
@@ -713,6 +786,124 @@ function ScraperTab() {
           {savingApi ? 'Saving…' : savedApi ? '✓ Saved' : 'Save API Settings'}
         </button>
       </div>
+
+      {/* Sender Profiles — only shown when there are SDRs with scraper access */}
+      {sdrs.length > 0 && (
+        <div style={S.card}>
+          <p style={S.sectionTitle}>Sender Profiles</p>
+          <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', marginBottom: 16, marginTop: 0 }}>
+            Each SDR needs a default sender profile so the scraper can personalize outreach messages.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {sdrs.map(sdr => {
+              const profiles = profilesBySdr[sdr.id] ?? []
+              const defaultProfile = profiles.find(p => p.is_default && p.is_active)
+              const isOpen = openFormFor === sdr.id
+              return (
+                <div key={sdr.id} style={{ border: '1px solid var(--crm-border)', borderRadius: 8, overflow: 'hidden' }}>
+                  {/* SDR header */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', backgroundColor: 'var(--crm-surface-raised)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-primary)' }}>{sdr.full_name}</span>
+                      {defaultProfile ? (
+                        <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, backgroundColor: '#22C55E20', color: '#22C55E', fontWeight: 700 }}>
+                          ✓ {defaultProfile.display_name}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, backgroundColor: '#EF444420', color: '#EF4444', fontWeight: 700 }}>
+                          No default profile
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => { setOpenFormFor(isOpen ? null : sdr.id); setProfileError(null); setFormFields({ display_name: '', title: '', company: '', style_hint: '', language: 'en', is_default: true }) }}
+                      style={{ ...S.btn, padding: '5px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}
+                    >
+                      <Plus size={12} /> Add profile
+                    </button>
+                  </div>
+
+                  {/* Existing profiles */}
+                  {profiles.length > 0 && (
+                    <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {profiles.map(p => (
+                        <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--crm-border)' }}>
+                          <div style={{ flex: 1 }}>
+                            <span style={{ fontSize: 13, fontWeight: p.is_default ? 700 : 400, color: 'var(--crm-text-primary)' }}>{p.display_name}</span>
+                            <span style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginLeft: 8 }}>{p.title} · {p.company}</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                            {p.is_default ? (
+                              <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, backgroundColor: '#6C63FF20', color: 'var(--crm-accent)', fontWeight: 700 }}>DEFAULT</span>
+                            ) : (
+                              <button
+                                onClick={() => setDefault(sdr.id, p.id)}
+                                style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-muted)', cursor: 'pointer' }}
+                              >
+                                Set default
+                              </button>
+                            )}
+                            <button
+                              onClick={() => deleteProfile(sdr.id, p.id)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', display: 'flex', padding: 4 }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Create form */}
+                  {isOpen && (
+                    <div style={{ padding: '12px 16px', borderTop: '1px solid var(--crm-border)', backgroundColor: '#6C63FF06' }}>
+                      {profileError && <p style={{ fontSize: 12, color: '#EF4444', margin: '0 0 10px' }}>{profileError}</p>}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                        <div>
+                          <label style={S.label}>Display name *</label>
+                          <input value={formFields.display_name} onChange={e => setFormFields(p => ({ ...p, display_name: e.target.value }))} placeholder="John D." style={S.input} />
+                        </div>
+                        <div>
+                          <label style={S.label}>Title *</label>
+                          <input value={formFields.title} onChange={e => setFormFields(p => ({ ...p, title: e.target.value }))} placeholder="Sales Manager" style={S.input} />
+                        </div>
+                        <div>
+                          <label style={S.label}>Company *</label>
+                          <input value={formFields.company} onChange={e => setFormFields(p => ({ ...p, company: e.target.value }))} placeholder="AITokenKing" style={S.input} />
+                        </div>
+                        <div>
+                          <label style={S.label}>Language</label>
+                          <select value={formFields.language} onChange={e => setFormFields(p => ({ ...p, language: e.target.value }))} style={S.select}>
+                            <option value="en">English</option>
+                            <option value="zh">中文</option>
+                            <option value="es">Español</option>
+                            <option value="vi">Tiếng Việt</option>
+                          </select>
+                        </div>
+                        <div style={{ gridColumn: 'span 2' }}>
+                          <label style={S.label}>Style hint (optional)</label>
+                          <input value={formFields.style_hint} onChange={e => setFormFields(p => ({ ...p, style_hint: e.target.value }))} placeholder="Professional, concise, focuses on ROI..." style={S.input} />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, color: 'var(--crm-text-secondary)' }}>
+                          <input type="checkbox" checked={formFields.is_default} onChange={e => setFormFields(p => ({ ...p, is_default: e.target.checked }))} style={{ accentColor: 'var(--crm-accent)' }} />
+                          Set as default
+                        </label>
+                        <button onClick={() => createProfile(sdr.id)} disabled={savingProfile} style={{ ...S.btn, opacity: savingProfile ? 0.6 : 1 }}>
+                          {savingProfile ? 'Saving…' : 'Create profile'}
+                        </button>
+                        <button onClick={() => setOpenFormFor(null)} style={S.btnGhost}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <div style={S.card}>
         <p style={S.sectionTitle}>Search Combos</p>

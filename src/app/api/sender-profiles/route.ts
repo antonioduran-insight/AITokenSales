@@ -49,24 +49,27 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { display_name, title, company, style_hint, icp_focus, language, is_default } = body
+  const { display_name, title, company, style_hint, icp_focus, language, is_default, user_id: targetUserId } = body
 
   if (!display_name || !title || !company) {
     return NextResponse.json({ error: 'display_name, title and company are required' }, { status: 400 })
   }
 
+  const isAdmin = userData?.role === 'admin' || userData?.role === 'admin_global'
+  const profileUserId = (isAdmin && targetUserId) ? targetUserId : user.id
+
   if (is_default) {
     await supabase
       .from('sender_profiles')
       .update({ is_default: false })
-      .eq('user_id', user.id)
+      .eq('user_id', profileUserId)
       .eq('organization_id', userData?.organization_id)
   }
 
   const { data, error } = await supabase
     .from('sender_profiles')
     .insert({
-      user_id: user.id,
+      user_id: profileUserId,
       organization_id: userData?.organization_id,
       display_name,
       title,

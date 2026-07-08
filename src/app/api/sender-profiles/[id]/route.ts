@@ -9,6 +9,14 @@ export async function PATCH(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { data: userData } = await supabase
+    .from('users')
+    .select('role, organization_id')
+    .eq('id', user.id)
+    .single()
+
+  const isAdmin = userData?.role === 'admin' || userData?.role === 'admin_global'
+
   const { id } = await params
   const body = await req.json()
 
@@ -19,24 +27,28 @@ export async function PATCH(
   }
 
   if (patch.is_default) {
-    const { data: profile } = await supabase.from('sender_profiles').select('organization_id').eq('id', id).maybeSingle()
+    const { data: profile } = await supabase
+      .from('sender_profiles')
+      .select('user_id, organization_id')
+      .eq('id', id)
+      .maybeSingle()
     if (profile) {
       await supabase
         .from('sender_profiles')
         .update({ is_default: false })
-        .eq('user_id', user.id)
+        .eq('user_id', profile.user_id)
         .eq('organization_id', profile.organization_id)
     }
   }
 
-  const { data, error } = await supabase
-    .from('sender_profiles')
-    .update(patch)
-    .eq('id', id)
-    .eq('user_id', user.id)
-    .select()
-    .single()
+  let query = supabase.from('sender_profiles').update(patch).eq('id', id)
+  if (!isAdmin) {
+    query = query.eq('user_id', user.id)
+  } else {
+    query = query.eq('organization_id', userData?.organization_id)
+  }
 
+  const { data, error } = await query.select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   return NextResponse.json(data)
 }
@@ -49,14 +61,24 @@ export async function DELETE(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { data: userData } = await supabase
+    .from('users')
+    .select('role, organization_id')
+    .eq('id', user.id)
+    .single()
+
+  const isAdmin = userData?.role === 'admin' || userData?.role === 'admin_global'
+
   const { id } = await params
 
-  const { error } = await supabase
-    .from('sender_profiles')
-    .delete()
-    .eq('id', id)
-    .eq('user_id', user.id)
+  let query = supabase.from('sender_profiles').delete().eq('id', id)
+  if (!isAdmin) {
+    query = query.eq('user_id', user.id)
+  } else {
+    query = query.eq('organization_id', userData?.organization_id)
+  }
 
+  const { error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   return NextResponse.json({ ok: true })
 }
