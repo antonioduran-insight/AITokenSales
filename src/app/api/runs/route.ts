@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     const { data: org } = await supabase
       .from('organizations')
-      .select('plan, max_leads_per_month, apify_token, anthropic_key')
+      .select('plan, max_leads_per_month, apify_token, anthropic_key, anthropic_base_url, anthropic_model')
       .eq('id', userData?.organization_id)
       .single()
 
@@ -165,6 +165,8 @@ export async function POST(req: NextRequest) {
           sdr_market_assignments: sdr_market_assignments ?? {},
           apify_token: org.apify_token,
           anthropic_key: org.anthropic_key,
+          anthropic_base_url: org.anthropic_base_url,
+          anthropic_model: org.anthropic_model,
         }),
       })
 

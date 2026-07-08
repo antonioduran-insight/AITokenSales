@@ -592,13 +592,51 @@ function ScraperTab() {
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState<Record<string, boolean>>({})
 
+  const [anthropicKey, setAnthropicKey] = useState('')
+  const [anthropicBaseUrl, setAnthropicBaseUrl] = useState('https://api.aitokenking.com.tw/api/v1')
+  const [anthropicModel, setAnthropicModel] = useState('claude-sonnet-4.6')
+  const [apifyToken, setApifyToken] = useState('')
+  const [savingApi, setSavingApi] = useState(false)
+  const [savedApi, setSavedApi] = useState(false)
+  const [apiError, setApiError] = useState<string | null>(null)
+
   useEffect(() => {
     fetch('/api/scraper-combos')
       .then(r => r.json())
       .then((data: ScraperComboMaster[]) => setCombos(data))
       .catch(() => {})
       .finally(() => setLoading(false))
+
+    fetch('/api/settings/organization')
+      .then(r => r.json())
+      .then(d => {
+        if (d.anthropic_key) setAnthropicKey(d.anthropic_key)
+        if (d.anthropic_base_url) setAnthropicBaseUrl(d.anthropic_base_url)
+        if (d.anthropic_model) setAnthropicModel(d.anthropic_model)
+        if (d.apify_token) setApifyToken(d.apify_token)
+      })
+      .catch(() => {})
   }, [])
+
+  async function saveApiSettings() {
+    setSavingApi(true); setApiError(null)
+    try {
+      const res = await fetch('/api/settings/organization', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apify_token: apifyToken || null,
+          anthropic_key: anthropicKey || null,
+          anthropic_base_url: anthropicBaseUrl || null,
+          anthropic_model: anthropicModel || null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setApiError(data.error ?? 'Failed to save'); return }
+      setSavedApi(true)
+      setTimeout(() => setSavedApi(false), 2500)
+    } catch { setApiError('Network error') } finally { setSavingApi(false) }
+  }
 
   async function toggle(code: string, currentActive: boolean) {
     setToggling(p => ({ ...p, [code]: true }))
@@ -619,6 +657,63 @@ function ScraperTab() {
 
   return (
     <div>
+      {/* API Settings */}
+      <div style={S.card}>
+        <p style={S.sectionTitle}>API Settings</p>
+        {apiError && (
+          <p style={{ fontSize: 13, color: '#EF4444', marginBottom: 12, marginTop: 0 }}>{apiError}</p>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div>
+            <label style={S.label}>Anthropic Key (ATK_API_KEY)</label>
+            <input
+              type="password"
+              value={anthropicKey}
+              onChange={e => setAnthropicKey(e.target.value)}
+              placeholder="sk-ant-…"
+              style={S.input}
+              autoComplete="new-password"
+            />
+          </div>
+          <div>
+            <label style={S.label}>Apify Token</label>
+            <input
+              type="password"
+              value={apifyToken}
+              onChange={e => setApifyToken(e.target.value)}
+              placeholder="apify_api_…"
+              style={S.input}
+              autoComplete="new-password"
+            />
+          </div>
+          <div>
+            <label style={S.label}>Anthropic Base URL</label>
+            <input
+              value={anthropicBaseUrl}
+              onChange={e => setAnthropicBaseUrl(e.target.value)}
+              placeholder="https://api.aitokenking.com.tw/api/v1"
+              style={S.input}
+            />
+          </div>
+          <div>
+            <label style={S.label}>Anthropic Model</label>
+            <input
+              value={anthropicModel}
+              onChange={e => setAnthropicModel(e.target.value)}
+              placeholder="claude-sonnet-4.6"
+              style={S.input}
+            />
+          </div>
+        </div>
+        <button
+          onClick={saveApiSettings}
+          disabled={savingApi}
+          style={{ ...S.btn, opacity: savingApi ? 0.6 : 1 }}
+        >
+          {savingApi ? 'Saving…' : savedApi ? '✓ Saved' : 'Save API Settings'}
+        </button>
+      </div>
+
       <div style={S.card}>
         <p style={S.sectionTitle}>Search Combos</p>
         <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', marginBottom: 16, marginTop: 0 }}>

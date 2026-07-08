@@ -162,6 +162,8 @@ export interface Organization {
   billing_day: number
   apify_token: string | null
   anthropic_key: string | null
+  anthropic_base_url: string | null
+  anthropic_model: string | null
   created_at: string
   updated_at: string
 }

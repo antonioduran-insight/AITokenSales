@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     name, slug, plan, logo_url, admin_name, admin_email, admin_password,
     max_seats, max_leads_per_month, custom_price, vendor,
     default_language, markets, internal_notes, addons,
-    apify_token, anthropic_key,
+    apify_token, anthropic_key, anthropic_base_url, anthropic_model,
   } = body
 
   if (!name || !slug || !plan || !admin_name || !admin_email || !admin_password) {
@@ -72,6 +72,8 @@ export async function POST(req: NextRequest) {
       internal_notes: internal_notes ?? null,
       apify_token: apify_token ?? null,
       anthropic_key: anthropic_key ?? null,
+      anthropic_base_url: anthropic_base_url ?? 'https://api.aitokenking.com.tw/api/v1',
+      anthropic_model: anthropic_model ?? 'claude-sonnet-4.6',
       is_active: true,
       billing_day: 10,
     })

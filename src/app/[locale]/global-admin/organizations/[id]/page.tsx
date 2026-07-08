@@ -66,6 +66,8 @@ export default function OrgDetailPage() {
 
   const [apifyToken, setApifyToken] = useState('')
   const [anthropicKey, setAnthropicKey] = useState('')
+  const [anthropicBaseUrl, setAnthropicBaseUrl] = useState('https://api.aitokenking.com.tw/api/v1')
+  const [anthropicModel, setAnthropicModel] = useState('claude-sonnet-4.6')
   const [savingKeys, setSavingKeys] = useState(false)
   const [savedKeys, setSavedKeys] = useState(false)
 
@@ -86,6 +88,8 @@ export default function OrgDetailPage() {
       setInternalNotes(data.internal_notes ?? '')
       setApifyToken(data.apify_token ?? '')
       setAnthropicKey(data.anthropic_key ?? '')
+      setAnthropicBaseUrl(data.anthropic_base_url ?? 'https://api.aitokenking.com.tw/api/v1')
+      setAnthropicModel(data.anthropic_model ?? 'claude-sonnet-4.6')
       setActiveAddons(new Set(data.addons.map((a: OrganizationAddon) => a.addon_type)))
     } catch (e) {
       setError((e as Error).message)
@@ -139,7 +143,7 @@ export default function OrgDetailPage() {
       await fetch(`/api/global-admin/organizations/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apify_token: apifyToken || null, anthropic_key: anthropicKey || null }),
+        body: JSON.stringify({ apify_token: apifyToken || null, anthropic_key: anthropicKey || null, anthropic_base_url: anthropicBaseUrl || null, anthropic_model: anthropicModel || null }),
       })
       setSavedKeys(true)
       setTimeout(() => setSavedKeys(false), 2000)
@@ -347,8 +351,16 @@ export default function OrgDetailPage() {
                 <input type="password" value={apifyToken} onChange={e => setApifyToken(e.target.value)} placeholder="apify_api_…" style={inputStyle} />
               </div>
               <div>
-                <label style={labelStyle}>Anthropic API Key</label>
+                <label style={labelStyle}>Anthropic Key (ATK_API_KEY)</label>
                 <input type="password" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} placeholder="sk-ant-…" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Anthropic Base URL</label>
+                <input value={anthropicBaseUrl} onChange={e => setAnthropicBaseUrl(e.target.value)} placeholder="https://api.aitokenking.com.tw/api/v1" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Anthropic Model</label>
+                <input value={anthropicModel} onChange={e => setAnthropicModel(e.target.value)} placeholder="claude-sonnet-4.6" style={inputStyle} />
               </div>
             </div>
             <button

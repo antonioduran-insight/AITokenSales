@@ -56,6 +56,8 @@ export default function NewOrganizationPage() {
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set())
   const [apifyToken, setApifyToken] = useState('')
   const [anthropicKey, setAnthropicKey] = useState('')
+  const [anthropicBaseUrl, setAnthropicBaseUrl] = useState('https://api.aitokenking.com.tw/api/v1')
+  const [anthropicModel, setAnthropicModel] = useState('claude-sonnet-4.6')
   const [orgTempId] = useState(() => `new-${Date.now()}`)
 
   useEffect(() => {
@@ -135,6 +137,8 @@ export default function NewOrganizationPage() {
         addons: Array.from(selectedAddons),
         apify_token: apifyToken,
         anthropic_key: anthropicKey,
+        anthropic_base_url: anthropicBaseUrl || null,
+        anthropic_model: anthropicModel || null,
       }),
     })
 
@@ -343,8 +347,16 @@ export default function NewOrganizationPage() {
                 <input type="password" value={apifyToken} onChange={e => setApifyToken(e.target.value)} placeholder="apify_api_…" style={inputStyle} autoComplete="new-password" />
               </div>
               <div>
-                <label style={labelStyle}>Anthropic API Key *</label>
+                <label style={labelStyle}>Anthropic Key (ATK_API_KEY) *</label>
                 <input type="password" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} placeholder="sk-ant-…" style={inputStyle} autoComplete="new-password" />
+              </div>
+              <div>
+                <label style={labelStyle}>Anthropic Base URL</label>
+                <input value={anthropicBaseUrl} onChange={e => setAnthropicBaseUrl(e.target.value)} placeholder="https://api.aitokenking.com.tw/api/v1" style={inputStyle} autoComplete="off" />
+              </div>
+              <div>
+                <label style={labelStyle}>Anthropic Model</label>
+                <input value={anthropicModel} onChange={e => setAnthropicModel(e.target.value)} placeholder="claude-sonnet-4.6" style={inputStyle} autoComplete="off" />
               </div>
             </div>
           </div>
