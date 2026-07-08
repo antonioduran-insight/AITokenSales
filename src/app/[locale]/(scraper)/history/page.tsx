@@ -72,8 +72,10 @@ export default function HistoryPage() {
     e.stopPropagation();
     setCancellingIds(prev => new Set(prev).add(runId));
     try {
-      await fetch(`/api/scraper/runs/${runId}`, { method: 'DELETE' });
-      setRuns(prev => prev.map(r => r.id === runId ? { ...r, status: 'cancelled' } : r));
+      const res = await fetch(`/api/runs/${runId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setRuns(prev => prev.map(r => r.id === runId ? { ...r, status: 'cancelled' } : r));
+      }
     } catch { /* ignore */ }
     finally {
       setCancellingIds(prev => { const s = new Set(prev); s.delete(runId); return s; });
