@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function PATCH(
   req: NextRequest,
@@ -26,14 +27,16 @@ export async function PATCH(
     if (key in body) patch[key] = body[key]
   }
 
+  const writer = isAdmin ? createAdminClient() : supabase
+
   if (patch.is_default) {
-    const { data: profile } = await supabase
+    const { data: profile } = await writer
       .from('sender_profiles')
       .select('user_id, organization_id')
       .eq('id', id)
       .maybeSingle()
     if (profile) {
-      await supabase
+      await writer
         .from('sender_profiles')
         .update({ is_default: false })
         .eq('user_id', profile.user_id)
@@ -41,7 +44,7 @@ export async function PATCH(
     }
   }
 
-  let query = supabase.from('sender_profiles').update(patch).eq('id', id)
+  let query = writer.from('sender_profiles').update(patch).eq('id', id)
   if (!isAdmin) {
     query = query.eq('user_id', user.id)
   } else {
@@ -70,8 +73,9 @@ export async function DELETE(
   const isAdmin = userData?.role === 'admin' || userData?.role === 'admin_global'
 
   const { id } = await params
+  const deleter = isAdmin ? createAdminClient() : supabase
 
-  let query = supabase.from('sender_profiles').delete().eq('id', id)
+  let query = deleter.from('sender_profiles').delete().eq('id', id)
   if (!isAdmin) {
     query = query.eq('user_id', user.id)
   } else {

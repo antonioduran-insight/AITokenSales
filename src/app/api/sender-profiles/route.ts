@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -57,16 +58,17 @@ export async function POST(req: NextRequest) {
 
   const isAdmin = userData?.role === 'admin' || userData?.role === 'admin_global'
   const profileUserId = (isAdmin && targetUserId) ? targetUserId : user.id
+  const writer = profileUserId !== user.id ? createAdminClient() : supabase
 
   if (is_default) {
-    await supabase
+    await writer
       .from('sender_profiles')
       .update({ is_default: false })
       .eq('user_id', profileUserId)
       .eq('organization_id', userData?.organization_id)
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await writer
     .from('sender_profiles')
     .insert({
       user_id: profileUserId,
