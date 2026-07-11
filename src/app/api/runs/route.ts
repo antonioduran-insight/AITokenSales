@@ -183,7 +183,9 @@ export async function POST(req: NextRequest) {
           run_id: run.id,
           sdr_id: a.sdr_id,
           sender_profile_id: a.sender_profile_id,
-          assigned_markets: sdr_market_assignments?.[a.sdr_id] ?? [],
+          assigned_markets: sdr_market_assignments?.[a.sdr_id]?.length
+            ? sdr_market_assignments[a.sdr_id]
+            : allMarkets,
         }))
       )
     }
@@ -201,7 +203,9 @@ export async function POST(req: NextRequest) {
           sdr_id: a.sdr_id,
           sender_profile_id: a.sender_profile_id ?? null,
           sender_profile: a.sender_profile ?? null,
-          assigned_markets: sdr_market_assignments?.[a.sdr_id] ?? [],
+          assigned_markets: sdr_market_assignments?.[a.sdr_id]?.length
+            ? sdr_market_assignments[a.sdr_id]
+            : allMarkets,
         })),
         apify_token: org.apify_token,
         anthropic_key: org.anthropic_key,
