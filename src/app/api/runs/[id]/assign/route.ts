@@ -9,16 +9,6 @@ function adminClient() {
   )
 }
 
-// Fisher–Yates shuffle
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr]
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[a[i], a[j]] = [a[j], a[i]]
-  }
-  return a
-}
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -83,48 +73,44 @@ export async function POST(
   const areaBySdr: Record<string, string | null> = {}
   for (const s of validSdrs) areaBySdr[s.id] = s.area_id ?? null
 
-  // Shuffle then split into equal contiguous chunks
-  const shuffled = shuffle(leads)
-  const n = validSdrs.length
-  const base = Math.floor(shuffled.length / n)
-  const remainder = shuffled.length % n
+  // Assign each lead to the SDR the scraper already tagged it with (lead.sdr_id).
+  // Leads with no sdr_id — or an sdr_id that isn't in this run's SDR list — fall
+  // back to the first SDR.
+  const validSdrIds = new Set(validSdrs.map(s => s.id))
+  const fallbackSdrId = validSdrs[0].id
 
   const prospectRows: Record<string, unknown>[] = []
   const assignedCount: Record<string, number> = {}
-  let cursor = 0
+  for (const s of validSdrs) assignedCount[s.id] = 0
 
   const tempMap: Record<string, string> = { 'HOT': 'Hot', 'WARM': 'Warm', 'COLD': 'Cold' }
 
-  validSdrs.forEach((sdr, idx) => {
-    const take = base + (idx < remainder ? 1 : 0)
-    const slice = shuffled.slice(cursor, cursor + take)
-    cursor += take
-    assignedCount[sdr.id] = slice.length
+  for (const lead of leads) {
+    const sdrId = lead.sdr_id && validSdrIds.has(lead.sdr_id) ? lead.sdr_id : fallbackSdrId
+    assignedCount[sdrId] = (assignedCount[sdrId] ?? 0) + 1
 
-    for (const lead of slice) {
-      prospectRows.push({
-        name: lead.full_name,
-        linkedin_url: lead.linkedin_url ?? null,
-        email: lead.email ?? null,
-        company: lead.company ?? null,
-        title: lead.title ?? null,
-        industry: lead.industry ?? null,
-        company_size: lead.company_size ?? null,
-        icp_score: lead.icp_score ?? null,
-        lead_temperature: tempMap[lead.temperature?.toUpperCase() ?? ''] ?? 'Cold',
-        search_combo: lead.search_combo ?? null,
-        custom1: lead.custom1 ?? null,
-        custom2: lead.custom2 ?? null,
-        market: lead.market ?? null,
-        source: 'scraper',
-        outreach_status: 'new',
-        area_id: areaBySdr[sdr.id],
-        assigned_to: sdr.id,
-        organization_id: userData.organization_id,
-        flag_tomorrow: false,
-      })
-    }
-  })
+    prospectRows.push({
+      name: lead.full_name,
+      linkedin_url: lead.linkedin_url ?? null,
+      email: lead.email ?? null,
+      company: lead.company ?? null,
+      title: lead.title ?? null,
+      industry: lead.industry ?? null,
+      company_size: lead.company_size ?? null,
+      icp_score: lead.icp_score ?? null,
+      lead_temperature: tempMap[lead.temperature?.toUpperCase() ?? ''] ?? 'Cold',
+      search_combo: lead.search_combo ?? null,
+      custom1: lead.custom1 ?? null,
+      custom2: lead.custom2 ?? null,
+      market: lead.market ?? null,
+      source: 'scraper',
+      outreach_status: 'new',
+      area_id: areaBySdr[sdrId],
+      assigned_to: sdrId,
+      organization_id: userData.organization_id,
+      flag_tomorrow: false,
+    })
+  }
 
   // Insert prospects in batches
   let inserted = 0
