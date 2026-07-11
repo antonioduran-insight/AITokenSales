@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link } from '@/i18n/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/contexts/UserContext'
-import { Play, AlertCircle, Minus, Plus, CheckCircle2, XCircle, Loader2, ArrowRight } from 'lucide-react'
+import { Play, AlertCircle, Minus, Plus, CheckCircle2, XCircle, Loader2, ArrowRight, Download } from 'lucide-react'
 import type { User, ScraperComboMaster } from '@/lib/types'
 
 const MARKETS = ['Taiwan', 'LATAM', 'Vietnam', 'Global']
@@ -67,6 +67,10 @@ export default function RunPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
+  // ── Phase 1: SDR selection ──
+  const [sdrs, setSdrs] = useState<User[]>([])
+  const [selectedSdrIds, setSelectedSdrIds] = useState<string[]>([])
+
   // ── Phase 2: run + logs ──
   const [runId, setRunId] = useState<string | null>(null)
   const [runStatus, setRunStatus] = useState<string>('pending')
@@ -75,19 +79,12 @@ export default function RunPage() {
   const logBoxRef = useRef<HTMLDivElement | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // ── Phase 3: assignment ──
-  const [sdrs, setSdrs] = useState<User[]>([])
-  const [selectedSdrIds, setSelectedSdrIds] = useState<string[]>([])
-  const [assigning, setAssigning] = useState(false)
-  const [assignError, setAssignError] = useState<string | null>(null)
-  const [assignResult, setAssignResult] = useState<{ assigned: number } | null>(null)
-
   const maxLeads = PLAN_LIMITS[orgPlan ?? 'basic'] ?? 1000
   const available = maxLeads >= MAX_INT ? MAX_INT : Math.max(0, maxLeads - monthlyUsed)
   const leadsPerCombo = selectedCombos.length > 0 ? Math.floor(totalLeads / selectedCombos.length) : 0
 
   const canRun = !!market && selectedCombos.length > 0 && totalLeads >= MIN_LEADS &&
-    (available >= MAX_INT || totalLeads <= available)
+    selectedSdrIds.length > 0 && (available >= MAX_INT || totalLeads <= available)
 
   // Load combos
   useEffect(() => {
@@ -111,7 +108,7 @@ export default function RunPage() {
       .then(({ data }) => { if (data) setMonthlyUsed(data.count) })
   }, [isAdmin, user?.organization_id])
 
-  // Load SDRs with scraper access (for phase 3)
+  // Load SDRs with scraper access (selected in phase 1)
   useEffect(() => {
     createClient()
       .from('users')
@@ -197,6 +194,10 @@ export default function RunPage() {
           markets: [market],
           combos: selectedCombos,
           total_leads: totalLeads,
+          sdr_ids: selectedSdrIds,
+          sdr_market_assignments: Object.fromEntries(
+            selectedSdrIds.map(id => [id, market ? [market] : []])
+          ),
         }),
       })
       const data = await res.json()
@@ -214,40 +215,15 @@ export default function RunPage() {
     }
   }
 
-  // Preview distribution for phase 3
+  // Preview distribution of the requested leads across the selected SDRs
   function previewDist(): Record<string, number> {
     const out: Record<string, number> = {}
     const n = selectedSdrIds.length
-    if (!n || !leadsGenerated) return out
-    const base = Math.floor(leadsGenerated / n)
-    const rem = leadsGenerated % n
+    if (!n || !totalLeads) return out
+    const base = Math.floor(totalLeads / n)
+    const rem = totalLeads % n
     selectedSdrIds.forEach((id, i) => { out[id] = base + (i < rem ? 1 : 0) })
     return out
-  }
-
-  async function handleAssign() {
-    if (!runId || selectedSdrIds.length === 0 || assigning) return
-    setAssigning(true)
-    setAssignError(null)
-    try {
-      const res = await fetch(`/api/runs/${runId}/assign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sdr_ids: selectedSdrIds,
-          sdr_market_assignments: Object.fromEntries(
-            selectedSdrIds.map(id => [id, market ? [market] : []])
-          ),
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) { setAssignError(data.error ?? 'Assignment failed'); return }
-      setAssignResult({ assigned: data.assigned })
-    } catch (e) {
-      setAssignError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setAssigning(false)
-    }
   }
 
   const isConfig = !runId
@@ -342,6 +318,44 @@ export default function RunPage() {
             )}
           </div>
 
+          {/* SDRs */}
+          <div style={S.card}>
+            <span style={S.label}>Assign to SDRs</span>
+            {sdrs.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
+                No SDRs with scraper access. Enable it in Settings → Users.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {sdrs.map(sdr => {
+                  const sel = selectedSdrIds.includes(sdr.id)
+                  return (
+                    <label key={sdr.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 8, cursor: 'pointer',
+                      backgroundColor: sel ? '#6C63FF10' : 'var(--crm-surface-raised)',
+                      border: `1px solid ${sel ? '#6C63FF40' : 'var(--crm-border)'}`, transition: 'all .15s',
+                    }}>
+                      <input type="checkbox" checked={sel} onChange={() => toggleSdr(sdr.id)}
+                        style={{ accentColor: 'var(--crm-accent)', width: 14, height: 14 }} />
+                      <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--crm-text-primary)' }}>{sdr.full_name}</span>
+                      {sel && dist[sdr.id] != null && (
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-accent)' }}>~{dist[sdr.id]} leads</span>
+                      )}
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+            {selectedSdrIds.length > 0 && (
+              <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: '12px 0 0' }}>
+                {totalLeads} leads → {selectedSdrIds.map(id => {
+                  const s = sdrs.find(x => x.id === id)
+                  return `${s?.full_name ?? '?'}: ~${dist[id] ?? 0}`
+                }).join(' · ')}
+              </p>
+            )}
+          </div>
+
           {/* Error */}
           {submitError && (
             <div style={{ display: 'flex', gap: 12, padding: '14px 16px', borderRadius: 10, backgroundColor: '#EF444410', border: '1px solid #EF444430' }}>
@@ -405,73 +419,22 @@ export default function RunPage() {
             </button>
           )}
 
-          {/* ══════════ PHASE 3 — ASSIGN ══════════ */}
-          {isCompleted && !assignResult && (
-            <div style={S.card}>
-              <p style={{ fontSize: 15, fontWeight: 700, margin: '0 0 4px' }}>
-                {leadsGenerated} leads generated
-              </p>
-              <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: '0 0 16px' }}>
-                Select the SDRs to distribute these leads equally.
-              </p>
-
-              {sdrs.length === 0 ? (
-                <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
-                  No SDRs with scraper access. Enable it in Settings → Users.
-                </p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {sdrs.map(sdr => {
-                    const sel = selectedSdrIds.includes(sdr.id)
-                    return (
-                      <label key={sdr.id} style={{
-                        display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 8, cursor: 'pointer',
-                        backgroundColor: sel ? '#6C63FF10' : 'var(--crm-surface-raised)',
-                        border: `1px solid ${sel ? '#6C63FF40' : 'var(--crm-border)'}`, transition: 'all .15s',
-                      }}>
-                        <input type="checkbox" checked={sel} onChange={() => toggleSdr(sdr.id)}
-                          style={{ accentColor: 'var(--crm-accent)', width: 14, height: 14 }} />
-                        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--crm-text-primary)' }}>{sdr.full_name}</span>
-                        {sel && dist[sdr.id] != null && (
-                          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-accent)' }}>{dist[sdr.id]} leads</span>
-                        )}
-                      </label>
-                    )
-                  })}
-                </div>
-              )}
-
-              {selectedSdrIds.length > 0 && (
-                <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: '12px 0 0' }}>
-                  {leadsGenerated} leads → {selectedSdrIds.map(id => {
-                    const s = sdrs.find(x => x.id === id)
-                    return `${s?.full_name ?? '?'}: ${dist[id] ?? 0}`
-                  }).join(' · ')}
-                </p>
-              )}
-
-              {assignError && <p style={{ fontSize: 12, color: '#EF4444', margin: '12px 0 0' }}>{assignError}</p>}
-
-              <button onClick={handleAssign} disabled={selectedSdrIds.length === 0 || assigning}
-                style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, padding: '11px 20px', borderRadius: 9, border: 'none', backgroundColor: selectedSdrIds.length > 0 && !assigning ? 'var(--crm-accent)' : 'var(--crm-border)', color: '#FFF', cursor: selectedSdrIds.length > 0 && !assigning ? 'pointer' : 'not-allowed' }}>
-                {assigning ? 'Assigning…' : 'Assign Leads'}
-              </button>
-            </div>
-          )}
-
-          {/* Assignment success */}
-          {assignResult && (
+          {/* ══════════ PHASE 3 — COMPLETION SUMMARY ══════════ */}
+          {isCompleted && (
             <div style={{ ...S.card, borderColor: '#16A34A40', backgroundColor: '#14532D15' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                 <CheckCircle2 size={20} color="#22C55E" />
                 <p style={{ fontSize: 16, fontWeight: 700, margin: 0, color: '#22C55E' }}>
-                  {assignResult.assigned} leads assigned
+                  {leadsGenerated} leads generated
                 </p>
               </div>
               <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', margin: '0 0 16px' }}>
-                Leads are now in the SDRs&apos; kanban boards.
+                Leads were distributed to the selected SDRs and are now in their kanban boards.
               </p>
-              <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' as const }}>
+                <Link href={`/export?run_id=${runId}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--crm-text-secondary)', border: '1px solid var(--crm-border)', padding: '10px 18px', borderRadius: 8, textDecoration: 'none' }}>
+                  <Download size={14} /> Download CSV
+                </Link>
                 <Link href="/kanban" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#FFF', backgroundColor: 'var(--crm-accent)', padding: '10px 18px', borderRadius: 8, textDecoration: 'none' }}>
                   View in Kanban <ArrowRight size={14} />
                 </Link>
