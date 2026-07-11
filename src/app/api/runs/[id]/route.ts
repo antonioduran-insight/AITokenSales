@@ -45,7 +45,8 @@ export async function DELETE(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  if (run.status !== 'pending' && run.status !== 'running') {
+  const cancellable = new Set(['pending', 'running', 'scoring', 'drafting'])
+  if (!cancellable.has(run.status)) {
     return NextResponse.json({ error: 'Run is not cancellable' }, { status: 400 })
   }
 
