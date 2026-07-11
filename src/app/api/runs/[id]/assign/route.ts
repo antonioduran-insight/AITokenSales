@@ -38,7 +38,7 @@ export async function POST(
   }
 
   const { id: runId } = await params
-  const { sdr_ids } = await req.json()
+  const { sdr_ids, sdr_market_assignments } = await req.json()
 
   if (!Array.isArray(sdr_ids) || sdr_ids.length === 0) {
     return NextResponse.json({ error: 'sdr_ids is required' }, { status: 400 })
@@ -135,12 +135,17 @@ export async function POST(
     inserted += data?.length ?? 0
   }
 
-  // Record per-SDR assignment counts
+  // Record per-SDR assignment counts (and the markets each SDR was assigned)
   for (const sdrId of Object.keys(assignedCount)) {
     await admin
       .from('run_sdr_assignments')
       .upsert(
-        { run_id: runId, sdr_id: sdrId, leads_assigned: assignedCount[sdrId] },
+        {
+          run_id: runId,
+          sdr_id: sdrId,
+          leads_assigned: assignedCount[sdrId],
+          assigned_markets: sdr_market_assignments?.[sdrId] ?? [],
+        },
         { onConflict: 'run_id,sdr_id' }
       )
   }

@@ -233,7 +233,12 @@ export default function RunPage() {
       const res = await fetch(`/api/runs/${runId}/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sdr_ids: selectedSdrIds }),
+        body: JSON.stringify({
+          sdr_ids: selectedSdrIds,
+          sdr_market_assignments: Object.fromEntries(
+            selectedSdrIds.map(id => [id, market ? [market] : []])
+          ),
+        }),
       })
       const data = await res.json()
       if (!res.ok) { setAssignError(data.error ?? 'Assignment failed'); return }
