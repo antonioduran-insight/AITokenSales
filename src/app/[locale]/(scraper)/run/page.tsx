@@ -79,6 +79,12 @@ export default function RunPage() {
   const logBoxRef = useRef<HTMLDivElement | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // ── Phase 3: auto-assign on completion ──
+  const [assignState, setAssignState] = useState<'idle' | 'assigning' | 'done' | 'error'>('idle')
+  const [assignedCount, setAssignedCount] = useState(0)
+  const [assignError, setAssignError] = useState<string | null>(null)
+  const assignFiredRef = useRef(false)
+
   const maxLeads = PLAN_LIMITS[orgPlan ?? 'basic'] ?? 1000
   const available = maxLeads >= MAX_INT ? MAX_INT : Math.max(0, maxLeads - monthlyUsed)
   const leadsPerCombo = selectedCombos.length > 0 ? Math.floor(totalLeads / selectedCombos.length) : 0
@@ -225,6 +231,41 @@ export default function RunPage() {
     selectedSdrIds.forEach((id, i) => { out[id] = base + (i < rem ? 1 : 0) })
     return out
   }
+
+  // Push this run's scraper_leads into the SDRs' kanban boards.
+  // Called automatically when the run completes — no user action required.
+  const runAssign = useCallback(async () => {
+    if (!runId) return
+    setAssignState('assigning')
+    setAssignError(null)
+    try {
+      const res = await fetch(`/api/runs/${runId}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sdr_ids: selectedSdrIds,
+          sdr_market_assignments: Object.fromEntries(
+            selectedSdrIds.map(id => [id, market ? [market] : []])
+          ),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setAssignError(data.error ?? 'Assignment failed'); setAssignState('error'); return }
+      setAssignedCount(data.assigned ?? 0)
+      setAssignState('done')
+    } catch (e) {
+      setAssignError(e instanceof Error ? e.message : String(e))
+      setAssignState('error')
+    }
+  }, [runId, selectedSdrIds, market])
+
+  // Auto-assign once, as soon as the run reports completed
+  useEffect(() => {
+    if (runStatus === 'completed' && !assignFiredRef.current && selectedSdrIds.length > 0) {
+      assignFiredRef.current = true
+      runAssign()
+    }
+  }, [runStatus, selectedSdrIds.length, runAssign])
 
   const isConfig = !runId
   const isRunning = !!runId && ACTIVE.has(runStatus)
@@ -428,9 +469,30 @@ export default function RunPage() {
                   {leadsGenerated} leads generated
                 </p>
               </div>
-              <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', margin: '0 0 16px' }}>
-                Leads were distributed to the selected SDRs and are now in their kanban boards.
-              </p>
+
+              {assignState === 'assigning' && (
+                <p style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--crm-text-secondary)', margin: '0 0 16px' }}>
+                  <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                  Distributing leads to the SDRs&apos; kanban boards…
+                </p>
+              )}
+              {assignState === 'done' && (
+                <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', margin: '0 0 16px' }}>
+                  {assignedCount} leads distributed to the selected SDRs — now in their kanban boards.
+                </p>
+              )}
+              {assignState === 'error' && (
+                <div style={{ margin: '0 0 16px' }}>
+                  <p style={{ fontSize: 13, color: '#EF4444', margin: '0 0 8px' }}>
+                    Could not distribute leads: {assignError}
+                  </p>
+                  <button onClick={runAssign}
+                    style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-secondary)', border: '1px solid var(--crm-border)', padding: '8px 16px', borderRadius: 8, background: 'transparent', cursor: 'pointer' }}>
+                    Retry distribution
+                  </button>
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' as const }}>
                 <Link href={`/export?run_id=${runId}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--crm-text-secondary)', border: '1px solid var(--crm-border)', padding: '10px 18px', borderRadius: 8, textDecoration: 'none' }}>
                   <Download size={14} /> Download CSV
