@@ -111,7 +111,7 @@ export async function POST(
         industry: lead.industry ?? null,
         company_size: lead.company_size ?? null,
         icp_score: lead.icp_score ?? null,
-        lead_temperature: tempMap[lead.temperature?.toUpperCase()] ?? 'Cold',
+        lead_temperature: tempMap[lead.temperature?.toUpperCase() ?? ''] ?? 'Cold',
         search_combo: lead.search_combo ?? null,
         custom1: lead.custom1 ?? null,
         custom2: lead.custom2 ?? null,
