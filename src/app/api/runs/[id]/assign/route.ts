@@ -93,6 +93,8 @@ export async function POST(
   const assignedCount: Record<string, number> = {}
   let cursor = 0
 
+  const tempMap: Record<string, string> = { 'HOT': 'Hot', 'WARM': 'Warm', 'COLD': 'Cold' }
+
   validSdrs.forEach((sdr, idx) => {
     const take = base + (idx < remainder ? 1 : 0)
     const slice = shuffled.slice(cursor, cursor + take)
@@ -109,7 +111,7 @@ export async function POST(
         industry: lead.industry ?? null,
         company_size: lead.company_size ?? null,
         icp_score: lead.icp_score ?? null,
-        lead_temperature: lead.temperature ?? null,
+        lead_temperature: tempMap[lead.temperature?.toUpperCase()] ?? 'Cold',
         search_combo: lead.search_combo ?? null,
         custom1: lead.custom1 ?? null,
         custom2: lead.custom2 ?? null,
