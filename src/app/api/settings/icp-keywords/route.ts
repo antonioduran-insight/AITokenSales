@@ -29,38 +29,37 @@ export async function GET() {
 
   const admin = createAdminClient()
   const { data, error } = await admin
-    .from('organizations')
-    .select('id, name, slug, plan, logo_url, default_language, domain_blacklist, product_description, max_seats, max_leads_per_month, billing_day, apify_token, anthropic_key, anthropic_base_url, anthropic_model')
-    .eq('id', ctx.orgId)
-    .single()
+    .from('org_icp_keywords')
+    .select('*')
+    .eq('organization_id', ctx.orgId)
+    .order('category')
+    .order('created_at')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  return NextResponse.json(data)
+  return NextResponse.json(data ?? [])
 }
 
-export async function PATCH(req: Request) {
+export async function POST(req: Request) {
   const ctx = await getOrgAdmin()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json()
-  const allowed = ['name', 'default_language', 'logo_url', 'domain_blacklist', 'product_description', 'apify_token', 'anthropic_key', 'anthropic_base_url', 'anthropic_model']
-  const update: Record<string, unknown> = {}
-  for (const key of allowed) {
-    if (key in body) update[key] = body[key]
+  const { category, keyword, weight } = await req.json()
+  if (!category?.trim() || !keyword?.trim()) {
+    return NextResponse.json({ error: 'category and keyword are required' }, { status: 400 })
   }
-  if (Object.keys(update).length === 0) {
-    return NextResponse.json({ error: 'No valid fields' }, { status: 400 })
-  }
-  update.updated_at = new Date().toISOString()
 
   const admin = createAdminClient()
   const { data, error } = await admin
-    .from('organizations')
-    .update(update)
-    .eq('id', ctx.orgId)
-    .select('id, name, slug, plan, logo_url, default_language, domain_blacklist, product_description, apify_token, anthropic_key, anthropic_base_url, anthropic_model')
+    .from('org_icp_keywords')
+    .insert({
+      organization_id: ctx.orgId,
+      category: category.trim(),
+      keyword: keyword.trim(),
+      weight: weight ?? 1,
+    })
+    .select()
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  return NextResponse.json(data)
+  return NextResponse.json(data, { status: 201 })
 }

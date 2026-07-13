@@ -6,7 +6,21 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { useUser } from '@/contexts/UserContext'
 import { GripVertical, Plus, Trash2, X } from 'lucide-react'
-import type { Organization, PipelineStage, OrganizationAddon, ScraperComboMaster, User, SenderProfile } from '@/lib/types'
+import { TagInput } from '@/components/ui/TagInput'
+import type {
+  Organization, PipelineStage, OrganizationAddon, ScraperComboMaster, User, SenderProfile,
+  ChannelFamilyType, OrgCompanySeedList, OrgIcpKeyword, OrgChannelHook,
+} from '@/lib/types'
+
+const MARKETS = ['Taiwan', 'LATAM', 'Vietnam', 'Global']
+
+const ICP_CATEGORIES = ['industry', 'ai_signal', 'decision_title', 'influencer_title'] as const
+const ICP_CATEGORY_LABELS: Record<string, string> = {
+  industry: 'Industry Keywords',
+  ai_signal: 'Buying Signal Keywords',
+  decision_title: 'Decision-Maker Title Keywords',
+  influencer_title: 'Influencer Title Keywords',
+}
 
 const PLAN_COLORS: Record<string, string> = {
   basic: '#3B82F6',
@@ -55,6 +69,7 @@ function OrgTab() {
   const [language, setLanguage] = useState('en')
   const [logoUrl, setLogoUrl] = useState('')
   const [blacklist, setBlacklist] = useState('')
+  const [productDescription, setProductDescription] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -71,6 +86,7 @@ function OrgTab() {
         setLanguage(d.default_language ?? 'en')
         setLogoUrl(d.logo_url ?? '')
         setBlacklist(d.domain_blacklist ?? '')
+        setProductDescription(d.product_description ?? '')
       })
   }, [])
 
@@ -79,7 +95,7 @@ function OrgTab() {
     const res = await fetch('/api/settings/organization', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, default_language: language, logo_url: logoUrl || null, domain_blacklist: blacklist || null }),
+      body: JSON.stringify({ name, default_language: language, logo_url: logoUrl || null, domain_blacklist: blacklist || null, product_description: productDescription || null }),
     })
     const data = await res.json()
     if (!res.ok) { setError(data.error); setSaving(false); return }
@@ -172,6 +188,20 @@ function OrgTab() {
           rows={6}
           placeholder={'competitor.com\nblocked-company.io'}
           style={{ ...S.input, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
+        />
+      </div>
+
+      <div style={S.card}>
+        <p style={S.sectionTitle}>Product Description</p>
+        <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginBottom: 12 }}>
+          What your organization sells — used by the scraper backend so generated outreach messages can reference something concrete instead of an empty template.
+        </p>
+        <textarea
+          value={productDescription}
+          onChange={e => setProductDescription(e.target.value)}
+          rows={4}
+          placeholder="e.g. We help mid-size logistics companies cut fuel costs with route-optimization software…"
+          style={{ ...S.input, resize: 'vertical' }}
         />
       </div>
 
@@ -587,6 +617,13 @@ function PlanTab() {
 // ────────────────────────────────────────────────────────────────────────────
 // Tab 4 — Scraper
 // ────────────────────────────────────────────────────────────────────────────
+function emptySenderProfileForm() {
+  return {
+    display_name: '', title: '', company: '', style_hint: '', language: 'en', is_default: true,
+    linkedin_account_tier: '', connection_note_max_chars: '300', followup_max_chars: '1900',
+  }
+}
+
 function ScraperTab() {
   const [combos, setCombos] = useState<ScraperComboMaster[]>([])
   const [loading, setLoading] = useState(true)
@@ -595,7 +632,7 @@ function ScraperTab() {
   const [sdrs, setSdrs] = useState<User[]>([])
   const [profilesBySdr, setProfilesBySdr] = useState<Record<string, SenderProfile[]>>({})
   const [openFormFor, setOpenFormFor] = useState<string | null>(null)
-  const [formFields, setFormFields] = useState({ display_name: '', title: '', company: '', style_hint: '', language: 'en', is_default: true })
+  const [formFields, setFormFields] = useState(emptySenderProfileForm())
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
 
@@ -637,7 +674,13 @@ function ScraperTab() {
       const res = await fetch('/api/sender-profiles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formFields, user_id: sdrId }),
+        body: JSON.stringify({
+          ...formFields,
+          user_id: sdrId,
+          linkedin_account_tier: formFields.linkedin_account_tier || null,
+          connection_note_max_chars: Number(formFields.connection_note_max_chars) || 300,
+          followup_max_chars: Number(formFields.followup_max_chars) || 1900,
+        }),
       })
       const data = await res.json()
       if (!res.ok) { setProfileError(data.error ?? 'Failed to create'); return }
@@ -649,7 +692,7 @@ function ScraperTab() {
         return { ...prev, [sdrId]: [...updated, data] }
       })
       setOpenFormFor(null)
-      setFormFields({ display_name: '', title: '', company: '', style_hint: '', language: 'en', is_default: true })
+      setFormFields(emptySenderProfileForm())
     } catch { setProfileError('Network error') } finally { setSavingProfile(false) }
   }
 
@@ -721,7 +764,7 @@ function ScraperTab() {
                       )}
                     </div>
                     <button
-                      onClick={() => { setOpenFormFor(isOpen ? null : sdr.id); setProfileError(null); setFormFields({ display_name: '', title: '', company: '', style_hint: '', language: 'en', is_default: true }) }}
+                      onClick={() => { setOpenFormFor(isOpen ? null : sdr.id); setProfileError(null); setFormFields(emptySenderProfileForm()) }}
                       style={{ ...S.btn, padding: '5px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}
                     >
                       <Plus size={12} /> Add profile
@@ -789,6 +832,24 @@ function ScraperTab() {
                         <div style={{ gridColumn: 'span 2' }}>
                           <label style={S.label}>Style hint (optional)</label>
                           <input value={formFields.style_hint} onChange={e => setFormFields(p => ({ ...p, style_hint: e.target.value }))} placeholder="Professional, concise, focuses on ROI..." style={S.input} />
+                        </div>
+                        <div>
+                          <label style={S.label}>LinkedIn Account Tier</label>
+                          <select value={formFields.linkedin_account_tier} onChange={e => setFormFields(p => ({ ...p, linkedin_account_tier: e.target.value }))} style={S.select}>
+                            <option value="">—</option>
+                            <option value="free">Free</option>
+                            <option value="premium">Premium</option>
+                            <option value="sales_navigator">Sales Navigator</option>
+                            <option value="recruiter">Recruiter</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={S.label}>Connection Note Max Chars</label>
+                          <input type="number" value={formFields.connection_note_max_chars} onChange={e => setFormFields(p => ({ ...p, connection_note_max_chars: e.target.value }))} style={S.input} />
+                        </div>
+                        <div>
+                          <label style={S.label}>Follow-up Max Chars</label>
+                          <input type="number" value={formFields.followup_max_chars} onChange={e => setFormFields(p => ({ ...p, followup_max_chars: e.target.value }))} style={S.input} />
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -883,6 +944,421 @@ function ScraperTab() {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Tab 5 — BD Group
+// ────────────────────────────────────────────────────────────────────────────
+function emptySeedListForm() {
+  return { list_name: '', market: '', company_names: [] as string[], title_keywords: [] as string[], seniority_levels: [] as string[], channel_family: '' }
+}
+
+function SeedListsSection({ channelFamilies }: { channelFamilies: ChannelFamilyType[] }) {
+  const [lists, setLists] = useState<OrgCompanySeedList[]>([])
+  const [loading, setLoading] = useState(true)
+  const [open, setOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState(emptySeedListForm())
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/settings/seed-lists')
+      .then(r => r.json())
+      .then((d: OrgCompanySeedList[]) => { setLists(d); setLoading(false) })
+  }, [])
+
+  function openCreate() {
+    setForm(emptySeedListForm())
+    setEditingId(null)
+    setOpen(true)
+    setError(null)
+  }
+
+  function openEdit(sl: OrgCompanySeedList) {
+    setForm({
+      list_name: sl.list_name,
+      market: sl.market ?? '',
+      company_names: sl.company_names,
+      title_keywords: sl.title_keywords,
+      seniority_levels: sl.seniority_levels,
+      channel_family: sl.channel_family ?? '',
+    })
+    setEditingId(sl.id)
+    setOpen(true)
+    setError(null)
+  }
+
+  async function save() {
+    if (!form.list_name.trim()) { setError('List name is required'); return }
+    setSaving(true); setError(null)
+    const payload = {
+      list_name: form.list_name.trim(),
+      market: form.market || null,
+      company_names: form.company_names,
+      title_keywords: form.title_keywords,
+      seniority_levels: form.seniority_levels,
+      channel_family: form.channel_family || null,
+    }
+    const res = editingId
+      ? await fetch(`/api/settings/seed-lists/${editingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      : await fetch('/api/settings/seed-lists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    const data = await res.json()
+    if (!res.ok) { setError(data.error ?? 'Failed to save'); setSaving(false); return }
+    setLists(prev => editingId ? prev.map(l => l.id === editingId ? data : l) : [...prev, data])
+    setOpen(false)
+    setSaving(false)
+  }
+
+  async function remove(sl: OrgCompanySeedList) {
+    if (!confirm(`Delete seed list "${sl.list_name}"?`)) return
+    const res = await fetch(`/api/settings/seed-lists/${sl.id}`, { method: 'DELETE' })
+    if (res.ok) setLists(prev => prev.filter(l => l.id !== sl.id))
+  }
+
+  if (loading) return <div style={S.card}><p style={{ color: 'var(--crm-text-muted)', margin: 0 }}>Loading…</p></div>
+
+  return (
+    <div style={S.card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <p style={{ ...S.sectionTitle, marginBottom: 0 }}>Seed Lists</p>
+        <button onClick={openCreate} style={{ ...S.btn, padding: '5px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <Plus size={12} /> Add Seed List
+        </button>
+      </div>
+      <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', marginBottom: 16, marginTop: 0 }}>
+        Companies to search under for BD channel scraping. A run can cover more than one list.
+      </p>
+
+      {lists.length === 0 && !open ? (
+        <p style={{ fontSize: 13, color: 'var(--crm-text-muted)' }}>No seed lists yet.</p>
+      ) : lists.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: open ? 16 : 0 }}>
+          {lists.map(sl => (
+            <div key={sl.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', backgroundColor: 'var(--crm-surface-raised)', borderRadius: 8, border: '1px solid var(--crm-border)' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-primary)' }}>{sl.list_name}</span>
+                  {sl.market && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-muted)' }}>{sl.market}</span>}
+                </div>
+                <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: '4px 0 0' }}>
+                  {sl.company_names.length} companies · {sl.title_keywords.length} title keywords
+                  {sl.channel_family && ` · ${channelFamilies.find(f => f.code === sl.channel_family)?.label ?? sl.channel_family}`}
+                </p>
+              </div>
+              <button onClick={() => openEdit(sl)} style={{ ...S.btnGhost, fontSize: 12, padding: '5px 12px' }}>Edit</button>
+              <button onClick={() => remove(sl)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', padding: 4 }}>
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <div style={{ padding: '14px 16px', borderRadius: 8, border: '1px solid var(--crm-border)', backgroundColor: '#6C63FF06' }}>
+          {error && <p style={{ fontSize: 12, color: '#EF4444', margin: '0 0 10px' }}>{error}</p>}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div>
+              <label style={S.label}>List Name *</label>
+              <input value={form.list_name} onChange={e => setForm(f => ({ ...f, list_name: e.target.value }))} placeholder="Q3 LATAM Telecoms" style={S.input} />
+            </div>
+            <div>
+              <label style={S.label}>Market</label>
+              <select value={form.market} onChange={e => setForm(f => ({ ...f, market: e.target.value }))} style={S.select}>
+                <option value="">—</option>
+                {MARKETS.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={S.label}>Channel Family</label>
+              <select value={form.channel_family} onChange={e => setForm(f => ({ ...f, channel_family: e.target.value }))} style={S.select}>
+                <option value="">—</option>
+                {channelFamilies.map(cf => <option key={cf.code} value={cf.code}>{cf.label}</option>)}
+              </select>
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={S.label}>Company Names</label>
+              <TagInput value={form.company_names} onChange={v => setForm(f => ({ ...f, company_names: v }))} placeholder="Type a company name and press Enter…" />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={S.label}>Title Keywords</label>
+              <TagInput value={form.title_keywords} onChange={v => setForm(f => ({ ...f, title_keywords: v }))} placeholder="e.g. VP Partnerships…" />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={S.label}>Seniority Levels</label>
+              <TagInput value={form.seniority_levels} onChange={v => setForm(f => ({ ...f, seniority_levels: v }))} placeholder="e.g. Director, VP…" />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={save} disabled={saving} style={{ ...S.btn, opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Seed List'}</button>
+            <button onClick={() => setOpen(false)} style={S.btnGhost}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function IcpKeywordsSection() {
+  const [keywords, setKeywords] = useState<OrgIcpKeyword[]>([])
+  const [loading, setLoading] = useState(true)
+  const [drafts, setDrafts] = useState<Record<string, { keyword: string; weight: string }>>({})
+  const [adding, setAdding] = useState<Record<string, boolean>>({})
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/settings/icp-keywords')
+      .then(r => r.json())
+      .then((d: OrgIcpKeyword[]) => { setKeywords(d); setLoading(false) })
+  }, [])
+
+  function draftFor(cat: string) {
+    return drafts[cat] ?? { keyword: '', weight: '1' }
+  }
+  function setDraft(cat: string, patch: Partial<{ keyword: string; weight: string }>) {
+    setDrafts(prev => ({ ...prev, [cat]: { ...draftFor(cat), ...patch } }))
+  }
+
+  async function addKeyword(cat: string) {
+    const d = draftFor(cat)
+    if (!d.keyword.trim()) return
+    setAdding(p => ({ ...p, [cat]: true }))
+    try {
+      const res = await fetch('/api/settings/icp-keywords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: cat, keyword: d.keyword.trim(), weight: Number(d.weight) || 1 }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? 'Failed to add keyword'); return }
+      setKeywords(prev => [...prev, data])
+      setDrafts(prev => ({ ...prev, [cat]: { keyword: '', weight: '1' } }))
+    } finally {
+      setAdding(p => ({ ...p, [cat]: false }))
+    }
+  }
+
+  async function updateWeight(kw: OrgIcpKeyword, weight: number) {
+    setKeywords(prev => prev.map(k => k.id === kw.id ? { ...k, weight } : k))
+    await fetch(`/api/settings/icp-keywords/${kw.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ weight }),
+    })
+  }
+
+  async function removeKeyword(kw: OrgIcpKeyword) {
+    setKeywords(prev => prev.filter(k => k.id !== kw.id))
+    await fetch(`/api/settings/icp-keywords/${kw.id}`, { method: 'DELETE' })
+  }
+
+  if (loading) return <div style={S.card}><p style={{ color: 'var(--crm-text-muted)', margin: 0 }}>Loading…</p></div>
+
+  return (
+    <div style={S.card}>
+      <p style={S.sectionTitle}>ICP Keywords</p>
+      <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', marginBottom: 16, marginTop: 0 }}>
+        Scoring signal keywords, grouped by category, each with a weight.
+      </p>
+      {error && (
+        <div style={{ color: '#EF4444', fontSize: 13, backgroundColor: '#3A1A1A', border: '1px solid #EF444430', borderRadius: 7, padding: '10px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between' }}>
+          {error}
+          <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444' }}><X size={13} /></button>
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {ICP_CATEGORIES.map(cat => {
+          const rows = keywords.filter(k => k.category === cat)
+          const d = draftFor(cat)
+          return (
+            <div key={cat}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--crm-text-secondary)', marginBottom: 8 }}>{ICP_CATEGORY_LABELS[cat]}</p>
+              {rows.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                  {rows.map(kw => (
+                    <div key={kw.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', backgroundColor: 'var(--crm-surface-raised)', borderRadius: 6 }}>
+                      <span style={{ flex: 1, fontSize: 13, color: 'var(--crm-text-primary)' }}>{kw.keyword}</span>
+                      <input
+                        type="number"
+                        value={kw.weight}
+                        onChange={e => updateWeight(kw, Number(e.target.value))}
+                        style={{ width: 60, padding: '4px 8px', borderRadius: 5, border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface)', color: 'var(--crm-text-primary)', fontSize: 12, textAlign: 'center' }}
+                      />
+                      <button onClick={() => removeKeyword(kw)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', padding: 2 }}>
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={d.keyword}
+                  onChange={e => setDraft(cat, { keyword: e.target.value })}
+                  onKeyDown={e => e.key === 'Enter' && addKeyword(cat)}
+                  placeholder="Add keyword…"
+                  style={{ ...S.input, flex: 1 }}
+                />
+                <input
+                  type="number"
+                  value={d.weight}
+                  onChange={e => setDraft(cat, { weight: e.target.value })}
+                  style={{ width: 70, padding: '8px 10px', borderRadius: 7, border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)', color: 'var(--crm-text-primary)', fontSize: 13 }}
+                  title="Weight"
+                />
+                <button onClick={() => addKeyword(cat)} disabled={adding[cat] || !d.keyword.trim()} style={{ ...S.btn, padding: '8px 14px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Plus size={12} /> Add
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function emptyHookForm() {
+  return { hook_copy: '', decision_maker_titles: [] as string[], partnership_models_offered: [] as string[] }
+}
+
+function ChannelHooksSection({ channelFamilies }: { channelFamilies: ChannelFamilyType[] }) {
+  const [hooks, setHooks] = useState<OrgChannelHook[]>([])
+  const [loading, setLoading] = useState(true)
+  const [openFamily, setOpenFamily] = useState<string | null>(null)
+  const [form, setForm] = useState(emptyHookForm())
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/settings/channel-hooks')
+      .then(r => r.json())
+      .then((d: OrgChannelHook[]) => { setHooks(d); setLoading(false) })
+  }, [])
+
+  function hookFor(code: string) { return hooks.find(h => h.channel_family === code) }
+
+  function openEdit(code: string) {
+    const existing = hookFor(code)
+    setForm(existing
+      ? { hook_copy: existing.hook_copy ?? '', decision_maker_titles: existing.decision_maker_titles, partnership_models_offered: existing.partnership_models_offered }
+      : emptyHookForm())
+    setOpenFamily(code)
+    setError(null)
+  }
+
+  async function save(code: string) {
+    setSaving(true); setError(null)
+    const res = await fetch('/api/settings/channel-hooks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel_family: code, ...form }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setError(data.error ?? 'Failed to save'); setSaving(false); return }
+    setHooks(prev => {
+      const existing = prev.find(h => h.channel_family === code)
+      return existing ? prev.map(h => h.channel_family === code ? data : h) : [...prev, data]
+    })
+    setOpenFamily(null)
+    setSaving(false)
+  }
+
+  async function clear(hook: OrgChannelHook) {
+    if (!confirm('Clear this channel hook?')) return
+    const res = await fetch(`/api/settings/channel-hooks/${hook.id}`, { method: 'DELETE' })
+    if (res.ok) setHooks(prev => prev.filter(h => h.id !== hook.id))
+  }
+
+  if (loading) return <div style={S.card}><p style={{ color: 'var(--crm-text-muted)', margin: 0 }}>Loading…</p></div>
+
+  return (
+    <div style={S.card}>
+      <p style={S.sectionTitle}>Channel Hooks</p>
+      <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', marginBottom: 16, marginTop: 0 }}>
+        Your pitch angle per channel family — used to personalize BD outreach.
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {channelFamilies.map(cf => {
+          const existing = hookFor(cf.code)
+          const isOpen = openFamily === cf.code
+          return (
+            <div key={cf.code} style={{ border: '1px solid var(--crm-border)', borderRadius: 8, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', backgroundColor: 'var(--crm-surface-raised)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-primary)' }}>{cf.label}</span>
+                  {existing ? (
+                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, backgroundColor: '#22C55E20', color: '#22C55E', fontWeight: 700 }}>Configured</span>
+                  ) : (
+                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-muted)', fontWeight: 700 }}>Not configured</span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => isOpen ? setOpenFamily(null) : openEdit(cf.code)} style={{ ...S.btnGhost, fontSize: 12, padding: '5px 12px' }}>
+                    {isOpen ? 'Close' : existing ? 'Edit' : 'Configure'}
+                  </button>
+                  {existing && (
+                    <button onClick={() => clear(existing)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', padding: 4 }}>
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+              </div>
+              {isOpen && (
+                <div style={{ padding: '14px 16px', backgroundColor: '#6C63FF06' }}>
+                  {error && <p style={{ fontSize: 12, color: '#EF4444', margin: '0 0 10px' }}>{error}</p>}
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={S.label}>Hook Copy</label>
+                    <textarea
+                      value={form.hook_copy}
+                      onChange={e => setForm(f => ({ ...f, hook_copy: e.target.value }))}
+                      rows={3}
+                      placeholder="Your pitch angle for this channel family…"
+                      style={{ ...S.input, resize: 'vertical' as const }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={S.label}>Decision-Maker Titles</label>
+                    <TagInput value={form.decision_maker_titles} onChange={v => setForm(f => ({ ...f, decision_maker_titles: v }))} placeholder="e.g. VP Partnerships…" />
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={S.label}>Partnership Models Offered</label>
+                    <TagInput value={form.partnership_models_offered} onChange={v => setForm(f => ({ ...f, partnership_models_offered: v }))} placeholder="e.g. referral, reseller…" />
+                  </div>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button onClick={() => save(cf.code)} disabled={saving} style={{ ...S.btn, opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : 'Save'}</button>
+                    <button onClick={() => setOpenFamily(null)} style={S.btnGhost}>Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+        {channelFamilies.length === 0 && (
+          <p style={{ fontSize: 13, color: 'var(--crm-text-muted)' }}>No channel families defined yet.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function BdGroupTab() {
+  const [channelFamilies, setChannelFamilies] = useState<ChannelFamilyType[]>([])
+
+  useEffect(() => {
+    createClient()
+      .from('channel_family_types')
+      .select('*')
+      .order('label')
+      .then(({ data }) => { if (data) setChannelFamilies(data as ChannelFamilyType[]) })
+  }, [])
+
+  return (
+    <div>
+      <SeedListsSection channelFamilies={channelFamilies} />
+      <IcpKeywordsSection />
+      <ChannelHooksSection channelFamilies={channelFamilies} />
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Main Settings page
 // ────────────────────────────────────────────────────────────────────────────
 const TABS = [
@@ -890,6 +1366,7 @@ const TABS = [
   { key: 'pipeline',     label: 'Pipeline' },
   { key: 'plan',         label: 'Plan & Usage' },
   { key: 'scraper',      label: 'Scraper' },
+  { key: 'bdgroup',      label: 'BD Group' },
 ]
 
 function SettingsContent() {
@@ -945,6 +1422,7 @@ function SettingsContent() {
       {tab === 'pipeline'     && <PipelineTab />}
       {tab === 'plan'         && <PlanTab />}
       {tab === 'scraper'      && <ScraperTab />}
+      {tab === 'bdgroup'      && <BdGroupTab />}
     </div>
   )
 }

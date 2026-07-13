@@ -50,7 +50,10 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { display_name, title, company, style_hint, icp_focus, language, is_default, user_id: targetUserId } = body
+  const {
+    display_name, title, company, style_hint, icp_focus, language, is_default, user_id: targetUserId,
+    linkedin_account_tier, connection_note_max_chars, followup_max_chars,
+  } = body
 
   if (!display_name || !title || !company) {
     return NextResponse.json({ error: 'display_name, title and company are required' }, { status: 400 })
@@ -81,6 +84,9 @@ export async function POST(req: NextRequest) {
       language: language ?? 'en',
       is_default: is_default ?? false,
       is_active: true,
+      linkedin_account_tier: linkedin_account_tier || null,
+      connection_note_max_chars: connection_note_max_chars ?? 300,
+      followup_max_chars: followup_max_chars ?? 1900,
     })
     .select()
     .single()

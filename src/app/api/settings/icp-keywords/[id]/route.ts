@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -23,44 +23,50 @@ async function getOrgAdmin() {
   return { userId: user.id, orgId: profile.organization_id as string }
 }
 
-export async function GET() {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const ctx = await getOrgAdmin()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { id } = await params
+  const body = await req.json()
+  const patch: Record<string, unknown> = {}
+  if ('keyword' in body) patch.keyword = body.keyword
+  if ('weight' in body) patch.weight = body.weight
+  if (Object.keys(patch).length === 0) {
+    return NextResponse.json({ error: 'No valid fields' }, { status: 400 })
+  }
+
   const admin = createAdminClient()
   const { data, error } = await admin
-    .from('organizations')
-    .select('id, name, slug, plan, logo_url, default_language, domain_blacklist, product_description, max_seats, max_leads_per_month, billing_day, apify_token, anthropic_key, anthropic_base_url, anthropic_model')
-    .eq('id', ctx.orgId)
+    .from('org_icp_keywords')
+    .update(patch)
+    .eq('id', id)
+    .eq('organization_id', ctx.orgId)
+    .select()
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   return NextResponse.json(data)
 }
 
-export async function PATCH(req: Request) {
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const ctx = await getOrgAdmin()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json()
-  const allowed = ['name', 'default_language', 'logo_url', 'domain_blacklist', 'product_description', 'apify_token', 'anthropic_key', 'anthropic_base_url', 'anthropic_model']
-  const update: Record<string, unknown> = {}
-  for (const key of allowed) {
-    if (key in body) update[key] = body[key]
-  }
-  if (Object.keys(update).length === 0) {
-    return NextResponse.json({ error: 'No valid fields' }, { status: 400 })
-  }
-  update.updated_at = new Date().toISOString()
-
+  const { id } = await params
   const admin = createAdminClient()
-  const { data, error } = await admin
-    .from('organizations')
-    .update(update)
-    .eq('id', ctx.orgId)
-    .select('id, name, slug, plan, logo_url, default_language, domain_blacklist, product_description, apify_token, anthropic_key, anthropic_base_url, anthropic_model')
-    .single()
+  const { error } = await admin
+    .from('org_icp_keywords')
+    .delete()
+    .eq('id', id)
+    .eq('organization_id', ctx.orgId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  return NextResponse.json(data)
+  return NextResponse.json({ ok: true })
 }
