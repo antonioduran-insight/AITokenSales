@@ -11,9 +11,10 @@ interface UserContextValue {
   user: UserWithArea | null
   isAdmin: boolean
   orgPlan: string  // 'basic' | 'premium' | 'enterprise' | 'ultra' | ''
+  activeAddons: string[]  // organization_addons.addon_type values where is_active = true
 }
 
-const UserContext = createContext<UserContextValue>({ user: null, isAdmin: false, orgPlan: '' })
+const UserContext = createContext<UserContextValue>({ user: null, isAdmin: false, orgPlan: '', activeAddons: [] })
 
 export function UserProvider({
   value,

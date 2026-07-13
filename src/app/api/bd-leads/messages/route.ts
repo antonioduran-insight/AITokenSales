@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { orgHasActiveAddon } from '@/lib/utils/addons'
 
 const SCRAPER_API = process.env.SCRAPER_API_URL ?? ''
 
@@ -41,6 +42,10 @@ export async function POST(req: NextRequest) {
 
   if (!userData?.organization_id || userData.role !== 'admin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  if (!(await orgHasActiveAddon(userData.organization_id, 'bd_group'))) {
+    return NextResponse.json({ error: 'BD Group add-on is not active for this organization' }, { status: 403 })
   }
 
   const { lead_ids } = await req.json()

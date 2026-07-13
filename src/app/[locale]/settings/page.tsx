@@ -7,6 +7,8 @@ import { useLocale } from 'next-intl'
 import { useUser } from '@/contexts/UserContext'
 import { GripVertical, Plus, Trash2, X } from 'lucide-react'
 import { TagInput } from '@/components/ui/TagInput'
+import { AddonFeature } from '@/components/ui/AddonFeature'
+import { useHasAddon } from '@/lib/hooks/useHasAddon'
 import type {
   Organization, PipelineStage, OrganizationAddon, ScraperComboMaster, User, SenderProfile,
   ChannelFamilyType, OrgCompanySeedList, OrgIcpKeyword, OrgChannelHook,
@@ -1374,6 +1376,7 @@ function SettingsContent() {
   const router = useRouter()
   const locale = useLocale()
   const { user } = useUser()
+  const hasBdGroup = useHasAddon('bd_group')
 
   const tab = searchParams.get('tab') ?? 'organization'
 
@@ -1399,7 +1402,7 @@ function SettingsContent() {
 
       {/* Tab nav */}
       <div style={{ display: 'flex', gap: 2, marginBottom: 28, borderBottom: '1px solid var(--crm-border)', paddingBottom: 0 }}>
-        {TABS.map(t => (
+        {TABS.filter(t => t.key !== 'bdgroup' || hasBdGroup).map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
@@ -1422,7 +1425,11 @@ function SettingsContent() {
       {tab === 'pipeline'     && <PipelineTab />}
       {tab === 'plan'         && <PlanTab />}
       {tab === 'scraper'      && <ScraperTab />}
-      {tab === 'bdgroup'      && <BdGroupTab />}
+      {tab === 'bdgroup'      && (
+        <AddonFeature hasAccess={hasBdGroup} featureName="BD Group Settings">
+          <BdGroupTab />
+        </AddonFeature>
+      )}
     </div>
   )
 }

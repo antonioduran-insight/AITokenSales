@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/contexts/UserContext'
+import { useHasAddon } from '@/lib/hooks/useHasAddon'
+import { AddonFeature } from '@/components/ui/AddonFeature'
 import { type Lead } from '@/lib/scraper-api'
 import type { RunRecord } from '@/lib/types'
 import { Check, X, RefreshCw, CheckCircle, AlertTriangle, Send, Copy } from 'lucide-react'
@@ -31,6 +33,7 @@ function runLabel(run: RunRecord | undefined): string {
 
 export function BdLeadsContent() {
   const { user } = useUser()
+  const hasBdGroup = useHasAddon('bd_group')
 
   const [leads, setLeads] = useState<Lead[]>([])
   const [runs, setRuns] = useState<RunRecord[]>([])
@@ -164,6 +167,7 @@ export function BdLeadsContent() {
   }
 
   return (
+    <AddonFeature hasAccess={hasBdGroup} featureName="BD Leads Review">
     <div style={S.page}>
       <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>BD Leads</h1>
 
@@ -396,6 +400,7 @@ export function BdLeadsContent() {
         </div>
       )}
     </div>
+    </AddonFeature>
   )
 }
 

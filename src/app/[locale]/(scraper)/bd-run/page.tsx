@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link } from '@/i18n/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/contexts/UserContext'
+import { useHasAddon } from '@/lib/hooks/useHasAddon'
+import { AddonFeature } from '@/components/ui/AddonFeature'
 import { Play, AlertCircle, Minus, Plus, CheckCircle2, XCircle, Loader2, ArrowRight, Download } from 'lucide-react'
 import type { User, OrgCompanySeedList } from '@/lib/types'
 
@@ -36,6 +38,7 @@ const S: Record<string, React.CSSProperties> = {
 function BdRunContent() {
   const { user } = useUser()
   const isAdmin = user?.role === 'admin'
+  const hasBdGroup = useHasAddon('bd_group')
 
   // ── Phase 1: config ──
   const [seedLists, setSeedLists] = useState<OrgCompanySeedList[]>([])
@@ -179,6 +182,7 @@ function BdRunContent() {
   }
 
   return (
+    <AddonFeature hasAccess={hasBdGroup} featureName="BD New Run">
     <div style={S.page}>
       <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>BD New Run</h1>
 
@@ -368,6 +372,7 @@ function BdRunContent() {
         </div>
       )}
     </div>
+    </AddonFeature>
   )
 }
 

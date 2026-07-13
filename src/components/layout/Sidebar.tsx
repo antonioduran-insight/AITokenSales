@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { AreaBadge } from '@/components/ui/AreaBadge'
 import type { UserWithArea } from '@/contexts/UserContext'
+import { useHasAddon } from '@/lib/hooks/useHasAddon'
 
 interface Props {
   user: UserWithArea | null
@@ -23,6 +24,7 @@ export function Sidebar({ user }: Props) {
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const hasBdGroup = useHasAddon('bd_group')
 
   const [collapsed, setCollapsed] = useState(false)
 
@@ -168,10 +170,11 @@ export function Sidebar({ user }: Props) {
               { href: '/run',       label: 'New Run',   icon: Play },
               { href: '/history',   label: 'History',   icon: History },
               { href: '/leads',     label: 'Leads',     icon: Users2 },
-              { href: '/bd-run',    label: 'BD New Run', icon: Building2, adminOnly: true },
-              { href: '/bd-leads',  label: 'BD Leads',  icon: Building2, adminOnly: true },
+              { href: '/bd-run',    label: 'BD New Run', icon: Building2, adminOnly: true, addonGated: true },
+              { href: '/bd-leads',  label: 'BD Leads',  icon: Building2, adminOnly: true, addonGated: true },
             ].map(item => {
               if (item.adminOnly && !isAdmin) return null
+              if (item.addonGated && !hasBdGroup) return null
               const fullHref = `/${locale}${item.href}`
               const isActive = pathname === fullHref || pathname.startsWith(fullHref + '/')
               const Icon = item.icon

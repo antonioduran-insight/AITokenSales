@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { orgHasActiveAddon } from '@/lib/utils/addons'
 
+// BD Group is a paid add-on — every route in this file is gated on it
+// being active for the org, in addition to the admin-role check.
 async function getOrgAdmin() {
   const cookieStore = await cookies()
   const supabase = createServerClient(
@@ -20,6 +23,7 @@ async function getOrgAdmin() {
     .single()
 
   if (!profile || profile.role !== 'admin' || !profile.organization_id) return null
+  if (!(await orgHasActiveAddon(profile.organization_id, 'bd_group'))) return null
   return { userId: user.id, orgId: profile.organization_id as string }
 }
 
