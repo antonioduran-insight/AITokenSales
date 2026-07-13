@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
   LayoutGrid, Users2, ClipboardList, BarChart3, Users, LogOut, Trophy,
-  LayoutDashboard, Play, History, Headphones, Settings2,
+  LayoutDashboard, Play, History, Headphones, Settings2, Building2,
 } from 'lucide-react'
 import { AreaBadge } from '@/components/ui/AreaBadge'
 import type { UserWithArea } from '@/contexts/UserContext'
@@ -168,7 +168,9 @@ export function Sidebar({ user }: Props) {
               { href: '/run',       label: 'New Run',   icon: Play },
               { href: '/history',   label: 'History',   icon: History },
               { href: '/leads',     label: 'Leads',     icon: Users2 },
+              { href: '/bd-leads',  label: 'BD Leads',  icon: Building2, adminOnly: true },
             ].map(item => {
+              if (item.adminOnly && !isAdmin) return null
               const fullHref = `/${locale}${item.href}`
               const isActive = pathname === fullHref || pathname.startsWith(fullHref + '/')
               const Icon = item.icon
