@@ -402,5 +402,6 @@ export interface OrgCompanySeedList {
   market: string | null
   title_keywords: string[]
   seniority_levels: string[]
+  channel_family: string | null
   created_at: string
 }
