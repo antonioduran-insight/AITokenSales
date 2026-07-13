@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/contexts/UserContext'
 import { type Lead } from '@/lib/scraper-api'
 import type { RunRecord } from '@/lib/types'
-import { Check, X, RefreshCw, CheckCircle, Send, Copy } from 'lucide-react'
+import { Check, X, RefreshCw, CheckCircle, AlertTriangle, Send, Copy } from 'lucide-react'
 
 const MARKETS = ['Taiwan', 'LATAM', 'Vietnam', 'Global']
 
@@ -43,7 +43,7 @@ export function BdLeadsContent() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [rowActionId, setRowActionId] = useState<string | null>(null)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null)
   const [generating, setGenerating] = useState(false)
 
   const runsById = Object.fromEntries(runs.map(r => [r.id, r]))
@@ -79,9 +79,9 @@ export function BdLeadsContent() {
 
   useEffect(() => { fetchLeads() }, [fetchLeads])
 
-  function showToast(msg: string) {
-    setToast(msg)
-    setTimeout(() => setToast(null), 3500)
+  function showToast(message: string, type: 'success' | 'warning' = 'success') {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), type === 'warning' ? 7000 : 3500)
   }
 
   function isEligibleForMessaging(lead: Lead): boolean {
@@ -102,7 +102,14 @@ export function BdLeadsContent() {
       const res = await fetch(`/api/bd-leads/${lead.id}/confirm`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok) { showToast(data.error ?? 'Failed to confirm'); return }
-      showToast(data.bd_channel_created ? 'Confirmed — new channel created' : 'Confirmed — added to existing channel')
+      if (data.owner_conflict) {
+        showToast(
+          `Confirmed — but ${lead.company} is already tracked under ${data.channel_owner_name ?? 'another SDR'}. This contact was assigned to them, not ${data.requesting_sdr_name ?? 'the SDR who ran this search'}.`,
+          'warning'
+        )
+      } else {
+        showToast(data.bd_channel_created ? 'Confirmed — new channel created' : 'Confirmed — added to existing channel')
+      }
       fetchLeads()
     } finally {
       setRowActionId(null)
@@ -349,14 +356,16 @@ export function BdLeadsContent() {
       {/* Toast */}
       {toast && (
         <div style={{
-          position: 'fixed', bottom: 20, right: 24, zIndex: 60,
-          backgroundColor: '#1A3A2A', border: '1px solid #22C55E40',
+          position: 'fixed', bottom: 20, right: 24, zIndex: 60, maxWidth: 420,
+          backgroundColor: toast.type === 'warning' ? '#3A2E0D' : '#1A3A2A',
+          border: `1px solid ${toast.type === 'warning' ? '#F59E0B40' : '#22C55E40'}`,
           borderRadius: 8, padding: '10px 16px',
-          display: 'flex', alignItems: 'center', gap: 8,
-          fontSize: 13, color: '#22C55E', boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'flex-start', gap: 8,
+          fontSize: 13, color: toast.type === 'warning' ? '#F59E0B' : '#22C55E',
+          lineHeight: 1.5, boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
         }}>
-          <CheckCircle size={14} />
-          {toast}
+          {toast.type === 'warning' ? <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} /> : <CheckCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />}
+          {toast.message}
         </div>
       )}
 

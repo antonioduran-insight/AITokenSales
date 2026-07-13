@@ -54,8 +54,8 @@ export async function POST(
 
   // 1. Find an existing bd_channels row for this org + company. If one
   // exists, use it as-is — including its existing owner_sdr_id, even if
-  // this run belongs to a different SDR (see PR summary for the flagged
-  // edge case this implies).
+  // this run belongs to a different SDR (surfaced to the reviewer below
+  // as owner_conflict rather than silently decided).
   const { data: existingChannel } = await admin
     .from('bd_channels')
     .select('*')
@@ -63,22 +63,28 @@ export async function POST(
     .ilike('company_name', lead.company)
     .maybeSingle()
 
+  // This run's own assigned SDR (the mechanism the BD scraping phase used
+  // to record run ownership — not lead.sdr_id). Needed both as the
+  // fallback owner when creating a new channel, and to detect whether an
+  // existing channel belongs to a different SDR than the one who ran
+  // this particular scrape.
+  const { data: runAssignment } = await admin
+    .from('run_sdr_assignments')
+    .select('sdr_id')
+    .eq('run_id', lead.run_id)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  const runSdrId = runAssignment?.sdr_id ?? null
+
   let channel = existingChannel
+  let ownerConflict = false
+  let channelOwnerName: string | null = null
+  let requestingSdrName: string | null = null
 
   if (!channel) {
-    // 2. No channel yet — determine this run's owning SDR via
-    // run_sdr_assignments (the mechanism the BD scraping phase used to
-    // record run ownership), not lead.sdr_id.
-    const { data: assignment } = await admin
-      .from('run_sdr_assignments')
-      .select('sdr_id')
-      .eq('run_id', lead.run_id)
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-
-    const ownerSdrId = assignment?.sdr_id ?? null
-    if (!ownerSdrId) {
+    // 2. No channel yet — this run's SDR becomes the owner.
+    if (!runSdrId) {
       return NextResponse.json({ error: 'No SDR owner found for this run — cannot confirm' }, { status: 400 })
     }
 
@@ -89,7 +95,7 @@ export async function POST(
         company_name: lead.company,
         channel_family: lead.channel_family ?? null,
         market: lead.market ?? null,
-        owner_sdr_id: ownerSdrId,
+        owner_sdr_id: runSdrId,
         run_id: lead.run_id,
       })
       .select()
@@ -99,6 +105,17 @@ export async function POST(
       return NextResponse.json({ error: channelError?.message ?? 'Failed to create bd_channels row' }, { status: 500 })
     }
     channel = newChannel
+  } else if (runSdrId && channel.owner_sdr_id && channel.owner_sdr_id !== runSdrId) {
+    // Existing channel belongs to a different SDR than this run's own —
+    // make it visible rather than silently assigning to the existing owner.
+    ownerConflict = true
+    const { data: names } = await admin
+      .from('users')
+      .select('id, full_name')
+      .in('id', [channel.owner_sdr_id, runSdrId])
+    const nameById = Object.fromEntries((names ?? []).map(u => [u.id, u.full_name]))
+    channelOwnerName = nameById[channel.owner_sdr_id] ?? null
+    requestingSdrName = nameById[runSdrId] ?? null
   }
 
   if (!channel.owner_sdr_id) {
@@ -162,5 +179,8 @@ export async function POST(
     bd_channel_created: !existingChannel,
     prospect_id: prospect.id,
     owner_sdr_id: channel.owner_sdr_id,
+    owner_conflict: ownerConflict,
+    channel_owner_name: channelOwnerName,
+    requesting_sdr_name: requestingSdrName,
   })
 }
