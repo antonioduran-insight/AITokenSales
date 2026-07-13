@@ -15,6 +15,16 @@ export type UserRole = 'admin_global' | 'admin' | 'sdr' | 'support'
 
 export type AreaName = 'taiwan' | 'latam' | 'vietnam' | 'europe'
 
+export type LeadType = 'individual' | 'bd_channel_contact'
+
+export type BdChannelStatus =
+  | 'pending'
+  | 'active'
+  | 'in_conversation'
+  | 'pilot_agreed'
+  | 'live'
+  | 'declined'
+
 export type AuditEventType =
   | 'prospect_created'
   | 'status_changed'
@@ -81,9 +91,13 @@ export interface Prospect {
   created_by: string | null
   created_at: string
   updated_at: string
+  // BD Group
+  lead_type: LeadType
+  bd_channel_id: string | null
   // Joined
   area?: Area
   assigned_user?: User
+  bd_channel?: BdChannel
 }
 
 export interface Note {
@@ -204,6 +218,9 @@ export interface SenderProfile {
   is_default: boolean
   is_active: boolean
   created_at: string
+  linkedin_account_tier: string | null
+  connection_note_max_chars: number | null
+  followup_max_chars: number | null
 }
 
 export interface RunRecord {
@@ -248,7 +265,7 @@ export interface PipelineStage {
 export interface OrganizationAddon {
   id: string
   organization_id: string
-  addon_type: 'account_management' | 'multi_workspace' | 'extended_data_retention' | 'sso' | 'linkedin_auto_messaging'
+  addon_type: 'account_management' | 'multi_workspace' | 'extended_data_retention' | 'sso' | 'linkedin_auto_messaging' | 'bd_group'
   is_active: boolean
   price_monthly: number | null
   activated_at: string
@@ -308,6 +325,7 @@ export const ADDON_LIST = [
   { type: 'extended_data_retention', labelKey: 'addOn_extended_data_retention', price: '$99/mo' },
   { type: 'sso', labelKey: 'addOn_sso', price: '$299 one-time' },
   { type: 'linkedin_auto_messaging', labelKey: 'addOn_linkedin_auto_messaging', price: 'TBD' },
+  { type: 'bd_group', labelKey: 'addOn_bd_group', price: 'TBD' },
 ] as const
 
 export interface UserArea {
@@ -325,4 +343,63 @@ export interface MonthlyLeadCount {
   count: number
   created_at: string
   updated_at: string
+}
+
+// ---- BD Group (channel/partnership prospecting) ----
+
+export interface ChannelFamilyType {
+  id: string
+  code: string
+  label: string
+  description: string | null
+  created_at: string
+}
+
+export interface BdChannel {
+  id: string
+  organization_id: string
+  company_name: string
+  channel_family: string
+  channel_score: number | null
+  partnership_model: string | null
+  status: BdChannelStatus
+  market: string | null
+  owner_sdr_id: string | null
+  run_id: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+  // Joined
+  channel_family_type?: ChannelFamilyType
+  owner?: User
+}
+
+export interface OrgIcpKeyword {
+  id: string
+  organization_id: string
+  category: string
+  keyword: string
+  weight: number
+  created_at: string
+}
+
+export interface OrgChannelHook {
+  id: string
+  organization_id: string
+  channel_family: string
+  hook_copy: string | null
+  decision_maker_titles: string[]
+  partnership_models_offered: string[]
+  created_at: string
+}
+
+export interface OrgCompanySeedList {
+  id: string
+  organization_id: string
+  list_name: string
+  company_names: string[]
+  market: string | null
+  title_keywords: string[]
+  seniority_levels: string[]
+  created_at: string
 }
