@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button'
 import type { Prospect, OutreachStatus, Area } from '@/lib/types'
 import { OUTREACH_STATUSES } from '@/lib/types'
 
-const PROSPECT_SELECT = '*, area:areas(*), assigned_user:users!assigned_to(id, full_name, email, role, area_id, is_active, created_at)'
+const PROSPECT_SELECT = '*, area:areas(*), assigned_user:users!assigned_to(id, full_name, email, role, area_id, is_active, created_at), bd_channel:bd_channels(id, company_name, channel_family, status, partnership_model, market, notes, owner_sdr_id, run_id, channel_family_type:channel_family_types(label))'
 
 interface PipelineStage {
   name: string

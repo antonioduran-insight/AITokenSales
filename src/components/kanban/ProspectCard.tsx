@@ -2,7 +2,7 @@
 
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { Star } from 'lucide-react'
+import { Star, Building2 } from 'lucide-react'
 import { AreaBadge } from '@/components/ui/AreaBadge'
 import { TemperatureBadge } from '@/components/ui/TemperatureBadge'
 import { ICPScore } from '@/components/ui/ICPScore'
@@ -18,6 +18,8 @@ export function ProspectCard({ prospect, onClick, isDragOverlay = false }: Props
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: prospect.id,
   })
+
+  const isBdContact = prospect.lead_type === 'bd_channel_contact'
 
   const style = {
     transform: CSS.Translate.toString(transform),
@@ -59,6 +61,20 @@ export function ProspectCard({ prospect, onClick, isDragOverlay = false }: Props
           </span>
         </div>
 
+        {/* BD contacts: parent channel company, shown prominently */}
+        {isBdContact && prospect.bd_channel && (
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 5,
+            padding: '3px 7px', borderRadius: 5,
+            backgroundColor: '#6C63FF15', border: '1px solid #6C63FF30',
+          }}>
+            <Building2 size={11} color="var(--crm-accent)" />
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-accent)' }}>
+              {prospect.bd_channel.company_name}
+            </span>
+          </div>
+        )}
+
         {/* Company + title */}
         {(prospect.company || prospect.title) && (
           <div style={{ fontSize: 11, color: 'var(--crm-text-secondary)', marginTop: 3, lineHeight: 1.4 }}>
@@ -70,6 +86,15 @@ export function ProspectCard({ prospect, onClick, isDragOverlay = false }: Props
 
         {/* Badges row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 8, flexWrap: 'wrap' }}>
+          {isBdContact && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+              backgroundColor: '#6C63FF20', color: 'var(--crm-accent)',
+              borderRadius: 4, padding: '2px 5px', fontSize: 10, fontWeight: 700,
+            }}>
+              <Building2 size={9} /> BD
+            </span>
+          )}
           {prospect.area && <AreaBadge area={prospect.area} size="sm" />}
           {prospect.lead_temperature && <TemperatureBadge temperature={prospect.lead_temperature} />}
           {prospect.icp_score !== null && (
