@@ -173,6 +173,7 @@ export interface Organization {
   default_language: string
   internal_notes: string | null
   domain_blacklist: string | null
+  product_description: string | null
   billing_day: number
   apify_token: string | null
   anthropic_key: string | null
