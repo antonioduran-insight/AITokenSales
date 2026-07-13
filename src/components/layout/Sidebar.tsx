@@ -168,6 +168,7 @@ export function Sidebar({ user }: Props) {
               { href: '/run',       label: 'New Run',   icon: Play },
               { href: '/history',   label: 'History',   icon: History },
               { href: '/leads',     label: 'Leads',     icon: Users2 },
+              { href: '/bd-run',    label: 'BD New Run', icon: Building2, adminOnly: true },
               { href: '/bd-leads',  label: 'BD Leads',  icon: Building2, adminOnly: true },
             ].map(item => {
               if (item.adminOnly && !isAdmin) return null

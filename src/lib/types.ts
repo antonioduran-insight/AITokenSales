@@ -235,6 +235,7 @@ export interface RunRecord {
   sdr_count: number
   plan: string
   status: string
+  run_type: 'individual' | 'bd'
   error_message: string | null
   created_at: string
   updated_at: string
@@ -404,4 +405,12 @@ export interface OrgCompanySeedList {
   seniority_levels: string[]
   channel_family: string | null
   created_at: string
+}
+
+export interface RunSeedList {
+  id: string
+  run_id: string
+  seed_list_id: string
+  created_at: string
+  seed_list?: OrgCompanySeedList
 }
