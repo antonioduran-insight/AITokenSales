@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
           sender_profile: profileByOwner[group.owner_sdr_id],
           anthropic_key: org.anthropic_key,
           anthropic_base_url: org.anthropic_base_url ?? 'https://api.aitokenking.com.tw/api/v1',
-          anthropic_model: org.anthropic_model ?? 'claude-sonnet-4.6',
+          anthropic_model: org.anthropic_model ?? 'claude-sonnet-5',
         }),
       })
       if (!res.ok) {
