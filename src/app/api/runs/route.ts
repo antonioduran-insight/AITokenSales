@@ -85,6 +85,8 @@ export async function POST(req: NextRequest) {
         years_experience: number | null
         seniority: string | null
         expertise_area: string | null
+        connection_note_max_chars: number | null
+        followup_max_chars: number | null
       } | null
     }
 
@@ -95,7 +97,7 @@ export async function POST(req: NextRequest) {
         const [{ data: profile }, { data: sdrCtx }] = await Promise.all([
           supabase
             .from('sender_profiles')
-            .select('id, display_name, title, company, style_hint, icp_focus, language')
+            .select('id, display_name, title, company, style_hint, icp_focus, language, connection_note_max_chars, followup_max_chars')
             .eq('user_id', sdrId)
             .eq('organization_id', userData.organization_id)
             .eq('is_default', true)
@@ -122,6 +124,8 @@ export async function POST(req: NextRequest) {
             years_experience: sdrCtx?.years_experience ?? null,
             seniority: sdrCtx?.seniority ?? null,
             expertise_area: sdrCtx?.expertise_area ?? null,
+            connection_note_max_chars: profile.connection_note_max_chars ?? null,
+            followup_max_chars: profile.followup_max_chars ?? null,
           } : null,
         })
       }
@@ -149,6 +153,8 @@ export async function POST(req: NextRequest) {
           years_experience: selfCtx.years_experience ?? null,
           seniority: selfCtx.seniority ?? null,
           expertise_area: selfCtx.expertise_area ?? null,
+          connection_note_max_chars: null,
+          followup_max_chars: null,
         }
       }
     }
@@ -210,7 +216,7 @@ export async function POST(req: NextRequest) {
         apify_token: org.apify_token,
         anthropic_key: org.anthropic_key,
         anthropic_base_url: org.anthropic_base_url ?? 'https://api.aitokenking.com.tw/api/v1',
-        anthropic_model: org.anthropic_model ?? 'claude-sonnet-4.6',
+        anthropic_model: org.anthropic_model ?? 'claude-sonnet-5',
       }
 
       console.log('Sending to scraper:', JSON.stringify(scraperPayload, null, 2))
