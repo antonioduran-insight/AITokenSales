@@ -67,7 +67,7 @@ export default function OrgDetailPage() {
   const [apifyToken, setApifyToken] = useState('')
   const [anthropicKey, setAnthropicKey] = useState('')
   const [anthropicBaseUrl, setAnthropicBaseUrl] = useState('https://api.aitokenking.com.tw/api/v1')
-  const [anthropicModel, setAnthropicModel] = useState('claude-sonnet-4.6')
+  const [anthropicModel, setAnthropicModel] = useState('claude-sonnet-5')
   const [savingKeys, setSavingKeys] = useState(false)
   const [savedKeys, setSavedKeys] = useState(false)
 
@@ -89,7 +89,7 @@ export default function OrgDetailPage() {
       setApifyToken(data.apify_token ?? '')
       setAnthropicKey(data.anthropic_key ?? '')
       setAnthropicBaseUrl(data.anthropic_base_url ?? 'https://api.aitokenking.com.tw/api/v1')
-      setAnthropicModel(data.anthropic_model ?? 'claude-sonnet-4.6')
+      setAnthropicModel(data.anthropic_model ?? 'claude-sonnet-5')
       setActiveAddons(new Set(data.addons.map((a: OrganizationAddon) => a.addon_type)))
     } catch (e) {
       setError((e as Error).message)
@@ -360,7 +360,7 @@ export default function OrgDetailPage() {
               </div>
               <div>
                 <label style={labelStyle}>Anthropic Model</label>
-                <input value={anthropicModel} onChange={e => setAnthropicModel(e.target.value)} placeholder="claude-sonnet-4.6" style={inputStyle} />
+                <input value={anthropicModel} onChange={e => setAnthropicModel(e.target.value)} placeholder="claude-sonnet-5" style={inputStyle} />
               </div>
             </div>
             <button

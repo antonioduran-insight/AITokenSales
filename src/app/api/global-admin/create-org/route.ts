@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       apify_token: apify_token ?? null,
       anthropic_key: anthropic_key ?? null,
       anthropic_base_url: anthropic_base_url ?? 'https://api.aitokenking.com.tw/api/v1',
-      anthropic_model: anthropic_model ?? 'claude-sonnet-4.6',
+      anthropic_model: anthropic_model ?? 'claude-sonnet-5',
       is_active: true,
       billing_day: 10,
     })
