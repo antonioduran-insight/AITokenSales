@@ -22,6 +22,7 @@ export default async function LocaleLayout({
 
   let userProfile: UserWithArea | null = null
   let orgPlan = ''
+  let activeAddons: string[] = []
   try {
     const supabase = await createClient()
     const { data: { user: authUser } } = await supabase.auth.getUser()
@@ -43,6 +44,13 @@ export default async function LocaleLayout({
           .eq('id', userProfile.organization_id)
           .single()
         orgPlan = orgData?.plan ?? 'basic'
+
+        const { data: addonRows } = await supabase
+          .from('organization_addons')
+          .select('addon_type')
+          .eq('organization_id', userProfile.organization_id)
+          .eq('is_active', true)
+        activeAddons = (addonRows ?? []).map(a => a.addon_type)
       }
     }
   } catch (e) {
@@ -51,7 +59,7 @@ export default async function LocaleLayout({
 
   return (
     <NextIntlClientProvider messages={messages}>
-      <AppShell initialUser={userProfile} orgPlan={orgPlan}>{children}</AppShell>
+      <AppShell initialUser={userProfile} orgPlan={orgPlan} activeAddons={activeAddons}>{children}</AppShell>
     </NextIntlClientProvider>
   )
 }

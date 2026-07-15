@@ -43,6 +43,10 @@ export interface Lead {
   custom2?: string;
   exported_to_crm: boolean;
   created_at: string;
+  lead_type?: "individual" | "bd_channel_contact";
+  seed_company_name?: string;
+  verification_status?: "pending" | "confirmed" | "rejected";
+  channel_family?: string;
 }
 
 export interface RunLog {

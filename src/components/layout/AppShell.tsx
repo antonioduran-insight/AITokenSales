@@ -13,6 +13,7 @@ interface Props {
   children: React.ReactNode
   initialUser: UserWithArea | null
   orgPlan: string
+  activeAddons: string[]
 }
 
 function ImpersonateBanner() {
@@ -58,7 +59,7 @@ function ImpersonateBanner() {
   )
 }
 
-export function AppShell({ children, initialUser, orgPlan }: Props) {
+export function AppShell({ children, initialUser, orgPlan, activeAddons }: Props) {
   const pathname = usePathname()
   const isLoginPage = /\/login$/.test(pathname)
   const isGlobalAdminPage = pathname.includes('/global-admin')
@@ -67,7 +68,7 @@ export function AppShell({ children, initialUser, orgPlan }: Props) {
   if (isGlobalAdminPage) return <>{children}</>
 
   return (
-    <UserProvider value={{ user: initialUser, isAdmin: initialUser?.role === 'admin', orgPlan }}>
+    <UserProvider value={{ user: initialUser, isAdmin: initialUser?.role === 'admin', orgPlan, activeAddons }}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', backgroundColor: 'var(--crm-background)' }}>
         <Suspense fallback={null}>
           <ImpersonateBanner />

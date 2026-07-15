@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { orgHasActiveAddon } from '@/lib/utils/addons'
 
+// BD Group is a paid add-on — every route in this file is gated on it
+// being active for the org, in addition to the admin-role check.
 async function getOrgAdmin() {
   const cookieStore = await cookies()
   const supabase = createServerClient(
@@ -20,6 +23,7 @@ async function getOrgAdmin() {
     .single()
 
   if (!profile || profile.role !== 'admin' || !profile.organization_id) return null
+  if (!(await orgHasActiveAddon(profile.organization_id, 'bd_group'))) return null
   return { userId: user.id, orgId: profile.organization_id as string }
 }
 
@@ -29,38 +33,37 @@ export async function GET() {
 
   const admin = createAdminClient()
   const { data, error } = await admin
-    .from('organizations')
-    .select('id, name, slug, plan, logo_url, default_language, domain_blacklist, product_description, max_seats, max_leads_per_month, billing_day, apify_token, anthropic_key, anthropic_base_url, anthropic_model')
-    .eq('id', ctx.orgId)
-    .single()
+    .from('org_company_seed_lists')
+    .select('*')
+    .eq('organization_id', ctx.orgId)
+    .order('created_at')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  return NextResponse.json(data)
+  return NextResponse.json(data ?? [])
 }
 
-export async function PATCH(req: Request) {
+export async function POST(req: Request) {
   const ctx = await getOrgAdmin()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json()
-  const allowed = ['name', 'default_language', 'logo_url', 'domain_blacklist', 'product_description', 'apify_token', 'anthropic_key', 'anthropic_base_url', 'anthropic_model']
-  const update: Record<string, unknown> = {}
-  for (const key of allowed) {
-    if (key in body) update[key] = body[key]
-  }
-  if (Object.keys(update).length === 0) {
-    return NextResponse.json({ error: 'No valid fields' }, { status: 400 })
-  }
-  update.updated_at = new Date().toISOString()
+  const { list_name, market, company_names, title_keywords, seniority_levels, channel_family } = await req.json()
+  if (!list_name?.trim()) return NextResponse.json({ error: 'list_name is required' }, { status: 400 })
 
   const admin = createAdminClient()
   const { data, error } = await admin
-    .from('organizations')
-    .update(update)
-    .eq('id', ctx.orgId)
-    .select('id, name, slug, plan, logo_url, default_language, domain_blacklist, product_description, apify_token, anthropic_key, anthropic_base_url, anthropic_model')
+    .from('org_company_seed_lists')
+    .insert({
+      organization_id: ctx.orgId,
+      list_name: list_name.trim(),
+      market: market || null,
+      company_names: company_names ?? [],
+      title_keywords: title_keywords ?? [],
+      seniority_levels: seniority_levels ?? [],
+      channel_family: channel_family || null,
+    })
+    .select()
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  return NextResponse.json(data)
+  return NextResponse.json(data, { status: 201 })
 }

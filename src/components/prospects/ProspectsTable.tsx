@@ -48,7 +48,7 @@ const S: Record<string, React.CSSProperties> = {
   td: { padding: '10px 14px', borderBottom: '1px solid var(--crm-surface-raised)', fontSize: 13, verticalAlign: 'middle' as const },
 }
 
-const PROSPECT_SELECT = '*, area:areas(*), assigned_user:users!assigned_to(id, full_name, email, role, area_id, is_active, created_at)'
+const PROSPECT_SELECT = '*, area:areas(*), assigned_user:users!assigned_to(id, full_name, email, role, area_id, is_active, created_at), bd_channel:bd_channels(id, company_name, channel_family, status, partnership_model, market, notes, owner_sdr_id, run_id, channel_family_type:channel_family_types(label))'
 
 export function ProspectsTable() {
   const { user } = useUser()

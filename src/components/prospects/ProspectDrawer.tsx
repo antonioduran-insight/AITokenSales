@@ -11,10 +11,26 @@ import { NotesLog } from './NotesLog'
 
 import { useUser } from '@/contexts/UserContext'
 import { useOrgId } from '@/lib/hooks/useOrgId'
-import { ExternalLink, Copy, Check, Star, ChevronDown, CheckCircle, X } from 'lucide-react'
+import { ExternalLink, Copy, Check, Star, ChevronDown, CheckCircle, X, Building2 } from 'lucide-react'
 import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, LeadTemperature, User } from '@/lib/types'
 import { OUTREACH_STATUSES, LEAD_TEMPERATURES } from '@/lib/types'
+
+const CHANNEL_STATUS_COLORS: Record<string, string> = {
+  pending: '#8B8BA0',
+  active: '#3B82F6',
+  in_conversation: '#F59E0B',
+  pilot_agreed: '#A78BFA',
+  live: '#22C55E',
+  declined: '#EF4444',
+}
+
+interface ChannelContact {
+  id: string
+  name: string
+  title: string | null
+  outreach_status: string
+}
 
 interface Props {
   prospect: Prospect
@@ -71,14 +87,36 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
   const { isAdmin, user } = useUser()
   const { isImpersonating } = useOrgId()
   const [prospect, setProspect] = useState(initial)
-  const [tab, setTab] = useState<'info' | 'messages' | 'notes'>('info')
+  const [tab, setTab] = useState<'info' | 'messages' | 'notes' | 'channel'>('info')
   const [saving, setSaving] = useState(false)
 
   const [sdrsForArea, setSdrsForArea] = useState<User[]>([])
   const [reassigning, setReassigning] = useState(false)
   const [reassignToast, setReassignToast] = useState<string | null>(null)
 
+  const isBdContact = prospect.lead_type === 'bd_channel_contact'
+  const [channelNotes, setChannelNotes] = useState('')
+  const [channelNotesSaving, setChannelNotesSaving] = useState(false)
+  const [otherContacts, setOtherContacts] = useState<ChannelContact[]>([])
+
   if (initial.id !== prospect.id) setProspect(initial)
+
+  useEffect(() => {
+    setChannelNotes(prospect.bd_channel?.notes ?? '')
+  }, [prospect.bd_channel?.notes])
+
+  // Other contacts tracked under the same channel — fetched once per
+  // channel, not gated behind the tab so the count is available even
+  // before the reviewer opens the Channel tab
+  useEffect(() => {
+    if (!prospect.bd_channel_id) { setOtherContacts([]); return }
+    createClient()
+      .from('prospects')
+      .select('id, name, title, outreach_status')
+      .eq('bd_channel_id', prospect.bd_channel_id)
+      .neq('id', prospect.id)
+      .then(({ data }) => setOtherContacts((data ?? []) as ChannelContact[]))
+  }, [prospect.bd_channel_id, prospect.id])
 
   useEffect(() => {
     if (!isAdmin || !prospect.area_id) return
@@ -153,6 +191,22 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
 
   async function toggleFlag() { await updateField('flag_tomorrow', !prospect.flag_tomorrow) }
 
+  async function saveChannelNotes() {
+    if (isImpersonating || !prospect.bd_channel_id) return
+    setChannelNotesSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('bd_channels')
+      .update({ notes: channelNotes })
+      .eq('id', prospect.bd_channel_id)
+    if (!error && prospect.bd_channel) {
+      const updated = { ...prospect, bd_channel: { ...prospect.bd_channel, notes: channelNotes } }
+      setProspect(updated)
+      onUpdated(updated)
+    }
+    setChannelNotesSaving(false)
+  }
+
   const TAB_STYLE = (active: boolean): React.CSSProperties => ({
     padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13,
     fontWeight: active ? 600 : 400,
@@ -197,6 +251,15 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
               <h2 style={{ color: 'var(--crm-text-primary)', fontSize: 18, fontWeight: 700, margin: 0 }}>
                 {prospect.name}
               </h2>
+              {isBdContact && (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3,
+                  backgroundColor: '#6C63FF20', color: 'var(--crm-accent)',
+                  borderRadius: 4, padding: '2px 6px', fontSize: 10, fontWeight: 700,
+                }}>
+                  <Building2 size={10} /> BD
+                </span>
+              )}
               {prospect.area && <AreaBadge area={prospect.area} size="md" />}
             </div>
             {prospect.company && (
@@ -209,9 +272,9 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
 
           {/* Tabs */}
           <div style={{ display: 'flex', gap: 2 }}>
-            {(['info', 'messages', 'notes'] as const).map(tab_ => (
+            {(isBdContact ? (['info', 'channel', 'messages', 'notes'] as const) : (['info', 'messages', 'notes'] as const)).map(tab_ => (
               <button key={tab_} style={TAB_STYLE(tab === tab_)} onClick={() => setTab(tab_)}>
-                {tab_ === 'info' ? t('prospect.info') : tab_ === 'messages' ? t('prospect.messages') : t('prospect.notes')}
+                {tab_ === 'info' ? t('prospect.info') : tab_ === 'channel' ? 'Channel' : tab_ === 'messages' ? t('prospect.messages') : t('prospect.notes')}
               </button>
             ))}
           </div>
@@ -326,6 +389,86 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
                   </span>
                 </Field>
               </div>
+            </div>
+          )}
+
+          {/* CHANNEL TAB (BD contacts only) */}
+          {tab === 'channel' && (
+            <div>
+              {!prospect.bd_channel ? (
+                <p style={{ color: 'var(--crm-text-muted)', fontSize: 13 }}>Channel details are not available.</p>
+              ) : (
+                <>
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                      Company
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Building2 size={16} color="var(--crm-accent)" />
+                      <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--crm-text-primary)' }}>{prospect.bd_channel.company_name}</span>
+                      <span style={{
+                        marginLeft: 'auto', fontSize: 11, fontWeight: 600, textTransform: 'capitalize',
+                        padding: '2px 8px', borderRadius: 4,
+                        backgroundColor: (CHANNEL_STATUS_COLORS[prospect.bd_channel.status] ?? '#8B8BA0') + '20',
+                        color: CHANNEL_STATUS_COLORS[prospect.bd_channel.status] ?? '#8B8BA0',
+                      }}>
+                        {prospect.bd_channel.status.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid var(--crm-border)', paddingTop: 16 }}>
+                    {prospect.bd_channel.channel_family_type && (
+                      <Field label="Channel Family">{prospect.bd_channel.channel_family_type.label}</Field>
+                    )}
+                    {prospect.bd_channel.partnership_model && (
+                      <Field label="Partnership Model">{prospect.bd_channel.partnership_model}</Field>
+                    )}
+                    {prospect.bd_channel.market && (
+                      <Field label={t('prospect.market')}>{prospect.bd_channel.market}</Field>
+                    )}
+                  </div>
+
+                  <div style={{ borderTop: '1px solid var(--crm-border)', paddingTop: 16, marginTop: 4 }}>
+                    <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                      Channel Notes
+                    </div>
+                    <textarea
+                      value={channelNotes}
+                      onChange={e => setChannelNotes(e.target.value)}
+                      onBlur={saveChannelNotes}
+                      disabled={isImpersonating}
+                      rows={3}
+                      placeholder="Notes about this channel relationship…"
+                      style={{
+                        width: '100%', padding: '8px 10px', borderRadius: 6,
+                        backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)',
+                        color: 'var(--crm-text-primary)', fontSize: 13, resize: 'vertical' as const,
+                        opacity: isImpersonating ? 0.6 : 1,
+                      }}
+                    />
+                    {channelNotesSaving && <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 4 }}>Saving…</p>}
+                  </div>
+
+                  <div style={{ borderTop: '1px solid var(--crm-border)', paddingTop: 16, marginTop: 4 }}>
+                    <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                      Other Contacts at This Company ({otherContacts.length})
+                    </div>
+                    {otherContacts.length === 0 ? (
+                      <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>No other contacts tracked yet.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {otherContacts.map(c => (
+                          <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 10px', backgroundColor: 'var(--crm-surface-raised)', borderRadius: 6 }}>
+                            <span style={{ color: 'var(--crm-text-primary)' }}>{c.name}{c.title ? ` · ${c.title}` : ''}</span>
+                            <span style={{ color: 'var(--crm-text-muted)', fontSize: 11 }}>{c.outreach_status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
