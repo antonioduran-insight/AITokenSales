@@ -73,11 +73,12 @@ export async function POST(
   const areaBySdr: Record<string, string | null> = {}
   for (const s of validSdrs) areaBySdr[s.id] = s.area_id ?? null
 
-  // Assign each lead to the SDR the scraper already tagged it with (lead.sdr_id).
-  // Leads with no sdr_id — or an sdr_id that isn't in this run's SDR list — fall
-  // back to the first SDR.
+  // Assign each lead to the SDR the scraper tagged it with (lead.sdr_id) when that
+  // SDR is part of this run. Leads with a missing or unknown sdr_id are spread
+  // round-robin across the selected SDRs instead of piling onto a single one, so
+  // the distribution stays balanced even when the scraper doesn't tag leads.
   const validSdrIds = new Set(validSdrs.map(s => s.id))
-  const fallbackSdrId = validSdrs[0].id
+  let fallbackCursor = 0
 
   const prospectRows: Record<string, unknown>[] = []
   const assignedCount: Record<string, number> = {}
@@ -86,7 +87,13 @@ export async function POST(
   const tempMap: Record<string, string> = { 'HOT': 'Hot', 'WARM': 'Warm', 'COLD': 'Cold' }
 
   for (const lead of leads) {
-    const sdrId = lead.sdr_id && validSdrIds.has(lead.sdr_id) ? lead.sdr_id : fallbackSdrId
+    let sdrId: string
+    if (lead.sdr_id && validSdrIds.has(lead.sdr_id)) {
+      sdrId = lead.sdr_id
+    } else {
+      sdrId = validSdrs[fallbackCursor % validSdrs.length].id
+      fallbackCursor++
+    }
     assignedCount[sdrId] = (assignedCount[sdrId] ?? 0) + 1
 
     prospectRows.push({
