@@ -6,16 +6,8 @@ import { scraperApi, type Lead, type RunLog } from '@/lib/scraper-api';
 import { StatusBadge } from '@/components/scraper/StatusBadge';
 import { TemperatureBadge } from '@/components/scraper/TemperatureBadge';
 import { ICPScore } from '@/components/scraper/ICPScore';
-import { ChevronDown, ChevronUp, DatabaseZap, CheckCircle2, XCircle } from 'lucide-react';
-import type { Area, User, RunRecord } from '@/lib/types';
-
-interface ImportState {
-  area_id: string;
-  assigned_to: string;
-  loading: boolean;
-  result: { imported: number; duplicates: number; no_name: number } | null;
-  error: string | null;
-}
+import { ChevronDown, ChevronUp, XCircle } from 'lucide-react';
+import type { RunRecord } from '@/lib/types';
 
 const ACTIVE = new Set(['pending', 'running', 'scoring', 'drafting']);
 
@@ -43,10 +35,6 @@ export default function HistoryPage() {
   const [clearAllConfirm, setClearAllConfirm] = useState(false);
   const [clearAllInput, setClearAllInput] = useState('');
   const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
-  const [areas, setAreas] = useState<Area[]>([]);
-  const [sdrs, setSdrs] = useState<User[]>([]);
-  const [importOpen, setImportOpen] = useState<string | null>(null);
-  const [importState, setImportState] = useState<Record<string, ImportState>>({});
   const logBoxRef = useRef<Record<string, HTMLDivElement | null>>({});
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -59,9 +47,6 @@ export default function HistoryPage() {
 
   useEffect(() => {
     fetchRuns().finally(() => setLoading(false));
-    const supabase = createClient();
-    supabase.from('areas').select('*').then(({ data }) => { if (data) setAreas(data as Area[]) });
-    supabase.from('users').select('*').eq('role', 'sdr').eq('is_active', true).then(({ data }) => { if (data) setSdrs(data as User[]) });
   }, []);
 
   const fetchLogs = async (runId: string, silent = false) => {
@@ -139,39 +124,6 @@ export default function HistoryPage() {
     finally { setClearAllConfirm(false); setClearAllInput(''); }
   };
 
-  const openImport = (runId: string) => {
-    setImportOpen(runId);
-    if (!importState[runId]) {
-      setImportState(p => ({ ...p, [runId]: { area_id: areas[0]?.id ?? '', assigned_to: '', loading: false, result: null, error: null } }));
-    }
-  };
-  const setImportField = (runId: string, field: keyof ImportState, value: unknown) =>
-    setImportState(p => ({ ...p, [runId]: { ...p[runId], [field]: value } }));
-
-  const handleImportToCRM = async (runId: string) => {
-    const s = importState[runId];
-    if (!s?.area_id) return;
-    setImportField(runId, 'loading', true);
-    setImportField(runId, 'error', null);
-    setImportField(runId, 'result', null);
-    try {
-      const res = await fetch('/api/scraper/to-crm', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ run_id: runId, area_id: s.area_id, assigned_to: s.assigned_to || undefined }),
-      });
-      const data = await res.json();
-      if (!res.ok) setImportField(runId, 'error', data.error ?? 'Import failed');
-      else setImportField(runId, 'result', data);
-    } catch (e) {
-      setImportField(runId, 'error', String(e));
-    } finally { setImportField(runId, 'loading', false); }
-  };
-
-  const SELECT: React.CSSProperties = {
-    padding: '7px 10px', borderRadius: 7, backgroundColor: 'var(--crm-surface-raised)',
-    border: '1px solid var(--crm-border)', color: 'var(--crm-text-primary)', fontSize: 12, outline: 'none',
-  };
-
   return (
     <div style={S.page}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
@@ -208,8 +160,6 @@ export default function HistoryPage() {
         const leadsLoad = leadsLoading[run.id] ?? false;
         const logs = runLogs[run.id] ?? [];
         const logsLoad = logsLoading[run.id] ?? false;
-        const imp = importState[run.id];
-        const showImport = importOpen === run.id;
         const isActive = ACTIVE.has(run.status);
         const isCancelling = cancellingIds.has(run.id);
 
@@ -325,57 +275,16 @@ export default function HistoryPage() {
                 ) : null}
 
                 {/* Actions */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {run.status === 'completed' && !imp?.result && (
-                      <button onClick={() => showImport ? setImportOpen(null) : openImport(run.id)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, backgroundColor: showImport ? 'var(--crm-border)' : 'var(--crm-accent)', color: '#FFF', padding: '7px 14px', borderRadius: 7, border: 'none', cursor: 'pointer' }}>
-                        <DatabaseZap size={13} />{showImport ? 'Cancel' : 'Import to CRM'}
-                      </button>
-                    )}
-                    <button onClick={() => setExpandedId(null)}
-                      style={{ fontSize: 12, color: 'var(--crm-text-muted)', border: '1px solid var(--crm-border)', padding: '7px 14px', borderRadius: 7, background: 'transparent', cursor: 'pointer' }}>
-                      Close
-                    </button>
-                  </div>
-
-                  {showImport && run.status === 'completed' && imp && !imp.result && (
-                    <div style={{ backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', margin: 0, letterSpacing: '0.06em' }}>Import to CRM</p>
-                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                        <div style={{ flex: 1, minWidth: 180 }}>
-                          <label style={{ fontSize: 11, color: 'var(--crm-text-secondary)', display: 'block', marginBottom: 4 }}>Area *</label>
-                          <select value={imp.area_id} onChange={e => setImportField(run.id, 'area_id', e.target.value)} style={{ ...SELECT, width: '100%' }}>
-                            <option value="">Select…</option>
-                            {areas.filter(a => a.is_active).map(a => <option key={a.id} value={a.id}>{a.label_en}</option>)}
-                          </select>
-                        </div>
-                        <div style={{ flex: 1, minWidth: 180 }}>
-                          <label style={{ fontSize: 11, color: 'var(--crm-text-secondary)', display: 'block', marginBottom: 4 }}>Assign to SDR (optional)</label>
-                          <select value={imp.assigned_to} onChange={e => setImportField(run.id, 'assigned_to', e.target.value)} style={{ ...SELECT, width: '100%' }}>
-                            <option value="">Unassigned</option>
-                            {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
-                          </select>
-                        </div>
-                      </div>
-                      {imp.error && <p style={{ fontSize: 12, color: '#EF4444', margin: 0 }}>{imp.error}</p>}
-                      <button onClick={() => handleImportToCRM(run.id)} disabled={!imp.area_id || imp.loading}
-                        style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, backgroundColor: !imp.area_id || imp.loading ? 'var(--crm-border)' : 'var(--crm-accent)', color: '#FFF', padding: '7px 16px', borderRadius: 7, border: 'none', cursor: !imp.area_id || imp.loading ? 'default' : 'pointer', opacity: !imp.area_id ? 0.5 : 1 }}>
-                        <DatabaseZap size={13} />{imp.loading ? 'Importing…' : `Import ${leads.length} leads`}
-                      </button>
-                    </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {run.status === 'completed' && (
+                    <span style={{ display: 'flex', alignItems: 'center', fontSize: 12, color: 'var(--crm-text-muted)' }}>
+                      Leads auto-assigned to the run&apos;s SDRs — see their Kanban boards.
+                    </span>
                   )}
-
-                  {imp?.result && (
-                    <div style={{ backgroundColor: '#14532D20', border: '1px solid #16A34A40', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <CheckCircle2 size={16} color="#22C55E" />
-                      <div style={{ fontSize: 13 }}>
-                        <span style={{ color: '#22C55E', fontWeight: 600 }}>Imported: {imp.result.imported}</span>
-                        <span style={{ color: 'var(--crm-text-muted)', marginLeft: 12 }}>Duplicates: {imp.result.duplicates}</span>
-                        {imp.result.no_name > 0 && <span style={{ color: 'var(--crm-text-muted)', marginLeft: 12 }}>No name: {imp.result.no_name}</span>}
-                      </div>
-                    </div>
-                  )}
+                  <button onClick={() => setExpandedId(null)}
+                    style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--crm-text-muted)', border: '1px solid var(--crm-border)', padding: '7px 14px', borderRadius: 7, background: 'transparent', cursor: 'pointer' }}>
+                    Close
+                  </button>
                 </div>
               </div>
             )}
