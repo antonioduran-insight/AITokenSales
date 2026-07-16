@@ -5,7 +5,12 @@ import { Link } from '@/i18n/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/contexts/UserContext'
 import { Play, AlertCircle, Minus, Plus, CheckCircle2, XCircle, Loader2, ArrowRight, Download } from 'lucide-react'
-import type { User, ScraperComboMaster } from '@/lib/types'
+import type { User, ScraperComboMaster, AreaName } from '@/lib/types'
+import { inferAreaFromCountry } from '@/lib/utils/area-inference'
+
+// An SDR row plus the flattened set of area names it covers (primary area_id +
+// any user_areas), used to filter the SDR list by the selected market.
+type SdrOption = User & { areaNames: string[] }
 
 const MARKETS = ['Taiwan', 'LATAM', 'Vietnam', 'Global']
 const MAX_INT = 2147483647
@@ -68,7 +73,7 @@ export default function RunPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   // ── Phase 1: SDR selection ──
-  const [sdrs, setSdrs] = useState<User[]>([])
+  const [sdrs, setSdrs] = useState<SdrOption[]>([])
   const [selectedSdrIds, setSelectedSdrIds] = useState<string[]>([])
 
   // ── Phase 2: run + logs ──
@@ -114,16 +119,39 @@ export default function RunPage() {
       .then(({ data }) => { if (data) setMonthlyUsed(data.count) })
   }, [isAdmin, user?.organization_id])
 
-  // Load SDRs with scraper access (selected in phase 1)
+  // Load SDRs with scraper access + the areas they cover (primary area_id and
+  // any user_areas), so the list can be filtered by the selected market.
+  // Flat selects + client-side merge to avoid embed-relationship ambiguity.
   useEffect(() => {
-    createClient()
-      .from('users')
-      .select('*')
-      .eq('role', 'sdr')
-      .eq('is_active', true)
-      .eq('scraper_access', true)
-      .then(({ data }) => { if (data) setSdrs(data as User[]) })
+    const supabase = createClient()
+    Promise.all([
+      supabase.from('users').select('*').eq('role', 'sdr').eq('is_active', true).eq('scraper_access', true),
+      supabase.from('areas').select('id, name'),
+      supabase.from('user_areas').select('user_id, area_id'),
+    ]).then(([usersRes, areasRes, uaRes]) => {
+      const users = (usersRes.data ?? []) as User[]
+      const areaName = new Map<string, string>(
+        ((areasRes.data ?? []) as Array<{ id: string; name: string }>).map(a => [a.id, a.name])
+      )
+      const areasByUser = new Map<string, string[]>()
+      for (const ua of (uaRes.data ?? []) as Array<{ user_id: string; area_id: string }>) {
+        const list = areasByUser.get(ua.user_id) ?? []
+        list.push(ua.area_id)
+        areasByUser.set(ua.user_id, list)
+      }
+      setSdrs(users.map(u => {
+        const names = new Set<string>()
+        if (u.area_id && areaName.has(u.area_id)) names.add(areaName.get(u.area_id)!)
+        for (const aid of areasByUser.get(u.id) ?? []) if (areaName.has(aid)) names.add(areaName.get(aid)!)
+        return { ...u, areaNames: [...names] }
+      }))
+    })
   }, [])
+
+  // Market → area mapping (Taiwan→taiwan, LATAM→latam, Vietnam→vietnam).
+  // "Global" (or no market yet) resolves to null → no filter, show every SDR.
+  const marketArea: AreaName | null = market ? inferAreaFromCountry(market) : null
+  const visibleSdrs = marketArea ? sdrs.filter(s => s.areaNames.includes(marketArea)) : sdrs
 
   // ── Poll logs while the run is active ──
   const poll = useCallback(async (id: string) => {
@@ -285,7 +313,7 @@ export default function RunPage() {
             <span style={S.label}>Market</span>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {MARKETS.map(m => (
-                <button key={m} onClick={() => { setMarket(m); setSubmitError(null) }} style={chipBtn(market === m)}>
+                <button key={m} onClick={() => { setMarket(m); setSubmitError(null); setSelectedSdrIds([]) }} style={chipBtn(market === m)}>
                   {m}
                 </button>
               ))}
@@ -366,9 +394,13 @@ export default function RunPage() {
               <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
                 No SDRs with scraper access. Enable it in Settings → Users.
               </p>
+            ) : visibleSdrs.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
+                No SDRs assigned to {market}. Assign an area to an SDR in Settings → Users.
+              </p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {sdrs.map(sdr => {
+                {visibleSdrs.map(sdr => {
                   const sel = selectedSdrIds.includes(sdr.id)
                   return (
                     <label key={sdr.id} style={{
