@@ -61,7 +61,6 @@ function HistoryContent() {
   const [runLeads, setRunLeads] = useState<Record<string, Lead[]>>({});
   const [leadsLoading, setLeadsLoading] = useState<Record<string, boolean>>({});
   const [assignedBy, setAssignedBy] = useState<Record<string, Record<string, string>>>({}); // runId → linkedin_url → sdr name
-  const [sdrsWithRunLeads, setSdrsWithRunLeads] = useState<Record<string, Set<string>>>({}); // runId → set of sdr ids already holding this run's leads
   const [sdrs, setSdrs] = useState<SdrOption[]>([]);
 
   // "Send to another SDR" picker state
@@ -128,13 +127,10 @@ function HistoryContent() {
           .select('linkedin_url, assigned_to, assigned_user:users!assigned_to(full_name)')
           .in('linkedin_url', urls);
         const map: Record<string, string> = {};
-        const sdrSet = new Set<string>();
-        for (const p of (prospects ?? []) as Array<{ linkedin_url: string | null; assigned_to: string | null; assigned_user?: { full_name?: string } | null }>) {
+        for (const p of (prospects ?? []) as Array<{ linkedin_url: string | null; assigned_user?: { full_name?: string } | null }>) {
           if (p.linkedin_url && p.assigned_user?.full_name) map[p.linkedin_url] = p.assigned_user.full_name;
-          if (p.assigned_to) sdrSet.add(p.assigned_to);
         }
         setAssignedBy(prev => ({ ...prev, [runId]: map }));
-        setSdrsWithRunLeads(prev => ({ ...prev, [runId]: sdrSet }));
       }
     } catch { /* ignore */ }
     finally { setLeadsLoading(p => ({ ...p, [runId]: false })); }
@@ -191,8 +187,14 @@ function HistoryContent() {
       });
       const data = await res.json();
       if (!res.ok) { setSendMsg(data.error ?? 'Send failed'); return; }
+      // Show the real split, e.g. "Distributed 18 leads · Lauren 5 · Antonio 5 · …"
+      const perSdr = (data.per_sdr ?? {}) as Record<string, number>;
+      const breakdown = Object.entries(perSdr)
+        .filter(([, n]) => n > 0)
+        .map(([id, n]) => `${sdrs.find(s => s.id === id)?.full_name ?? 'SDR'} ${n}`)
+        .join(' · ');
       const suffix = data.skipped > 0 ? ` (${data.skipped} already assigned, skipped)` : '';
-      setSendMsg(`Sent ${data.assigned} leads to ${sendSelected.length} SDR${sendSelected.length !== 1 ? 's' : ''}${suffix}.`);
+      setSendMsg(`Distributed ${data.assigned} leads${breakdown ? ` · ${breakdown}` : ''}${suffix}.`);
       setSendSelected([]);
       setSendOpenFor(null);
       // Refresh detail so re-sent SDRs drop out of the picker / assignee column.
@@ -222,11 +224,10 @@ function HistoryContent() {
         const generated = (run.run_sdr_assignments ?? []).reduce((s, a) => s + (a.leads_assigned || 0), 0);
         const statusLabel = isActive ? 'Running' : run.status.charAt(0).toUpperCase() + run.status.slice(1);
         const runArea: AreaName | null = inferAreaFromCountry(run.market);
-        // Hide SDRs who already hold this run's leads — sending again would be a
-        // no-op (or hit the unique key), so they aren't valid re-send targets.
-        const alreadyHave = sdrsWithRunLeads[run.id] ?? new Set<string>();
-        const pickableSdrs = (runArea ? sdrs.filter(s => s.areaNames.includes(runArea)) : sdrs)
-          .filter(s => !alreadyHave.has(s.id));
+        // Any SDR covering the run's market can be picked. "Send to another SDR"
+        // moves + splits the leads across the chosen SDRs, so it's fine to
+        // include SDRs who already hold some (they just get redistributed).
+        const pickableSdrs = runArea ? sdrs.filter(s => s.areaNames.includes(runArea)) : sdrs;
 
         return (
           <div key={run.id} style={S.row} ref={el => { rowRefs.current[run.id] = el; }}>

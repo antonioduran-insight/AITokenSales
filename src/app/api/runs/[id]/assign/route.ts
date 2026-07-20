@@ -86,13 +86,26 @@ export async function POST(
   const areaBySdr: Record<string, string | null> = {}
   for (const s of validSdrs) areaBySdr[s.id] = s.area_id ?? null
 
-  // A lead may already be a prospect for a given SDR (e.g. this run was already
-  // assigned, or the lead was sent to that SDR before). Fetch the existing
-  // (linkedin_url → assigned_to) pairs so we can skip those inserts and let the
-  // same lead land on multiple SDR boards without violating the unique key.
   const leadUrls = [...new Set(leads.map(l => l.linkedin_url).filter(Boolean))] as string[]
   const existingKeys = new Set<string>()
-  if (leadUrls.length > 0) {
+
+  if (isManual) {
+    // "Send to another SDR" = distribute & MOVE. Wipe every existing scraper
+    // copy of these leads first so they end up ONLY on the newly chosen SDRs
+    // (split evenly), with no leftover duplicate on their previous owner. This
+    // also cleans up any duplicate rows from earlier sends.
+    for (let i = 0; i < leadUrls.length; i += 200) {
+      await admin
+        .from('prospects')
+        .delete()
+        .eq('organization_id', userData.organization_id)
+        .eq('source', 'scraper')
+        .in('linkedin_url', leadUrls.slice(i, i + 200))
+    }
+  } else if (leadUrls.length > 0) {
+    // Auto-assign: a lead may already be a prospect for a given SDR (run already
+    // assigned). Fetch existing (linkedin_url → assigned_to) pairs to skip those
+    // inserts instead of hitting the unique key.
     for (let i = 0; i < leadUrls.length; i += 200) {
       const { data: existing } = await admin
         .from('prospects')
@@ -105,10 +118,13 @@ export async function POST(
     }
   }
 
-  // Assign each lead to the SDR the scraper tagged it with (lead.sdr_id) when that
-  // SDR is part of this run. Leads with a missing or unknown sdr_id are spread
-  // round-robin across the selected SDRs instead of piling onto a single one, so
-  // the distribution stays balanced even when the scraper doesn't tag leads.
+  // Auto-assign (run completion): honour the SDR the scraper tagged each lead
+  // with (lead.sdr_id) when that SDR is in the run; otherwise round-robin.
+  //
+  // Manual "Send to another SDR": ALWAYS round-robin across the chosen SDRs so
+  // the run's leads are SPLIT evenly among them (each lead → exactly one SDR).
+  // We never copy every lead to every selected SDR — that would put the same
+  // lead on multiple people's boards and break the no-duplicate rule.
   const validSdrIds = new Set(validSdrs.map(s => s.id))
   let fallbackCursor = 0
 
@@ -121,7 +137,7 @@ export async function POST(
 
   for (const lead of leads) {
     let sdrId: string
-    if (lead.sdr_id && validSdrIds.has(lead.sdr_id)) {
+    if (!isManual && lead.sdr_id && validSdrIds.has(lead.sdr_id)) {
       sdrId = lead.sdr_id
     } else {
       sdrId = validSdrs[fallbackCursor % validSdrs.length].id
