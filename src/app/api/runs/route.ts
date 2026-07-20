@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { getLeadQuota } from '@/lib/utils/lead-quota'
 
 const SCRAPER_API = process.env.SCRAPER_API_URL ?? ''
 
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
 
     const { data: org } = await supabase
       .from('organizations')
-      .select('plan, max_leads_per_month, apify_token, anthropic_key, anthropic_base_url, anthropic_model')
+      .select('plan, max_leads_per_month, billing_day, apify_token, anthropic_key, anthropic_base_url, anthropic_model')
       .eq('id', userData?.organization_id)
       .single()
 
@@ -49,21 +50,19 @@ export async function POST(req: NextRequest) {
     const primaryMarket: string = markets?.[0] ?? market ?? 'global'
     const allMarkets: string[] = markets?.length ? markets : (market ? [market] : [])
 
-    // Monthly lead limit check
-    const currentMonth = new Date().toISOString().slice(0, 7)
-    const { data: monthlyCount } = await supabase
-      .from('monthly_lead_counts')
-      .select('count')
-      .eq('organization_id', userData.organization_id)
-      .eq('year_month', currentMonth)
-      .single()
+    // Lead limit check — scoped to the current billing period (renews on the
+    // org's billing_day, not the calendar month).
+    const quotaClient = adminClient()
+    const quota = await getLeadQuota(
+      quotaClient,
+      userData.organization_id,
+      org.billing_day ?? 1,
+      org.max_leads_per_month ?? null
+    )
 
-    const usedLeads = monthlyCount?.count ?? 0
-    const maxLeads = org.max_leads_per_month ?? 1000
-
-    if (maxLeads < 999999 && usedLeads + total_leads > maxLeads) {
+    if (!quota.unlimited && total_leads > quota.available) {
       return NextResponse.json(
-        { error: `Monthly lead limit exceeded. Used: ${usedLeads}, Limit: ${maxLeads}, Requested: ${total_leads}` },
+        { error: `Lead limit reached for this billing period. Used: ${quota.used}, Limit: ${quota.max}, Available: ${quota.available}, Requested: ${total_leads}` },
         { status: 429 }
       )
     }

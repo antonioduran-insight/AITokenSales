@@ -11,6 +11,58 @@ function adminClient() {
   )
 }
 
+// Run status + result summary. Used by New Run Phase 2 polling and Phase 3.
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: userData } = await supabase
+    .from('users')
+    .select('organization_id, role')
+    .eq('id', user.id)
+    .single()
+
+  if (!userData?.organization_id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { id } = await params
+  const admin = adminClient()
+
+  const { data: run, error } = await admin
+    .from('runs')
+    .select('*, executor:users!executed_by(full_name), run_sdr_assignments(sdr_id, leads_assigned, assigned_markets, user:users(full_name))')
+    .eq('id', id)
+    .single()
+
+  if (error || !run) return NextResponse.json({ error: 'Run not found' }, { status: 404 })
+  if (run.organization_id !== userData.organization_id && userData.role !== 'admin_global') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  // Temperature breakdown + total generated
+  const { data: leadRows } = await admin
+    .from('scraper_leads')
+    .select('temperature')
+    .eq('run_id', id)
+
+  const temperature = { HOT: 0, WARM: 0, COLD: 0 }
+  for (const l of leadRows ?? []) {
+    const t = (l.temperature ?? '').toUpperCase()
+    if (t === 'HOT') temperature.HOT++
+    else if (t === 'WARM') temperature.WARM++
+    else temperature.COLD++
+  }
+
+  return NextResponse.json({
+    ...run,
+    leads_generated: leadRows?.length ?? 0,
+    temperature,
+  })
+}
+
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

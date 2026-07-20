@@ -1,155 +1,185 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { scraperApi, type Lead, type RunLog } from '@/lib/scraper-api';
-import { StatusBadge } from '@/components/scraper/StatusBadge';
+import { type Lead } from '@/lib/scraper-api';
 import { TemperatureBadge } from '@/components/scraper/TemperatureBadge';
 import { ICPScore } from '@/components/scraper/ICPScore';
-import { ChevronDown, ChevronUp, XCircle } from 'lucide-react';
-import type { RunRecord } from '@/lib/types';
+import { ChevronDown, ChevronUp, Download, Send, X } from 'lucide-react';
+import type { RunRecord, User, AreaName } from '@/lib/types';
+import { inferAreaFromCountry } from '@/lib/utils/area-inference';
 
-const ACTIVE = new Set(['pending', 'running', 'scoring', 'drafting']);
+const ACTIVE = new Set(['pending', 'running', 'scraping', 'scoring', 'drafting']);
 
-const LOG_COLORS: Record<string, string> = {
-  info:    'var(--crm-text-secondary)',
-  success: '#22C55E',
-  warning: '#F59E0B',
-  error:   '#EF4444',
-};
+type SdrOption = User & { areaNames: string[] };
+
+const CSV_COLUMNS = ['full_name', 'company', 'title', 'linkedin_url', 'location', 'icp_score', 'temperature', 'search_combo', 'market', 'custom1', 'custom2'] as const;
 
 const S: Record<string, React.CSSProperties> = {
-  page:    { padding: '24px', color: 'var(--crm-text-primary)', maxWidth: 900 },
-  row:     { backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 10, overflow: 'hidden', marginBottom: 8 },
-  logBox:  { backgroundColor: '#0D1117', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '10px 12px', maxHeight: 260, overflowY: 'auto', fontFamily: 'monospace', fontSize: 11, lineHeight: 1.7, marginBottom: 12 },
+  page: { padding: '24px', color: 'var(--crm-text-primary)', maxWidth: 960, margin: '0 auto' },
+  row:  { backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 10, overflow: 'hidden', marginBottom: 10 },
+  badge:{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 5, backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', color: 'var(--crm-text-secondary)' },
 };
 
-export default function HistoryPage() {
+function statusBadge(status: string): React.CSSProperties {
+  const map: Record<string, { bg: string; color: string }> = {
+    completed: { bg: '#22C55E20', color: '#22C55E' },
+    failed:    { bg: '#EF444420', color: '#EF4444' },
+    cancelled: { bg: '#52526A20', color: 'var(--crm-text-muted)' },
+  };
+  const active = ACTIVE.has(status);
+  const c = active ? { bg: '#F59E0B20', color: '#F59E0B' } : (map[status] ?? { bg: 'var(--crm-border)', color: 'var(--crm-text-secondary)' });
+  return { display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, backgroundColor: c.bg, color: c.color };
+}
+
+function csvEscape(v: unknown): string {
+  if (v == null) return '';
+  const s = String(v);
+  return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function downloadCsv(runId: string, leads: Lead[]) {
+  const header = CSV_COLUMNS.join(',');
+  const body = leads.map(l => CSV_COLUMNS.map(c => csvEscape((l as unknown as Record<string, unknown>)[c])).join(',')).join('\n');
+  const blob = new Blob([[header, body].join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `run_${runId.slice(0, 8)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function HistoryContent() {
+  const searchParams = useSearchParams();
+  const runParam = searchParams.get('run');
+
   const [runs, setRuns] = useState<RunRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [runLeads, setRunLeads] = useState<Record<string, Lead[]>>({});
   const [leadsLoading, setLeadsLoading] = useState<Record<string, boolean>>({});
-  const [runLogs, setRunLogs] = useState<Record<string, RunLog[]>>({});
-  const [logsLoading, setLogsLoading] = useState<Record<string, boolean>>({});
-  const [clearAllConfirm, setClearAllConfirm] = useState(false);
-  const [clearAllInput, setClearAllInput] = useState('');
-  const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
-  const logBoxRef = useRef<Record<string, HTMLDivElement | null>>({});
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [assignedBy, setAssignedBy] = useState<Record<string, Record<string, string>>>({}); // runId → linkedin_url → sdr name
+  const [sdrs, setSdrs] = useState<SdrOption[]>([]);
 
-  const fetchRuns = async () => {
+  // "Send to another SDR" picker state
+  const [sendOpenFor, setSendOpenFor] = useState<string | null>(null);
+  const [sendSelected, setSendSelected] = useState<string[]>([]);
+  const [sending, setSending] = useState(false);
+  const [sendMsg, setSendMsg] = useState<string | null>(null);
+
+  const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const autoExpanded = useRef(false);
+
+  const fetchRuns = useCallback(async () => {
     const r = await fetch('/api/runs').catch(() => null);
     if (!r?.ok) return;
     const data: RunRecord[] = await r.json();
     if (Array.isArray(data)) setRuns(data);
-  };
-
-  useEffect(() => {
-    fetchRuns().finally(() => setLoading(false));
   }, []);
 
-  const fetchLogs = async (runId: string, silent = false) => {
-    if (!silent) setLogsLoading(p => ({ ...p, [runId]: true }));
-    try {
-      const logs = await scraperApi.get<RunLog[]>(`/runs/${runId}/logs`);
-      setRunLogs(p => ({ ...p, [runId]: Array.isArray(logs) ? logs : [] }));
-      // Auto-scroll to bottom
-      const el = logBoxRef.current[runId];
-      if (el) el.scrollTop = el.scrollHeight;
-    } catch { /* backend unavailable */ }
-    finally { if (!silent) setLogsLoading(p => ({ ...p, [runId]: false })); }
-  };
+  useEffect(() => { fetchRuns().finally(() => setLoading(false)); }, [fetchRuns]);
 
-  // Poll logs + run status for active expanded run
+  // Load SDRs (with covered areas) for the "Send to another SDR" picker
   useEffect(() => {
-    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-    if (!expandedId) return;
-    const run = runs.find(r => r.id === expandedId);
-    if (!run || !ACTIVE.has(run.status)) return;
-
-    pollRef.current = setInterval(async () => {
-      await Promise.all([fetchLogs(expandedId, true), fetchRuns()]);
-    }, 4000);
-
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expandedId, runs.find(r => r.id === expandedId)?.status]);
-
-  const toggleExpand = async (runId: string) => {
-    if (expandedId === runId) { setExpandedId(null); return; }
-    setExpandedId(runId);
-
-    // Fetch leads
-    if (!runLeads[runId]) {
-      setLeadsLoading(p => ({ ...p, [runId]: true }));
-      try {
-        const supabase = createClient();
-        const { data } = await supabase
-          .from('scraper_leads').select('*')
-          .eq('run_id', runId).order('created_at', { ascending: false }).limit(200);
-        setRunLeads(p => ({ ...p, [runId]: (data ?? []) as Lead[] }));
-      } catch { /* supabase error */ }
-      finally { setLeadsLoading(p => ({ ...p, [runId]: false })); }
-    }
-
-    // Fetch logs
-    await fetchLogs(runId);
-  };
-
-  const handleCancelRun = async (e: React.MouseEvent, runId: string) => {
-    e.stopPropagation();
-    setCancellingIds(prev => new Set(prev).add(runId));
-    try {
-      const res = await fetch(`/api/runs/${runId}`, { method: 'DELETE' });
-      const body = await res.json();
-      if (res.ok) {
-        setRuns(prev => prev.map(r => r.id === runId ? { ...r, status: 'cancelled' } : r));
-      } else {
-        alert(`Cancel failed: ${body.error ?? res.status}`);
+    const supabase = createClient();
+    Promise.all([
+      supabase.from('users').select('*').eq('role', 'sdr').eq('is_active', true).eq('scraper_access', true),
+      supabase.from('areas').select('id, name'),
+      supabase.from('user_areas').select('user_id, area_id'),
+    ]).then(([usersRes, areasRes, uaRes]) => {
+      const users = (usersRes.data ?? []) as User[];
+      const areaName = new Map<string, string>(((areasRes.data ?? []) as Array<{ id: string; name: string }>).map(a => [a.id, a.name]));
+      const areasByUser = new Map<string, string[]>();
+      for (const ua of (uaRes.data ?? []) as Array<{ user_id: string; area_id: string }>) {
+        const list = areasByUser.get(ua.user_id) ?? [];
+        list.push(ua.area_id);
+        areasByUser.set(ua.user_id, list);
       }
-    } catch (err) {
-      alert(`Cancel error: ${String(err)}`);
-    } finally {
-      setCancellingIds(prev => { const s = new Set(prev); s.delete(runId); return s; });
-    }
-  };
+      setSdrs(users.map(u => {
+        const names = new Set<string>();
+        if (u.area_id && areaName.has(u.area_id)) names.add(areaName.get(u.area_id)!);
+        for (const aid of areasByUser.get(u.id) ?? []) if (areaName.has(aid)) names.add(areaName.get(aid)!);
+        return { ...u, areaNames: [...names] };
+      }));
+    });
+  }, []);
 
-  const handleClearAll = async () => {
-    if (clearAllInput !== 'DELETE') return;
+  const loadRunDetail = useCallback(async (runId: string) => {
+    if (runLeads[runId]) return;
+    setLeadsLoading(p => ({ ...p, [runId]: true }));
     try {
-      const res = await fetch('/api/runs', { method: 'DELETE' });
-      if (res.ok) { setRuns([]); setExpandedId(null); setRunLeads({}); setRunLogs({}); }
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('scraper_leads').select('*')
+        .eq('run_id', runId).order('icp_score', { ascending: false }).limit(500);
+      const leads = (data ?? []) as Lead[];
+      setRunLeads(p => ({ ...p, [runId]: leads }));
+
+      // Resolve which SDR each lead landed on: join prospects by linkedin_url.
+      const urls = leads.map(l => l.linkedin_url).filter(Boolean) as string[];
+      if (urls.length > 0) {
+        const { data: prospects } = await supabase
+          .from('prospects')
+          .select('linkedin_url, assigned_user:users!assigned_to(full_name)')
+          .in('linkedin_url', urls);
+        const map: Record<string, string> = {};
+        for (const p of (prospects ?? []) as Array<{ linkedin_url: string | null; assigned_user?: { full_name?: string } | null }>) {
+          if (p.linkedin_url && p.assigned_user?.full_name) map[p.linkedin_url] = p.assigned_user.full_name;
+        }
+        setAssignedBy(prev => ({ ...prev, [runId]: map }));
+      }
     } catch { /* ignore */ }
-    finally { setClearAllConfirm(false); setClearAllInput(''); }
-  };
+    finally { setLeadsLoading(p => ({ ...p, [runId]: false })); }
+  }, [runLeads]);
+
+  const toggleExpand = useCallback((runId: string) => {
+    setExpandedId(prev => (prev === runId ? null : runId));
+    setSendOpenFor(null);
+    setSendMsg(null);
+    loadRunDetail(runId);
+  }, [loadRunDetail]);
+
+  // Auto-expand + scroll to ?run={id}
+  useEffect(() => {
+    if (autoExpanded.current || loading || !runParam) return;
+    if (!runs.some(r => r.id === runParam)) return;
+    autoExpanded.current = true;
+    setExpandedId(runParam);
+    loadRunDetail(runParam);
+    setTimeout(() => rowRefs.current[runParam]?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+  }, [runParam, runs, loading, loadRunDetail]);
+
+  async function handleSend(runId: string, market: string) {
+    if (sendSelected.length === 0 || sending) return;
+    setSending(true);
+    setSendMsg(null);
+    try {
+      const res = await fetch(`/api/runs/${runId}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          manual: true,
+          sdr_ids: sendSelected,
+          sdr_market_assignments: Object.fromEntries(sendSelected.map(id => [id, market ? [market] : []])),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setSendMsg(data.error ?? 'Send failed'); return; }
+      setSendMsg(`Sent ${data.assigned} leads to ${sendSelected.length} SDR${sendSelected.length !== 1 ? 's' : ''}.`);
+      setSendSelected([]);
+      setSendOpenFor(null);
+    } catch (e) {
+      setSendMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSending(false);
+    }
+  }
 
   return (
     <div style={S.page}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Run History</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{runs.length} runs</span>
-          {clearAllConfirm ? (
-            <>
-              <span style={{ fontSize: 11, color: 'var(--crm-text-secondary)' }}>Type <b>DELETE</b>:</span>
-              <input autoFocus value={clearAllInput} onChange={e => setClearAllInput(e.target.value)} placeholder="DELETE"
-                style={{ width: 80, padding: '4px 8px', fontSize: 11, borderRadius: 6, backgroundColor: 'var(--crm-surface-raised)', border: '1px solid #EF444430', color: 'var(--crm-text-primary)', outline: 'none' }} />
-              <button onClick={handleClearAll} disabled={clearAllInput !== 'DELETE'}
-                style={{ fontSize: 11, backgroundColor: '#EF4444', color: '#FFF', padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', opacity: clearAllInput !== 'DELETE' ? 0.3 : 1 }}>
-                Delete all
-              </button>
-              <button onClick={() => { setClearAllConfirm(false); setClearAllInput(''); }}
-                style={{ fontSize: 11, color: 'var(--crm-text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
-            </>
-          ) : (
-            <button onClick={() => runs.length > 0 && setClearAllConfirm(true)} disabled={runs.length === 0}
-              style={{ fontSize: 11, color: 'var(--crm-text-muted)', border: '1px solid var(--crm-border)', padding: '5px 10px', borderRadius: 6, background: 'transparent', cursor: 'pointer', opacity: runs.length === 0 ? 0.3 : 1 }}>
-              Clear History
-            </button>
-          )}
-        </div>
-      </div>
+      <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 20px' }}>Run History</h1>
 
       {loading && <p style={{ color: 'var(--crm-text-muted)', textAlign: 'center', padding: 40 }}>Loading…</p>}
       {!loading && runs.length === 0 && <p style={{ color: 'var(--crm-text-muted)', textAlign: 'center', padding: 40 }}>No runs yet.</p>}
@@ -158,139 +188,147 @@ export default function HistoryPage() {
         const isExpanded = expandedId === run.id;
         const leads = runLeads[run.id] ?? [];
         const leadsLoad = leadsLoading[run.id] ?? false;
-        const logs = runLogs[run.id] ?? [];
-        const logsLoad = logsLoading[run.id] ?? false;
         const isActive = ACTIVE.has(run.status);
-        const isCancelling = cancellingIds.has(run.id);
+        const isFailed = run.status === 'failed' || run.status === 'cancelled';
+        const markets = run.markets?.length ? run.markets : [run.market];
+        const generated = (run.run_sdr_assignments ?? []).reduce((s, a) => s + (a.leads_assigned || 0), 0);
+        const statusLabel = isActive ? 'Running' : run.status.charAt(0).toUpperCase() + run.status.slice(1);
+        const runArea: AreaName | null = inferAreaFromCountry(run.market);
+        const pickableSdrs = runArea ? sdrs.filter(s => s.areaNames.includes(runArea)) : sdrs;
 
         return (
-          <div key={run.id} style={S.row}>
-            {/* Row header */}
+          <div key={run.id} style={S.row} ref={el => { rowRefs.current[run.id] = el; }}>
+            {/* Header */}
             <div onClick={() => toggleExpand(run.id)}
-              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer' }}>
-              <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--crm-text-muted)', flexShrink: 0, width: 80 }}>
-                {new Date(run.created_at).toLocaleDateString()}
-              </span>
-              <span style={{ fontSize: 13, fontWeight: 600, minWidth: 80 }}>
-                {(run.markets?.length ? run.markets : [run.market]).join(' + ')}
-              </span>
-              <div style={{ flex: 1, display: 'flex', gap: 12, fontSize: 11, flexWrap: 'wrap' }}>
-                <span style={{ color: 'var(--crm-text-secondary)' }}>{run.total_leads_requested} leads req.</span>
-                {run.combos?.length > 0 && (
-                  <span style={{ color: 'var(--crm-text-muted)' }}>{run.combos.join(' · ')}</span>
-                )}
+              style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', cursor: 'pointer' }}>
+              <div style={{ minWidth: 130 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-primary)' }}>
+                  {new Date(run.created_at).toLocaleDateString()}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>
+                  {new Date(run.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <StatusBadge status={run.status as Parameters<typeof StatusBadge>[0]['status']} />
-                {isActive && (
-                  <button onClick={e => handleCancelRun(e, run.id)} disabled={isCancelling}
-                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#EF4444', background: 'transparent', border: '1px solid #EF444440', borderRadius: 6, padding: '3px 8px', cursor: isCancelling ? 'default' : 'pointer', opacity: isCancelling ? 0.5 : 1, flexShrink: 0 }}>
-                    <XCircle size={12} />{isCancelling ? 'Cancelling…' : 'Cancel'}
-                  </button>
-                )}
-                {isExpanded ? <ChevronUp size={14} color="var(--crm-text-muted)" /> : <ChevronDown size={14} color="var(--crm-text-muted)" />}
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                {markets.map(m => <span key={m} style={{ ...S.badge, color: 'var(--crm-accent)', borderColor: '#6C63FF40' }}>{m}</span>)}
+                {(run.combos ?? []).map(c => <span key={c} style={S.badge}>{c}</span>)}
               </div>
+              <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)', fontWeight: 600, minWidth: 70, textAlign: 'right' }}>
+                {generated > 0 ? generated : run.total_leads_requested} leads
+              </span>
+              <span style={statusBadge(run.status)}>
+                {isActive && <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'currentColor', animation: 'pulse 1.5s ease-in-out infinite' }} />}
+                {statusLabel}
+              </span>
+              {isExpanded ? <ChevronUp size={16} color="var(--crm-text-muted)" /> : <ChevronDown size={16} color="var(--crm-text-muted)" />}
             </div>
 
             {isExpanded && (
-              <div style={{ borderTop: '1px solid var(--crm-border)', padding: 16 }}>
-
-                {/* Run metadata */}
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 14, fontSize: 12, color: 'var(--crm-text-secondary)' }}>
-                  {run.executor?.full_name && (
-                    <span>Executed by: <span style={{ color: 'var(--crm-text-primary)', fontWeight: 500 }}>{run.executor.full_name}</span></span>
-                  )}
-                  {run.run_sdr_assignments && run.run_sdr_assignments.length > 0 && (
-                    <span>
-                      SDRs: {run.run_sdr_assignments.map(a => (
-                        <span key={a.sdr_id} style={{ color: 'var(--crm-text-primary)', fontWeight: 500, marginLeft: 4 }}>
-                          {a.user?.full_name ?? a.sdr_id}
-                          {a.assigned_markets?.length ? ` (${a.assigned_markets.join(', ')})` : ''}
-                          {a.leads_assigned > 0 ? `: ${a.leads_assigned}` : ''}
-                          {a.sender_profile_id ? ' ✦' : ''}
-                        </span>
-                      ))}
-                    </span>
-                  )}
-                </div>
-
-                {/* Logs */}
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                    <span style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Logs</span>
-                    {isActive && (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--crm-accent)' }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--crm-accent)', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                        Live
-                      </span>
-                    )}
-                    {logs.length > 0 && <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', marginLeft: 'auto' }}>{logs.length} entries</span>}
-                  </div>
-                  <div style={S.logBox} ref={el => { logBoxRef.current[run.id] = el; }}>
-                    {logsLoad && <span style={{ color: '#52526A' }}>Loading logs…</span>}
-                    {!logsLoad && logs.length === 0 && (
-                      <span style={{ color: '#52526A' }}>No logs yet{isActive ? ' — waiting for backend…' : '.'}</span>
-                    )}
-                    {logs.map((log, i) => (
-                      <div key={log.id ?? i} style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
-                        <span style={{ color: '#52526A', flexShrink: 0, fontSize: 10 }}>
-                          {new Date(log.created_at).toLocaleTimeString()}
-                        </span>
-                        <span style={{ color: LOG_COLORS[log.level] ?? 'var(--crm-text-secondary)', flexShrink: 0, fontWeight: 600, fontSize: 10, textTransform: 'uppercase', width: 52 }}>
-                          {log.level}
-                        </span>
-                        <span style={{ color: '#C9D1D9', wordBreak: 'break-word' }}>{log.message}</span>
+              <div style={{ borderTop: '1px solid var(--crm-border)', padding: 18 }}>
+                {isFailed ? (
+                  <p style={{ fontSize: 14, color: 'var(--crm-text-secondary)', margin: 0, textAlign: 'center', padding: '20px 0' }}>
+                    This run failed. Contact support.
+                  </p>
+                ) : (
+                  <>
+                    {/* Toolbar */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+                      <span style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{leads.length} leads</span>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => { setSendOpenFor(sendOpenFor === run.id ? null : run.id); setSendSelected([]); setSendMsg(null); }}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--crm-text-secondary)', border: '1px solid var(--crm-border)', padding: '7px 14px', borderRadius: 8, background: 'transparent', cursor: 'pointer' }}>
+                          <Send size={13} /> Send to another SDR
+                        </button>
+                        <button onClick={() => downloadCsv(run.id, leads)} disabled={leads.length === 0}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#FFF', backgroundColor: 'var(--crm-accent)', padding: '7px 14px', borderRadius: 8, border: 'none', cursor: leads.length === 0 ? 'default' : 'pointer', opacity: leads.length === 0 ? 0.4 : 1 }}>
+                          <Download size={13} /> Download CSV
+                        </button>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
 
-                {/* Leads preview */}
-                {leadsLoad ? (
-                  <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginBottom: 12 }}>Loading leads…</p>
-                ) : leads.length > 0 ? (
-                  <div style={{ border: '1px solid var(--crm-border)', borderRadius: 8, overflow: 'auto', marginBottom: 12 }}>
-                    <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid var(--crm-border)' }}>
-                          {['Name', 'Company', 'Title', 'ICP', 'Temp'].map(h => (
-                            <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 10, color: 'var(--crm-text-muted)', fontWeight: 600 }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {leads.slice(0, 15).map((lead, i) => (
-                          <tr key={lead.id} style={{ borderTop: i > 0 ? '1px solid var(--crm-border)' : undefined }}>
-                            <td style={{ padding: '6px 12px', color: 'var(--crm-text-primary)', fontWeight: 600 }}>{lead.full_name || '—'}</td>
-                            <td style={{ padding: '6px 12px', color: 'var(--crm-text-secondary)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.company || '—'}</td>
-                            <td style={{ padding: '6px 12px', color: 'var(--crm-text-secondary)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.title || '—'}</td>
-                            <td style={{ padding: '6px 12px' }}><ICPScore score={lead.icp_score ?? 0} size="sm" /></td>
-                            <td style={{ padding: '6px 12px' }}>{lead.temperature && <TemperatureBadge temperature={lead.temperature} />}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {leads.length > 15 && <p style={{ padding: '6px 12px', fontSize: 11, color: 'var(--crm-text-muted)', textAlign: 'center', borderTop: '1px solid var(--crm-border)', margin: 0 }}>… and {leads.length - 15} more</p>}
-                  </div>
-                ) : null}
+                    {/* Send-to picker */}
+                    {sendOpenFor === run.id && (
+                      <div style={{ backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 10, padding: 14, marginBottom: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--crm-text-primary)' }}>Send this run&apos;s leads to additional SDRs</span>
+                          <button onClick={() => setSendOpenFor(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)' }}><X size={15} /></button>
+                        </div>
+                        {pickableSdrs.length === 0 ? (
+                          <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: 0 }}>No SDRs with scraper access for {run.market}.</p>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                            {pickableSdrs.map(sdr => {
+                              const sel = sendSelected.includes(sdr.id);
+                              return (
+                                <label key={sdr.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, cursor: 'pointer', backgroundColor: sel ? '#6C63FF10' : 'var(--crm-surface)', border: `1px solid ${sel ? '#6C63FF40' : 'var(--crm-border)'}` }}>
+                                  <input type="checkbox" checked={sel} onChange={() => setSendSelected(p => p.includes(sdr.id) ? p.filter(x => x !== sdr.id) : [...p, sdr.id])} style={{ accentColor: 'var(--crm-accent)' }} />
+                                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{sdr.full_name}</span>
+                                  <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>{sdr.areaNames.join(', ')}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <button onClick={() => handleSend(run.id, run.market)} disabled={sendSelected.length === 0 || sending}
+                            style={{ fontSize: 12, fontWeight: 700, color: '#FFF', backgroundColor: sendSelected.length === 0 || sending ? 'var(--crm-border)' : 'var(--crm-accent)', padding: '8px 18px', borderRadius: 8, border: 'none', cursor: sendSelected.length === 0 || sending ? 'default' : 'pointer' }}>
+                            {sending ? 'Sending…' : `Send to ${sendSelected.length || ''} SDR${sendSelected.length !== 1 ? 's' : ''}`.trim()}
+                          </button>
+                          {sendMsg && <span style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>{sendMsg}</span>}
+                        </div>
+                      </div>
+                    )}
+                    {sendMsg && sendOpenFor !== run.id && (
+                      <p style={{ fontSize: 12, color: '#22C55E', margin: '0 0 12px' }}>{sendMsg}</p>
+                    )}
 
-                {/* Actions */}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {run.status === 'completed' && (
-                    <span style={{ display: 'flex', alignItems: 'center', fontSize: 12, color: 'var(--crm-text-muted)' }}>
-                      Leads auto-assigned to the run&apos;s SDRs — see their Kanban boards.
-                    </span>
-                  )}
-                  <button onClick={() => setExpandedId(null)}
-                    style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--crm-text-muted)', border: '1px solid var(--crm-border)', padding: '7px 14px', borderRadius: 7, background: 'transparent', cursor: 'pointer' }}>
-                    Close
-                  </button>
-                </div>
+                    {/* Leads table */}
+                    {leadsLoad ? (
+                      <p style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>Loading leads…</p>
+                    ) : leads.length === 0 ? (
+                      <p style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>No leads for this run.</p>
+                    ) : (
+                      <div style={{ border: '1px solid var(--crm-border)', borderRadius: 8, overflow: 'auto' }}>
+                        <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid var(--crm-border)' }}>
+                              {['Name', 'Company', 'Title', 'ICP', 'Temp', 'Assigned to'].map(h => (
+                                <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontSize: 10, color: 'var(--crm-text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {leads.map((lead, i) => (
+                              <tr key={lead.id} style={{ borderTop: i > 0 ? '1px solid var(--crm-border)' : undefined }}>
+                                <td style={{ padding: '7px 12px', color: 'var(--crm-text-primary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{lead.full_name || '—'}</td>
+                                <td style={{ padding: '7px 12px', color: 'var(--crm-text-secondary)', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.company || '—'}</td>
+                                <td style={{ padding: '7px 12px', color: 'var(--crm-text-secondary)', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.title || '—'}</td>
+                                <td style={{ padding: '7px 12px' }}><ICPScore score={lead.icp_score ?? 0} size="sm" /></td>
+                                <td style={{ padding: '7px 12px' }}>{lead.temperature && <TemperatureBadge temperature={lead.temperature} />}</td>
+                                <td style={{ padding: '7px 12px', color: 'var(--crm-text-secondary)', whiteSpace: 'nowrap' }}>
+                                  {(lead.linkedin_url && assignedBy[run.id]?.[lead.linkedin_url]) || <span style={{ color: 'var(--crm-text-muted)' }}>—</span>}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </div>
         );
       })}
     </div>
+  );
+}
+
+export default function HistoryPage() {
+  return (
+    <Suspense fallback={<p style={{ color: 'var(--crm-text-muted)', padding: 40 }}>Loading…</p>}>
+      <HistoryContent />
+    </Suspense>
   );
 }

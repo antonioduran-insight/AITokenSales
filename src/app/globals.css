@@ -152,6 +152,20 @@
   to { transform: rotate(360deg); }
 }
 
+/* Scraper run — animated progress ring dash */
+@keyframes scraper-ring {
+  0%   { stroke-dashoffset: 300; }
+  50%  { stroke-dashoffset: 75; }
+  100% { stroke-dashoffset: 300; }
+}
+
+/* Scraper run — completion checkmark pop-in */
+@keyframes scraper-pop {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 /* Area badge colors */
 .area-badge-taiwan {
   background-color: #1E3A5F;

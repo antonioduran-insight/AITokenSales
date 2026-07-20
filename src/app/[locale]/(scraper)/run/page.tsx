@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { Link } from '@/i18n/navigation'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
-import { useUser } from '@/contexts/UserContext'
-import { Play, AlertCircle, Minus, Plus, CheckCircle2, XCircle, Loader2, ArrowRight, Download } from 'lucide-react'
+import { Minus, Plus, AlertCircle } from 'lucide-react'
 import type { User, ScraperComboMaster, AreaName } from '@/lib/types'
 import { inferAreaFromCountry } from '@/lib/utils/area-inference'
 
@@ -16,112 +16,129 @@ const MARKETS = ['Taiwan', 'LATAM', 'Vietnam', 'Global']
 const MAX_INT = 2147483647
 const STEP = 10
 const MIN_LEADS = 10
-const PLAN_LIMITS: Record<string, number> = {
-  basic: 1000,
-  premium: 3000,
-  enterprise: 10000,
-  ultra: MAX_INT,
+const MAX_LEADS = 500
+const PRESETS = [100, 200, 300, 400, 500]
+const STORAGE_KEY = 'scraper_active_run'
+
+const ACTIVE = new Set(['pending', 'running', 'scraping', 'scoring', 'drafting'])
+
+// Backend status → simple centered label for Phase 2
+const STATUS_LABEL: Record<string, string> = {
+  pending: 'Initializing…',
+  running: 'Initializing…',
+  scraping: '🔍 Scraping LinkedIn',
+  scoring: '📊 Scoring leads',
+  drafting: '✍️ Generating messages',
 }
 
-interface RunLogEntry {
-  id: string
-  level: 'info' | 'success' | 'warning' | 'error'
-  message: string
-  created_at: string
+// Which of the 4 progress dots is "active" for a given status
+const STATUS_STEP: Record<string, number> = {
+  pending: 0, running: 0, scraping: 0, scoring: 1, drafting: 2, completed: 3,
 }
+const STEPS = ['Scraping', 'Scoring', 'Messages', 'Done']
 
-const LOG_COLORS: Record<string, string> = {
-  info: '#C9D1D9',
-  success: '#22C55E',
-  warning: '#F59E0B',
-  error: '#EF4444',
+const CSV_COLUMNS = ['full_name', 'company', 'title', 'linkedin_url', 'location', 'icp_score', 'temperature', 'search_combo', 'market', 'custom1', 'custom2'] as const
+
+interface RunSummary {
+  status: string
+  market: string
+  markets?: string[]
+  total_leads_requested: number
+  leads_generated: number
+  temperature: { HOT: number; WARM: number; COLD: number }
+  run_sdr_assignments?: Array<{ sdr_id: string; leads_assigned: number; user?: { full_name: string } }>
 }
-
-const ACTIVE = new Set(['pending', 'running', 'scoring', 'drafting'])
 
 const S: Record<string, React.CSSProperties> = {
-  page:  { padding: '24px', color: 'var(--crm-text-primary)', maxWidth: 720 },
+  page:  { padding: '32px 24px', color: 'var(--crm-text-primary)', maxWidth: 680, margin: '0 auto' },
   card:  { backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: '20px 24px' },
   label: { fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.06em', display: 'block', marginBottom: 12 },
-  logBox:{ backgroundColor: '#0D1117', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '12px 14px', maxHeight: 380, overflowY: 'auto', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.8 },
 }
 
-function chipBtn(active: boolean, disabled = false): React.CSSProperties {
+function chip(active: boolean): React.CSSProperties {
   return {
-    padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500,
-    cursor: disabled ? 'not-allowed' : 'pointer',
+    padding: '10px 22px', borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer',
     border: `1px solid ${active ? 'var(--crm-accent)' : 'var(--crm-border)'}`,
     backgroundColor: active ? 'var(--crm-accent)' : 'var(--crm-surface-raised)',
-    color: active ? '#FFF' : disabled ? 'var(--crm-text-muted)' : 'var(--crm-text-secondary)',
-    opacity: disabled ? 0.4 : 1,
+    color: active ? '#FFF' : 'var(--crm-text-secondary)',
     transition: 'all .15s',
   }
 }
 
-export default function RunPage() {
-  const { user, orgPlan } = useUser()
-  const isAdmin = user?.role === 'admin'
+function csvEscape(v: unknown): string {
+  if (v == null) return ''
+  const s = String(v)
+  return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+async function downloadRunCsv(runId: string) {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('scraper_leads').select('*').eq('run_id', runId).limit(500)
+  const rows = data ?? []
+  const header = CSV_COLUMNS.join(',')
+  const body = rows.map(r => CSV_COLUMNS.map(c => csvEscape((r as Record<string, unknown>)[c])).join(',')).join('\n')
+  const blob = new Blob([[header, body].join('\n')], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `run_${runId.slice(0, 8)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function RunPageInner() {
+  const router = useRouter()
+  const locale = useLocale()
+  const searchParams = useSearchParams()
+
+  // ── Phase state ──
+  const [runId, setRunId] = useState<string | null>(null)
+  const [summary, setSummary] = useState<RunSummary | null>(null)
+  const [assignState, setAssignState] = useState<'idle' | 'assigning' | 'done'>('idle')
+  const assignFiredRef = useRef(false)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // ── Phase 1: config ──
   const [market, setMarket] = useState<string | null>(null)
   const [activeCombos, setActiveCombos] = useState<ScraperComboMaster[]>([])
   const [combosLoading, setCombosLoading] = useState(true)
   const [selectedCombos, setSelectedCombos] = useState<string[]>([])
-  const [totalLeads, setTotalLeads] = useState(MIN_LEADS)
-  const [monthlyUsed, setMonthlyUsed] = useState(0)
+  const [totalLeads, setTotalLeads] = useState(100)
+  const [available, setAvailable] = useState(MAX_INT)
+  const [unlimited, setUnlimited] = useState(true)
+  const [sdrs, setSdrs] = useState<SdrOption[]>([])
+  const [selectedSdrIds, setSelectedSdrIds] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  // ── Phase 1: SDR selection ──
-  const [sdrs, setSdrs] = useState<SdrOption[]>([])
-  const [selectedSdrIds, setSelectedSdrIds] = useState<string[]>([])
+  // Kept for the auto-assign call after completion (survives restore)
+  const runMetaRef = useRef<{ market: string | null; sdrIds: string[] }>({ market: null, sdrIds: [] })
 
-  // ── Phase 2: run + logs ──
-  const [runId, setRunId] = useState<string | null>(null)
-  const [runStatus, setRunStatus] = useState<string>('pending')
-  const [logs, setLogs] = useState<RunLogEntry[]>([])
-  const [leadsGenerated, setLeadsGenerated] = useState(0)
-  const logBoxRef = useRef<HTMLDivElement | null>(null)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  // ── Phase 3: auto-assign on completion ──
-  const [assignState, setAssignState] = useState<'idle' | 'assigning' | 'done' | 'error'>('idle')
-  const [assignedCount, setAssignedCount] = useState(0)
-  const [assignError, setAssignError] = useState<string | null>(null)
-  const assignFiredRef = useRef(false)
-
-  const maxLeads = PLAN_LIMITS[orgPlan ?? 'basic'] ?? 1000
-  const available = maxLeads >= MAX_INT ? MAX_INT : Math.max(0, maxLeads - monthlyUsed)
-  const leadsPerCombo = selectedCombos.length > 0 ? Math.floor(totalLeads / selectedCombos.length) : 0
+  const effectiveMax = unlimited ? MAX_LEADS : Math.min(MAX_LEADS, available)
+  const overLimit = !unlimited && totalLeads > available
 
   const canRun = !!market && selectedCombos.length > 0 && totalLeads >= MIN_LEADS &&
-    selectedSdrIds.length > 0 && (available >= MAX_INT || totalLeads <= available)
+    selectedSdrIds.length > 0 && !overLimit
 
-  // Load combos
+  // ── Load combos + quota ──
   useEffect(() => {
     fetch('/api/scraper-combos')
       .then(r => r.json())
       .then((data: ScraperComboMaster[]) => setActiveCombos(Array.isArray(data) ? data.filter(c => c.org_active) : []))
       .catch(() => {})
       .finally(() => setCombosLoading(false))
+
+    fetch('/api/runs/quota')
+      .then(r => r.json())
+      .then(q => {
+        if (typeof q.available === 'number') setAvailable(q.available)
+        if (typeof q.unlimited === 'boolean') setUnlimited(q.unlimited)
+      })
+      .catch(() => {})
   }, [])
 
-  // Load monthly usage
-  useEffect(() => {
-    if (!isAdmin || !user?.organization_id) return
-    const ym = new Date().toISOString().slice(0, 7)
-    createClient()
-      .from('monthly_lead_counts')
-      .select('count')
-      .eq('organization_id', user.organization_id)
-      .eq('year_month', ym)
-      .maybeSingle()
-      .then(({ data }) => { if (data) setMonthlyUsed(data.count) })
-  }, [isAdmin, user?.organization_id])
-
-  // Load SDRs with scraper access + the areas they cover (primary area_id and
-  // any user_areas), so the list can be filtered by the selected market.
-  // Flat selects + client-side merge to avoid embed-relationship ambiguity.
+  // ── Load SDRs + the areas they cover ──
   useEffect(() => {
     const supabase = createClient()
     Promise.all([
@@ -148,71 +165,115 @@ export default function RunPage() {
     })
   }, [])
 
-  // Market → area mapping (Taiwan→taiwan, LATAM→latam, Vietnam→vietnam).
-  // "Global" (or no market yet) resolves to null → no filter, show every SDR.
+  // ── Restore an in-progress run when returning to the page ──
+  useEffect(() => {
+    const fromQuery = searchParams.get('run')
+    let stored: { runId: string; market: string | null; sdrIds: string[] } | null = null
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) stored = JSON.parse(raw)
+    } catch { /* ignore */ }
+
+    const id = fromQuery ?? stored?.runId ?? null
+    if (!id) return
+    runMetaRef.current = {
+      market: stored?.market ?? null,
+      sdrIds: stored?.sdrIds ?? [],
+    }
+    setRunId(id)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Market → area mapping. "Global" (or no market) → null → show every SDR.
   const marketArea: AreaName | null = market ? inferAreaFromCountry(market) : null
   const visibleSdrs = marketArea ? sdrs.filter(s => s.areaNames.includes(marketArea)) : sdrs
 
-  // ── Poll logs while the run is active ──
+  // ── Auto-assign once the run completes (idempotent) ──
+  const runAssign = useCallback(async (id: string) => {
+    const meta = runMetaRef.current
+    setAssignState('assigning')
+    try {
+      await fetch(`/api/runs/${id}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sdr_ids: meta.sdrIds,
+          sdr_market_assignments: Object.fromEntries(
+            meta.sdrIds.map(sid => [sid, meta.market ? [meta.market] : []])
+          ),
+        }),
+      })
+    } catch { /* the exported flag keeps this safe on retry */ }
+    // Re-fetch the final summary (now with per-SDR counts)
+    try {
+      const res = await fetch(`/api/runs/${id}`)
+      if (res.ok) setSummary(await res.json())
+    } catch { /* ignore */ }
+    setAssignState('done')
+  }, [])
+
+  // ── Poll the run while it's active ──
   const poll = useCallback(async (id: string) => {
     try {
-      const res = await fetch(`/api/runs/${id}/logs`)
+      const res = await fetch(`/api/runs/${id}`)
       if (!res.ok) return
-      const data = await res.json()
-      setLogs(Array.isArray(data.logs) ? data.logs : [])
-      setLeadsGenerated(data.leads_generated ?? 0)
-      setRunStatus(data.status ?? 'running')
-      const el = logBoxRef.current
-      if (el) el.scrollTop = el.scrollHeight
+      const data: RunSummary = await res.json()
+      setSummary(data)
+
       if (!ACTIVE.has(data.status)) {
         if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+        // Terminal state: drop the persisted pointer so a fresh visit starts at
+        // the config form (the current view keeps its in-memory result state).
+        try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
+        if (data.status === 'completed' && !assignFiredRef.current) {
+          assignFiredRef.current = true
+          const alreadyAssigned = (data.run_sdr_assignments ?? []).some(a => a.leads_assigned > 0)
+          if (alreadyAssigned || runMetaRef.current.sdrIds.length === 0) {
+            setAssignState('done')
+          } else {
+            await runAssign(id)
+          }
+        }
       }
     } catch { /* transient */ }
-  }, [])
+  }, [runAssign])
 
   useEffect(() => {
     if (!runId) return
     poll(runId)
-    if (ACTIVE.has(runStatus)) {
-      pollRef.current = setInterval(() => poll(runId), 3000)
-    }
+    pollRef.current = setInterval(() => poll(runId), 3000)
     return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null } }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runId])
 
-  // Stop polling when status leaves the active set
-  useEffect(() => {
-    if (!ACTIVE.has(runStatus) && pollRef.current) {
-      clearInterval(pollRef.current); pollRef.current = null
-    }
-  }, [runStatus])
-
-  function stepLeads(delta: number) {
-    setTotalLeads(v => {
-      let next = v + delta
-      if (next < MIN_LEADS) next = MIN_LEADS
-      if (available < MAX_INT && next > available) next = available
-      return next
-    })
+  // ── Config actions ──
+  function selectMarket(m: string) {
+    setMarket(m)
+    setSelectedSdrIds([])
+    setSubmitError(null)
   }
-  function manualLeads(raw: string) {
-    const n = parseInt(raw.replace(/\D/g, ''), 10)
-    setTotalLeads(Number.isNaN(n) ? 0 : n)
-  }
-  function clampLeads() {
-    setTotalLeads(v => {
-      let x = Math.max(MIN_LEADS, v)
-      if (available < MAX_INT && x > available) x = available
-      return x
-    })
-  }
-
   function toggleCombo(code: string) {
     setSelectedCombos(prev => prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code])
     setSubmitError(null)
   }
   function toggleSdr(id: string) {
     setSelectedSdrIds(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id])
+  }
+  function setLeads(v: number) {
+    let x = v
+    if (x < MIN_LEADS) x = MIN_LEADS
+    if (x > MAX_LEADS) x = MAX_LEADS
+    setTotalLeads(x)
+  }
+
+  function previewDist(): Record<string, number> {
+    const out: Record<string, number> = {}
+    const n = selectedSdrIds.length
+    if (!n) return out
+    const base = Math.floor(totalLeads / n)
+    const rem = totalLeads % n
+    selectedSdrIds.forEach((id, i) => { out[id] = base + (i < rem ? 1 : 0) })
+    return out
   }
 
   async function handleRun() {
@@ -239,9 +300,14 @@ export default function RunPage() {
         setSubmitError(typeof data.error === 'string' ? data.error : JSON.stringify(data))
         return
       }
+      runMetaRef.current = { market, sdrIds: selectedSdrIds }
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ runId: data.run_id, market, sdrIds: selectedSdrIds }))
+      } catch { /* ignore */ }
+      assignFiredRef.current = false
+      setSummary(null)
+      setAssignState('idle')
       setRunId(data.run_id)
-      setRunStatus('pending')
-      setLogs([])
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -249,88 +315,60 @@ export default function RunPage() {
     }
   }
 
-  // Preview distribution of the requested leads across the selected SDRs
-  function previewDist(): Record<string, number> {
-    const out: Record<string, number> = {}
-    const n = selectedSdrIds.length
-    if (!n || !totalLeads) return out
-    const base = Math.floor(totalLeads / n)
-    const rem = totalLeads % n
-    selectedSdrIds.forEach((id, i) => { out[id] = base + (i < rem ? 1 : 0) })
-    return out
+  function resetToConfig() {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+    try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
+    assignFiredRef.current = false
+    setRunId(null)
+    setSummary(null)
+    setAssignState('idle')
+    setSelectedCombos([])
+    setSelectedSdrIds([])
+    setSubmitError(null)
+    // Clear the ?run= query param if present
+    router.replace(`/${locale}/run`)
   }
 
-  // Push this run's scraper_leads into the SDRs' kanban boards.
-  // Called automatically when the run completes — no user action required.
-  const runAssign = useCallback(async () => {
-    if (!runId) return
-    setAssignState('assigning')
-    setAssignError(null)
-    try {
-      const res = await fetch(`/api/runs/${runId}/assign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sdr_ids: selectedSdrIds,
-          sdr_market_assignments: Object.fromEntries(
-            selectedSdrIds.map(id => [id, market ? [market] : []])
-          ),
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) { setAssignError(data.error ?? 'Assignment failed'); setAssignState('error'); return }
-      setAssignedCount(data.assigned ?? 0)
-      setAssignState('done')
-    } catch (e) {
-      setAssignError(e instanceof Error ? e.message : String(e))
-      setAssignState('error')
-    }
-  }, [runId, selectedSdrIds, market])
-
-  // Auto-assign once, as soon as the run reports completed
-  useEffect(() => {
-    if (runStatus === 'completed' && !assignFiredRef.current && selectedSdrIds.length > 0) {
-      assignFiredRef.current = true
-      runAssign()
-    }
-  }, [runStatus, selectedSdrIds.length, runAssign])
-
+  // ── Derived phase ──
+  const status = summary?.status ?? 'pending'
   const isConfig = !runId
-  const isRunning = !!runId && ACTIVE.has(runStatus)
-  const isCompleted = !!runId && runStatus === 'completed'
-  const isFailed = !!runId && runStatus === 'failed'
+  const isRunning = !!runId && (ACTIVE.has(status) || (status === 'completed' && assignState !== 'done'))
+  const isCompleted = !!runId && status === 'completed' && assignState === 'done'
+  const isFailed = !!runId && (status === 'failed' || status === 'cancelled')
+
   const dist = previewDist()
 
+  // ══════════════════════════════════════════
   return (
     <div style={S.page}>
-      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>New Pipeline</h1>
-
       {/* ══════════ PHASE 1 — CONFIG ══════════ */}
       {isConfig && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ marginBottom: 4 }}>
+            <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>New Run</h1>
+            <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: '6px 0 0' }}>
+              {unlimited ? 'Unlimited leads available this month' : `${available.toLocaleString()} leads available this month`}
+            </p>
+          </div>
+
           {/* Market */}
           <div style={S.card}>
             <span style={S.label}>Market</span>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               {MARKETS.map(m => (
-                <button key={m} onClick={() => { setMarket(m); setSubmitError(null); setSelectedSdrIds([]) }} style={chipBtn(market === m)}>
-                  {m}
-                </button>
+                <button key={m} onClick={() => selectMarket(m)} style={chip(market === m)}>{m}</button>
               ))}
             </div>
           </div>
 
           {/* Combos */}
           <div style={S.card}>
-            <span style={S.label}>Search Combos</span>
+            <span style={S.label}>Search Strategy</span>
             {combosLoading ? (
               <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>Loading…</p>
             ) : activeCombos.length === 0 ? (
               <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
-                No active combos.{' '}
-                <Link href="/settings?tab=scraper" style={{ color: 'var(--crm-accent)', textDecoration: 'none' }}>
-                  Enable in Settings → Scraper
-                </Link>
+                No active search strategies. Enable them in Settings → Scraper.
               </p>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
@@ -338,11 +376,10 @@ export default function RunPage() {
                   const active = selectedCombos.includes(c.code)
                   return (
                     <button key={c.code} onClick={() => toggleCombo(c.code)} style={{
-                      padding: '10px 14px', borderRadius: 8, cursor: 'pointer', textAlign: 'left' as const,
+                      padding: '11px 14px', borderRadius: 8, cursor: 'pointer', textAlign: 'left' as const,
                       border: `1px solid ${active ? 'var(--crm-accent)' : 'var(--crm-border)'}`,
                       backgroundColor: active ? '#6C63FF15' : 'var(--crm-surface-raised)',
-                      color: active ? 'var(--crm-accent)' : 'var(--crm-text-secondary)',
-                      transition: 'all .15s',
+                      color: active ? 'var(--crm-accent)' : 'var(--crm-text-secondary)', transition: 'all .15s',
                     }}>
                       <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>
                         {active && <span style={{ marginRight: 4 }}>✓</span>}{c.name}
@@ -353,193 +390,242 @@ export default function RunPage() {
                 })}
               </div>
             )}
-            {selectedCombos.length > 0 && (
-              <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: '10px 0 0' }}>
-                {selectedCombos.length} combo{selectedCombos.length !== 1 ? 's' : ''} selected · ~{leadsPerCombo} leads per combo
-              </p>
-            )}
           </div>
 
           {/* Total leads */}
           <div style={S.card}>
             <span style={S.label}>Total Leads</span>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+              {PRESETS.map(p => (
+                <button key={p} onClick={() => setLeads(p)}
+                  disabled={!unlimited && p > available}
+                  style={{ ...chip(totalLeads === p), padding: '8px 16px', fontSize: 13,
+                    opacity: (!unlimited && p > available) ? 0.35 : 1,
+                    cursor: (!unlimited && p > available) ? 'not-allowed' : 'pointer' }}>
+                  {p}
+                </button>
+              ))}
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <button onClick={() => stepLeads(-STEP)} disabled={totalLeads <= MIN_LEADS}
+              <button onClick={() => setLeads(totalLeads - STEP)} disabled={totalLeads <= MIN_LEADS}
                 style={{ width: 40, height: 40, borderRadius: 8, border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)', color: 'var(--crm-text-primary)', cursor: totalLeads <= MIN_LEADS ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: totalLeads <= MIN_LEADS ? 0.4 : 1 }}>
                 <Minus size={16} />
               </button>
-              <input
-                value={totalLeads}
-                onChange={e => manualLeads(e.target.value)}
-                onBlur={clampLeads}
+              <input value={totalLeads}
+                onChange={e => { const n = parseInt(e.target.value.replace(/\D/g, ''), 10); setTotalLeads(Number.isNaN(n) ? 0 : n) }}
+                onBlur={() => setLeads(totalLeads)}
                 inputMode="numeric"
-                style={{ width: 120, textAlign: 'center', padding: '10px', borderRadius: 8, backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', color: 'var(--crm-text-primary)', fontSize: 18, fontWeight: 700, fontFamily: 'monospace', outline: 'none' }}
-              />
-              <button onClick={() => stepLeads(STEP)} disabled={available < MAX_INT && totalLeads >= available}
-                style={{ width: 40, height: 40, borderRadius: 8, border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)', color: 'var(--crm-text-primary)', cursor: (available < MAX_INT && totalLeads >= available) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: (available < MAX_INT && totalLeads >= available) ? 0.4 : 1 }}>
+                style={{ width: 120, textAlign: 'center', padding: '10px', borderRadius: 8, backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', color: 'var(--crm-text-primary)', fontSize: 18, fontWeight: 700, fontFamily: 'monospace', outline: 'none' }} />
+              <button onClick={() => setLeads(totalLeads + STEP)} disabled={totalLeads >= effectiveMax}
+                style={{ width: 40, height: 40, borderRadius: 8, border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)', color: 'var(--crm-text-primary)', cursor: totalLeads >= effectiveMax ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: totalLeads >= effectiveMax ? 0.4 : 1 }}>
                 <Plus size={16} />
               </button>
             </div>
-            {isAdmin && available < MAX_INT && (
-              <p style={{ fontSize: 12, color: available < 100 ? '#EF4444' : 'var(--crm-text-muted)', margin: '12px 0 0' }}>
-                {monthlyUsed} used this month · <strong style={{ color: available < 100 ? '#EF4444' : 'var(--crm-text-primary)' }}>{available}</strong> leads available
+            {!unlimited && (
+              <p style={{ fontSize: 12, color: overLimit ? '#EF4444' : 'var(--crm-text-muted)', margin: '12px 0 0' }}>
+                {overLimit
+                  ? `Only ${available.toLocaleString()} leads left this billing period — lower the total to continue.`
+                  : <>{available.toLocaleString()} leads available this billing period</>}
               </p>
             )}
           </div>
 
-          {/* SDRs */}
-          <div style={S.card}>
-            <span style={S.label}>Assign to SDRs</span>
-            {sdrs.length === 0 ? (
-              <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
-                No SDRs with scraper access. Enable it in Settings → Users.
-              </p>
-            ) : visibleSdrs.length === 0 ? (
-              <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
-                No SDRs assigned to {market}. Assign an area to an SDR in Settings → Users.
-              </p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {visibleSdrs.map(sdr => {
-                  const sel = selectedSdrIds.includes(sdr.id)
-                  return (
-                    <label key={sdr.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 8, cursor: 'pointer',
-                      backgroundColor: sel ? '#6C63FF10' : 'var(--crm-surface-raised)',
-                      border: `1px solid ${sel ? '#6C63FF40' : 'var(--crm-border)'}`, transition: 'all .15s',
-                    }}>
-                      <input type="checkbox" checked={sel} onChange={() => toggleSdr(sdr.id)}
-                        style={{ accentColor: 'var(--crm-accent)', width: 14, height: 14 }} />
-                      <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--crm-text-primary)' }}>{sdr.full_name}</span>
-                      {sel && dist[sdr.id] != null && (
-                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-accent)' }}>~{dist[sdr.id]} leads</span>
-                      )}
-                    </label>
-                  )
-                })}
-              </div>
-            )}
-            {selectedSdrIds.length > 0 && (
-              <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: '12px 0 0' }}>
-                {totalLeads} leads → {selectedSdrIds.map(id => {
-                  const s = sdrs.find(x => x.id === id)
-                  return `${s?.full_name ?? '?'}: ~${dist[id] ?? 0}`
-                }).join(' · ')}
-              </p>
-            )}
-          </div>
+          {/* SDRs — only after a market is picked */}
+          {market && (
+            <div style={S.card}>
+              <span style={S.label}>Assign to SDRs</span>
+              {visibleSdrs.length === 0 ? (
+                <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
+                  No SDRs with scraper access are assigned to {market}. Assign an area to an SDR in Settings → Users.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {visibleSdrs.map(sdr => {
+                    const sel = selectedSdrIds.includes(sdr.id)
+                    return (
+                      <label key={sdr.id} style={{
+                        display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 8, cursor: 'pointer',
+                        backgroundColor: sel ? '#6C63FF10' : 'var(--crm-surface-raised)',
+                        border: `1px solid ${sel ? '#6C63FF40' : 'var(--crm-border)'}`, transition: 'all .15s',
+                      }}>
+                        <input type="checkbox" checked={sel} onChange={() => toggleSdr(sdr.id)}
+                          style={{ accentColor: 'var(--crm-accent)', width: 15, height: 15 }} />
+                        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--crm-text-primary)' }}>{sdr.full_name}</span>
+                        <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>{sdr.areaNames.join(', ') || '—'}</span>
+                        {sel && dist[sdr.id] != null && (
+                          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-accent)' }}>{dist[sdr.id]}</span>
+                        )}
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+              {selectedSdrIds.length > 0 && (
+                <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: '12px 0 0' }}>
+                  {totalLeads} leads → {selectedSdrIds.map(id => {
+                    const s = sdrs.find(x => x.id === id)
+                    return `${s?.full_name ?? '?'}: ${dist[id] ?? 0}`
+                  }).join(' · ')}
+                </p>
+              )}
+            </div>
+          )}
 
-          {/* Error */}
           {submitError && (
             <div style={{ display: 'flex', gap: 12, padding: '14px 16px', borderRadius: 10, backgroundColor: '#EF444410', border: '1px solid #EF444430' }}>
               <AlertCircle size={16} color="#EF4444" style={{ flexShrink: 0, marginTop: 2 }} />
               <div>
-                <p style={{ fontSize: 13, color: '#EF4444', fontWeight: 600, margin: '0 0 4px' }}>Could not start pipeline</p>
+                <p style={{ fontSize: 13, color: '#EF4444', fontWeight: 600, margin: '0 0 4px' }}>Could not start the run</p>
                 <p style={{ fontSize: 12, color: 'var(--crm-text-secondary)', margin: 0, fontFamily: 'monospace', wordBreak: 'break-word' as const }}>{submitError}</p>
               </div>
             </div>
           )}
 
-          {/* Run button */}
           <button onClick={handleRun} disabled={!canRun || submitting}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px', borderRadius: 10, border: 'none', fontSize: 14, fontWeight: 600, backgroundColor: canRun && !submitting ? 'var(--crm-accent)' : 'var(--crm-border)', color: '#FFF', cursor: canRun && !submitting ? 'pointer' : 'not-allowed', transition: 'all .15s' }}>
-            <Play size={15} />
-            {submitting ? 'Starting…' : 'Run Pipeline'}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px', borderRadius: 10, border: 'none', fontSize: 15, fontWeight: 700, backgroundColor: canRun && !submitting ? 'var(--crm-accent)' : 'var(--crm-border)', color: '#FFF', cursor: canRun && !submitting ? 'pointer' : 'not-allowed', transition: 'all .15s' }}>
+            {submitting ? 'Starting…' : overLimit ? 'Monthly limit reached' : 'Run Scraping'}
           </button>
         </div>
       )}
 
-      {/* ══════════ PHASE 2 — LOGS ══════════ */}
-      {!isConfig && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={S.card}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {isRunning && <Loader2 size={16} color="var(--crm-accent)" style={{ animation: 'spin 1s linear infinite' }} />}
-                {isCompleted && <CheckCircle2 size={16} color="#22C55E" />}
-                {isFailed && <XCircle size={16} color="#EF4444" />}
-                <span style={{ fontSize: 15, fontWeight: 700, textTransform: 'capitalize' }}>{runStatus}</span>
-                {isRunning && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--crm-accent)' }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--crm-accent)', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                    Live
-                  </span>
-                )}
-              </div>
-              <span style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>
-                {leadsGenerated} / {totalLeads} leads
-              </span>
-            </div>
-
-            <div style={S.logBox} ref={logBoxRef}>
-              {logs.length === 0 ? (
-                <span style={{ color: '#52526A' }}>Waiting for logs…</span>
-              ) : logs.map(log => (
-                <div key={log.id} style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
-                  <span style={{ color: '#52526A', flexShrink: 0, fontSize: 10 }}>{new Date(log.created_at).toLocaleTimeString()}</span>
-                  <span style={{ color: LOG_COLORS[log.level] ?? '#C9D1D9', flexShrink: 0, fontWeight: 600, fontSize: 10, textTransform: 'uppercase', width: 52 }}>{log.level}</span>
-                  <span style={{ color: LOG_COLORS[log.level] ?? '#C9D1D9', wordBreak: 'break-word' }}>{log.message}</span>
-                </div>
-              ))}
+      {/* ══════════ PHASE 2 — PROGRESS ══════════ */}
+      {isRunning && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 40 }}>
+          <div style={{ position: 'relative', width: 160, height: 160, marginBottom: 32 }}>
+            <svg width="160" height="160" viewBox="0 0 160 160" style={{ animation: 'spin 2s linear infinite' }}>
+              <circle cx="80" cy="80" r="70" fill="none" stroke="var(--crm-border)" strokeWidth="6" />
+              <circle cx="80" cy="80" r="70" fill="none" stroke="var(--accent)" strokeWidth="6" strokeLinecap="round"
+                strokeDasharray="300" style={{ animation: 'scraper-ring 1.6s ease-in-out infinite' }} />
+            </svg>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: 15, fontWeight: 700, padding: 20 }}>
+              {assignState === 'assigning' ? 'Distributing leads to SDRs…' : (STATUS_LABEL[status] ?? 'Working…')}
             </div>
           </div>
 
-          {/* Failed → allow retry */}
-          {isFailed && (
-            <button onClick={() => { setRunId(null); setLogs([]); setRunStatus('pending') }}
-              style={{ alignSelf: 'flex-start', fontSize: 13, color: 'var(--crm-text-secondary)', border: '1px solid var(--crm-border)', padding: '9px 16px', borderRadius: 8, background: 'transparent', cursor: 'pointer' }}>
-              ← Start a new run
-            </button>
-          )}
-
-          {/* ══════════ PHASE 3 — COMPLETION SUMMARY ══════════ */}
-          {isCompleted && (
-            <div style={{ ...S.card, borderColor: '#16A34A40', backgroundColor: '#14532D15' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                <CheckCircle2 size={20} color="#22C55E" />
-                <p style={{ fontSize: 16, fontWeight: 700, margin: 0, color: '#22C55E' }}>
-                  {leadsGenerated} leads generated
-                </p>
-              </div>
-
-              {assignState === 'assigning' && (
-                <p style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--crm-text-secondary)', margin: '0 0 16px' }}>
-                  <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
-                  Distributing leads to the SDRs&apos; kanban boards…
-                </p>
-              )}
-              {assignState === 'done' && (
-                <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', margin: '0 0 16px' }}>
-                  {assignedCount} leads distributed to the selected SDRs — now in their kanban boards.
-                </p>
-              )}
-              {assignState === 'error' && (
-                <div style={{ margin: '0 0 16px' }}>
-                  <p style={{ fontSize: 13, color: '#EF4444', margin: '0 0 8px' }}>
-                    Could not distribute leads: {assignError}
-                  </p>
-                  <button onClick={runAssign}
-                    style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-secondary)', border: '1px solid var(--crm-border)', padding: '8px 16px', borderRadius: 8, background: 'transparent', cursor: 'pointer' }}>
-                    Retry distribution
-                  </button>
+          {/* 4-dot progress */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 24 }}>
+            {STEPS.map((label, i) => {
+              const cur = STATUS_STEP[status] ?? 0
+              const color = i < cur ? '#22C55E' : i === cur ? 'var(--accent)' : 'var(--crm-border)'
+              const textColor = i <= cur ? 'var(--crm-text-primary)' : 'var(--crm-text-muted)'
+              return (
+                <div key={label} style={{ display: 'flex', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: 76 }}>
+                    <span style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: color, transition: 'all .3s' }} />
+                    <span style={{ fontSize: 11, fontWeight: 600, color: textColor }}>{label}</span>
+                  </div>
+                  {i < STEPS.length - 1 && (
+                    <span style={{ width: 24, height: 2, backgroundColor: i < cur ? '#22C55E' : 'var(--crm-border)', marginBottom: 18 }} />
+                  )}
                 </div>
-              )}
+              )
+            })}
+          </div>
 
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' as const }}>
-                <Link href={`/export?run_id=${runId}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--crm-text-secondary)', border: '1px solid var(--crm-border)', padding: '10px 18px', borderRadius: 8, textDecoration: 'none' }}>
-                  <Download size={14} /> Download CSV
-                </Link>
-                <Link href="/kanban" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#FFF', backgroundColor: 'var(--crm-accent)', padding: '10px 18px', borderRadius: 8, textDecoration: 'none' }}>
-                  View in Kanban <ArrowRight size={14} />
-                </Link>
-                <Link href="/run" onClick={() => window.location.reload()} style={{ display: 'inline-flex', alignItems: 'center', fontSize: 13, color: 'var(--crm-text-secondary)', border: '1px solid var(--crm-border)', padding: '10px 18px', borderRadius: 8, textDecoration: 'none' }}>
-                  New Run
-                </Link>
-              </div>
-            </div>
+          <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', textAlign: 'center', maxWidth: 420, lineHeight: 1.6 }}>
+            This usually takes 2–5 minutes. Do not close this tab — but if you do, we&apos;ll keep working in the background.
+          </p>
+          {summary && summary.leads_generated > 0 && (
+            <p style={{ fontSize: 12, color: 'var(--crm-text-secondary)', marginTop: 10 }}>
+              {summary.leads_generated} / {summary.total_leads_requested} leads so far
+            </p>
           )}
         </div>
       )}
+
+      {/* ══════════ PHASE 3 — RESULT ══════════ */}
+      {isCompleted && summary && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 40 }}>
+          <div style={{ width: 88, height: 88, borderRadius: '50%', backgroundColor: '#22C55E20', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20, animation: 'scraper-pop .5s ease-out' }}>
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          </div>
+          <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px', textAlign: 'center' }}>
+            ✅ Run Complete
+          </h2>
+          <p style={{ fontSize: 14, color: 'var(--crm-text-secondary)', margin: '0 0 28px', textAlign: 'center' }}>
+            {summary.leads_generated} leads generated across {(summary.markets?.length ? summary.markets : [summary.market]).join(', ')}
+          </p>
+
+          {/* Temperature cards */}
+          <div style={{ display: 'flex', gap: 12, marginBottom: 28, width: '100%', maxWidth: 420 }}>
+            {[
+              { key: 'HOT', emoji: '🔥', label: 'Hot', color: '#F87171', n: summary.temperature.HOT },
+              { key: 'WARM', emoji: '🌡️', label: 'Warm', color: '#FBBF24', n: summary.temperature.WARM },
+              { key: 'COLD', emoji: '❄️', label: 'Cold', color: '#60A5FA', n: summary.temperature.COLD },
+            ].map(t => (
+              <div key={t.key} style={{ flex: 1, ...S.card, padding: '16px 12px', textAlign: 'center' }}>
+                <div style={{ fontSize: 22, marginBottom: 4 }}>{t.emoji}</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: t.color, fontFamily: 'monospace' }}>{t.n}</div>
+                <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2 }}>{t.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Per-SDR distribution bars */}
+          {(summary.run_sdr_assignments ?? []).some(a => a.leads_assigned > 0) && (
+            <div style={{ width: '100%', maxWidth: 420, marginBottom: 28 }}>
+              <span style={S.label}>Distribution</span>
+              {(() => {
+                const rows = (summary.run_sdr_assignments ?? []).filter(a => a.leads_assigned > 0)
+                const maxN = Math.max(1, ...rows.map(a => a.leads_assigned))
+                return rows.map(a => (
+                  <div key={a.sdr_id} style={{ marginBottom: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                      <span style={{ color: 'var(--crm-text-primary)', fontWeight: 600 }}>{a.user?.full_name ?? a.sdr_id}</span>
+                      <span style={{ color: 'var(--crm-text-secondary)', fontWeight: 700 }}>{a.leads_assigned}</span>
+                    </div>
+                    <div style={{ height: 8, backgroundColor: 'var(--crm-surface-raised)', borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${(a.leads_assigned / maxN) * 100}%`, backgroundColor: 'var(--accent)', borderRadius: 4 }} />
+                    </div>
+                  </div>
+                ))
+              })()}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button onClick={() => router.push(`/${locale}/history?run=${runId}`)}
+              style={{ fontSize: 13, fontWeight: 700, color: '#FFF', backgroundColor: 'var(--crm-accent)', padding: '11px 20px', borderRadius: 9, border: 'none', cursor: 'pointer' }}>
+              View Detailed
+            </button>
+            <button onClick={() => runId && downloadRunCsv(runId)}
+              style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-secondary)', backgroundColor: 'transparent', padding: '11px 20px', borderRadius: 9, border: '1px solid var(--crm-border)', cursor: 'pointer' }}>
+              Download CSV
+            </button>
+            <button onClick={resetToConfig}
+              style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-muted)', background: 'none', padding: '11px 16px', borderRadius: 9, border: 'none', cursor: 'pointer' }}>
+              New Run
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════ PHASE 3 — FAILURE ══════════ */}
+      {isFailed && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 60 }}>
+          <div style={{ width: 88, height: 88, borderRadius: '50%', backgroundColor: '#EF444420', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" /><path d="M15 9l-6 6M9 9l6 6" />
+            </svg>
+          </div>
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>This run failed. Contact support.</h2>
+          <button onClick={resetToConfig}
+            style={{ marginTop: 16, fontSize: 13, fontWeight: 700, color: '#FFF', backgroundColor: 'var(--crm-accent)', padding: '11px 22px', borderRadius: 9, border: 'none', cursor: 'pointer' }}>
+            New Run
+          </button>
+        </div>
+      )}
     </div>
+  )
+}
+
+export default function RunPage() {
+  return (
+    <Suspense fallback={<p style={{ color: 'var(--crm-text-muted)', padding: 40 }}>Loading…</p>}>
+      <RunPageInner />
+    </Suspense>
   )
 }

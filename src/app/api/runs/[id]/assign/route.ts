@@ -28,11 +28,18 @@ export async function POST(
   }
 
   const { id: runId } = await params
-  const { sdr_ids, sdr_market_assignments } = await req.json()
+  const { sdr_ids, sdr_market_assignments, manual } = await req.json()
 
   if (!Array.isArray(sdr_ids) || sdr_ids.length === 0) {
     return NextResponse.json({ error: 'sdr_ids is required' }, { status: 400 })
   }
+
+  // Manual mode = "Send to another SDR" from History. Re-assigns the run's leads
+  // to additional SDRs on demand: it targets ALL leads of the run (not just the
+  // not-yet-exported ones), does NOT flip exported_to_crm, and does NOT bump the
+  // monthly counter — so the same lead can reach an extra SDR without being
+  // double-counted against the quota or removed from its original SDR.
+  const isManual = manual === true
 
   const admin = adminClient()
 
@@ -47,16 +54,22 @@ export async function POST(
     return NextResponse.json({ error: 'Run not found' }, { status: 404 })
   }
 
-  // Fetch this run's leads that have not been pushed to the CRM yet
-  const { data: leads, error: leadsError } = await admin
+  // Auto (completion) mode → only leads not yet in the CRM.
+  // Manual (Send to another SDR) mode → every lead of the run.
+  let leadsQuery = admin
     .from('scraper_leads')
     .select('*')
     .eq('run_id', runId)
-    .eq('exported_to_crm', false)
+  if (!isManual) leadsQuery = leadsQuery.eq('exported_to_crm', false)
+
+  const { data: leads, error: leadsError } = await leadsQuery
 
   if (leadsError) return NextResponse.json({ error: leadsError.message }, { status: 500 })
   if (!leads || leads.length === 0) {
-    return NextResponse.json({ error: 'No unassigned leads for this run' }, { status: 400 })
+    return NextResponse.json(
+      { error: isManual ? 'This run has no leads to send' : 'No unassigned leads for this run' },
+      { status: 400 }
+    )
   }
 
   // Fetch each SDR's primary area so prospects land in their kanban
@@ -128,47 +141,51 @@ export async function POST(
     inserted += data?.length ?? 0
   }
 
-  // Record per-SDR assignment counts (and the markets each SDR was assigned)
-  for (const sdrId of Object.keys(assignedCount)) {
+  // Manual re-sends don't touch run history, the export flag, or the quota —
+  // they only push extra copies of the leads onto additional SDR boards.
+  if (!isManual) {
+    // Record per-SDR assignment counts (and the markets each SDR was assigned)
+    for (const sdrId of Object.keys(assignedCount)) {
+      await admin
+        .from('run_sdr_assignments')
+        .upsert(
+          {
+            run_id: runId,
+            sdr_id: sdrId,
+            leads_assigned: assignedCount[sdrId],
+            assigned_markets: sdr_market_assignments?.[sdrId] ?? [],
+          },
+          { onConflict: 'run_id,sdr_id' }
+        )
+    }
+
+    // Mark these leads as exported so they aren't assigned twice
     await admin
-      .from('run_sdr_assignments')
+      .from('scraper_leads')
+      .update({ exported_to_crm: true })
+      .eq('run_id', runId)
+      .eq('exported_to_crm', false)
+
+    // Bump the org's monthly lead counter
+    const ym = new Date().toISOString().slice(0, 7)
+    const { data: existing } = await admin
+      .from('monthly_lead_counts')
+      .select('count')
+      .eq('organization_id', userData.organization_id)
+      .eq('year_month', ym)
+      .maybeSingle()
+
+    await admin
+      .from('monthly_lead_counts')
       .upsert(
         {
-          run_id: runId,
-          sdr_id: sdrId,
-          leads_assigned: assignedCount[sdrId],
-          assigned_markets: sdr_market_assignments?.[sdrId] ?? [],
+          organization_id: userData.organization_id,
+          year_month: ym,
+          count: (existing?.count ?? 0) + inserted,
         },
-        { onConflict: 'run_id,sdr_id' }
+        { onConflict: 'organization_id,year_month' }
       )
   }
-
-  // Mark these leads as exported so they aren't assigned twice
-  await admin
-    .from('scraper_leads')
-    .update({ exported_to_crm: true })
-    .eq('run_id', runId)
-    .eq('exported_to_crm', false)
-
-  // Bump the org's monthly lead counter
-  const ym = new Date().toISOString().slice(0, 7)
-  const { data: existing } = await admin
-    .from('monthly_lead_counts')
-    .select('count')
-    .eq('organization_id', userData.organization_id)
-    .eq('year_month', ym)
-    .maybeSingle()
-
-  await admin
-    .from('monthly_lead_counts')
-    .upsert(
-      {
-        organization_id: userData.organization_id,
-        year_month: ym,
-        count: (existing?.count ?? 0) + inserted,
-      },
-      { onConflict: 'organization_id,year_month' }
-    )
 
   return NextResponse.json({ ok: true, assigned: inserted, per_sdr: assignedCount })
 }

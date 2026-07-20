@@ -167,7 +167,6 @@ export function Sidebar({ user }: Props) {
               { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
               { href: '/run',       label: 'New Run',   icon: Play },
               { href: '/history',   label: 'History',   icon: History },
-              { href: '/leads',     label: 'Leads',     icon: Users2 },
             ].map(item => {
               const fullHref = `/${locale}${item.href}`
               const isActive = pathname === fullHref || pathname.startsWith(fullHref + '/')
