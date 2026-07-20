@@ -134,16 +134,20 @@ export default function ReportsPage() {
   const net = gross - infraQuarter
 
   // Infra costs come off the general total before the split, hitting every
-  // party (Frank, Nicolás and vendors) proportionally to their gross share.
-  const infraScale = gross > 0 ? Math.max(0, net) / gross : 0
+  // party (Frank, Nicolás and vendors) proportionally. The ratio is always
+  // computed against the WHOLE quarter's revenue (every org), so a vendor-only
+  // view still discounts infra correctly instead of over-charging its subset.
+  const grossAll = allRows.reduce((s, r) => s + r.total, 0)
+  const infraScale = grossAll > 0 ? Math.max(0, grossAll - infraQuarter) / grossAll : 0
   const frankFinal = split.frankGross * infraScale
   const nicoFinal = split.nicoGross * infraScale
   const vendorFinal = (name: string) => (split.vendorTotals.get(name) ?? 0) * infraScale
 
-  // Vendor-mode summary
+  // Vendor-mode summary. Commission is shown already net of infrastructure
+  // (scaled by infraScale) but WITHOUT breaking out the platform costs to them.
   const vendorSales = mode === 'vendor' ? rows.reduce((s, r) => s + r.total, 0) : 0
   const vendorPct = mode === 'vendor' && vendorName ? commissionOf(vendorName) : 0
-  const vendorCommission = vendorSales * (vendorPct / 100)
+  const vendorCommission = vendorSales * (vendorPct / 100) * infraScale
 
   const activeVendors = vendors.filter(v => v.is_active)
 
