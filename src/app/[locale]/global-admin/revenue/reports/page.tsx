@@ -133,21 +133,16 @@ export default function ReportsPage() {
   const gross = rows.reduce((s, r) => s + r.total, 0)
   const net = gross - infraQuarter
 
-  // Infra costs come off the general total before the split, hitting every
-  // party (Frank, Nicolás and vendors) proportionally. The ratio is always
-  // computed against the WHOLE quarter's revenue (every org), so a vendor-only
-  // view still discounts infra correctly instead of over-charging its subset.
-  const grossAll = allRows.reduce((s, r) => s + r.total, 0)
-  const infraScale = grossAll > 0 ? Math.max(0, grossAll - infraQuarter) / grossAll : 0
-  const frankFinal = split.frankGross * infraScale
-  const nicoFinal = split.nicoGross * infraScale
-  const vendorFinal = (name: string) => (split.vendorTotals.get(name) ?? 0) * infraScale
+  // Infra costs are subtracted ONCE, split 50/50 between Frank and Nicolás only.
+  // Vendors never carry infra — they keep a clean commission on what they sold.
+  const frankFinal = split.frankGross - infraQuarter / 2
+  const nicoFinal = split.nicoGross - infraQuarter / 2
+  const vendorFinal = (name: string) => split.vendorTotals.get(name) ?? 0
 
-  // Vendor-mode summary. Commission is shown already net of infrastructure
-  // (scaled by infraScale) but WITHOUT breaking out the platform costs to them.
+  // Vendor-mode summary — clean commission on what they sold, no infra mention.
   const vendorSales = mode === 'vendor' ? rows.reduce((s, r) => s + r.total, 0) : 0
   const vendorPct = mode === 'vendor' && vendorName ? commissionOf(vendorName) : 0
-  const vendorCommission = vendorSales * (vendorPct / 100) * infraScale
+  const vendorCommission = vendorSales * (vendorPct / 100)
 
   const activeVendors = vendors.filter(v => v.is_active)
 
@@ -187,7 +182,7 @@ export default function ReportsPage() {
           <tr><td>− Infrastructure Costs</td><td class="r">-${fmt(infraQuarter)}</td></tr>
           <tr class="tot"><td>= Net Revenue</td><td class="r">${fmt(net)}</td></tr>
         </table>
-        <h3>Split (net of infra)</h3>
+        <h3>Split (infra 50/50 on partners, vendors clean)</h3>
         <table class="sum">
           <tr><td>${PARTNERS.frank}</td><td class="r">${fmt(frankFinal)}</td></tr>
           <tr><td>${PARTNERS.nicolas}</td><td class="r">${fmt(nicoFinal)}</td></tr>
@@ -317,7 +312,7 @@ export default function ReportsPage() {
                     </div>
                   </div>
                   <div style={{ ...card, padding: '18px 22px', flex: 1, minWidth: 280 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Split <span style={{ fontWeight: 400, textTransform: 'none' }}>· net of infra</span></div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Split <span style={{ fontWeight: 400, textTransform: 'none' }}>· infra 50/50 on partners, vendors clean</span></div>
                     <SummaryRow label={PARTNERS.frank} value={fmt(frankFinal)} colors={colors} />
                     <SummaryRow label={PARTNERS.nicolas} value={fmt(nicoFinal)} colors={colors} />
                     {[...split.vendorTotals.keys()].map(n => (
