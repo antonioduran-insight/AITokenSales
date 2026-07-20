@@ -108,18 +108,22 @@ export default function ReportsPage() {
   const allRows = useMemo(() => buildRows(orgs, qOpt.fq, qOpt.year), [orgs, qOpt.fq, qOpt.year])
   const rows = mode === 'vendor' && vendorName ? allRows.filter(r => r.vendor === vendorName) : allRows
 
-  // ── Split computation (per-org: 35/35 + vendor commission, or 50/50 direct) ──
+  // ── Split computation (per-org) ──────────────────────────────────────────
+  // With a vendor: the vendor takes its real commission_pct of that org's
+  // revenue; the remainder (100% − pct) is split 50/50 between Frank & Nicolás.
+  // Direct sale: Frank & Nicolás split the full revenue 50/50.
+  // e.g. vendor 15% → Frank 42.5% / Nicolás 42.5% / Vendor 15%.
   const split = useMemo(() => {
     let frankGross = 0, nicoGross = 0
     const vendorTotals = new Map<string, number>()
     for (const r of rows) {
       const hasVendor = r.vendor !== 'Direct'
-      const rate = hasVendor ? 0.35 : 0.5
-      frankGross += r.total * rate
-      nicoGross += r.total * rate
+      const pct = hasVendor ? commissionOf(r.vendor) / 100 : 0
+      const partnerShare = (r.total * (1 - pct)) / 2
+      frankGross += partnerShare
+      nicoGross += partnerShare
       if (hasVendor) {
-        const cut = r.total * (commissionOf(r.vendor) / 100)
-        vendorTotals.set(r.vendor, (vendorTotals.get(r.vendor) ?? 0) + cut)
+        vendorTotals.set(r.vendor, (vendorTotals.get(r.vendor) ?? 0) + r.total * pct)
       }
     }
     return { frankGross, nicoGross, vendorTotals }
@@ -128,6 +132,13 @@ export default function ReportsPage() {
 
   const gross = rows.reduce((s, r) => s + r.total, 0)
   const net = gross - infraQuarter
+
+  // Infra costs come off the general total before the split, hitting every
+  // party (Frank, Nicolás and vendors) proportionally to their gross share.
+  const infraScale = gross > 0 ? Math.max(0, net) / gross : 0
+  const frankFinal = split.frankGross * infraScale
+  const nicoFinal = split.nicoGross * infraScale
+  const vendorFinal = (name: string) => (split.vendorTotals.get(name) ?? 0) * infraScale
 
   // Vendor-mode summary
   const vendorSales = mode === 'vendor' ? rows.reduce((s, r) => s + r.total, 0) : 0
@@ -164,18 +175,18 @@ export default function ReportsPage() {
           <tr><td>Commission (${vendorPct}%)</td><td class="r">${fmt(vendorCommission)}</td></tr>
         </table>`
     } else {
-      const vendorLines = [...split.vendorTotals.entries()]
-        .map(([n, v]) => `<tr><td>${escapeHtml(n)}</td><td class="r">${fmt(v)}</td></tr>`).join('')
+      const vendorLines = [...split.vendorTotals.keys()]
+        .map(n => `<tr><td>${escapeHtml(n)} (${commissionOf(n)}%)</td><td class="r">${fmt(vendorFinal(n))}</td></tr>`).join('')
       summary = `
         <table class="sum">
           <tr><td>Gross Revenue Total</td><td class="r">${fmt(gross)}</td></tr>
           <tr><td>− Infrastructure Costs</td><td class="r">-${fmt(infraQuarter)}</td></tr>
           <tr class="tot"><td>= Net Revenue</td><td class="r">${fmt(net)}</td></tr>
         </table>
-        <h3>Split</h3>
+        <h3>Split (net of infra)</h3>
         <table class="sum">
-          <tr><td>${PARTNERS.frank}</td><td class="r">${fmt(split.frankGross - infraQuarter / 2)}</td></tr>
-          <tr><td>${PARTNERS.nicolas}</td><td class="r">${fmt(split.nicoGross - infraQuarter / 2)}</td></tr>
+          <tr><td>${PARTNERS.frank}</td><td class="r">${fmt(frankFinal)}</td></tr>
+          <tr><td>${PARTNERS.nicolas}</td><td class="r">${fmt(nicoFinal)}</td></tr>
           ${vendorLines}
         </table>`
     }
@@ -302,11 +313,11 @@ export default function ReportsPage() {
                     </div>
                   </div>
                   <div style={{ ...card, padding: '18px 22px', flex: 1, minWidth: 280 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Split</div>
-                    <SummaryRow label={PARTNERS.frank} value={fmt(split.frankGross - infraQuarter / 2)} colors={colors} />
-                    <SummaryRow label={PARTNERS.nicolas} value={fmt(split.nicoGross - infraQuarter / 2)} colors={colors} />
-                    {[...split.vendorTotals.entries()].map(([n, v]) => (
-                      <SummaryRow key={n} label={`${n} (${commissionOf(n)}%)`} value={fmt(v)} colors={colors} color="#F59E0B" />
+                    <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Split <span style={{ fontWeight: 400, textTransform: 'none' }}>· net of infra</span></div>
+                    <SummaryRow label={PARTNERS.frank} value={fmt(frankFinal)} colors={colors} />
+                    <SummaryRow label={PARTNERS.nicolas} value={fmt(nicoFinal)} colors={colors} />
+                    {[...split.vendorTotals.keys()].map(n => (
+                      <SummaryRow key={n} label={`${n} (${commissionOf(n)}%)`} value={fmt(vendorFinal(n))} colors={colors} color="#F59E0B" />
                     ))}
                   </div>
                 </>

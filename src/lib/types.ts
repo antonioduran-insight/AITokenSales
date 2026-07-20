@@ -316,7 +316,7 @@ export const ADDON_MONTHLY_PRICE: Record<string, number> = {
   account_management: 149,
   multi_workspace: 300,
   extended_data_retention: 99,
-  sso: 0,
+  sso: 99,
   linkedin_auto_messaging: 0,
 }
 
