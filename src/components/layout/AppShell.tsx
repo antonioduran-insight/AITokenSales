@@ -4,7 +4,6 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { Sidebar } from './Sidebar'
 import { LanguageSwitcher } from './LanguageSwitcher'
-import { ThemeToggle } from './ThemeToggle'
 
 import { UserProvider, type UserWithArea } from '@/contexts/UserContext'
 import { Suspense } from 'react'
@@ -90,7 +89,6 @@ export function AppShell({ children, initialUser, orgPlan }: Props) {
                 flexShrink: 0,
               }}
             >
-              <ThemeToggle />
               <LanguageSwitcher />
             </header>
             <main style={{ flex: 1, overflow: 'auto', backgroundColor: 'var(--crm-background)' }}>

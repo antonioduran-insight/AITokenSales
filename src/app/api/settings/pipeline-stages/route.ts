@@ -111,16 +111,26 @@ export async function DELETE(req: Request) {
   // Verify the stage belongs to this org
   const { data: stage } = await admin
     .from('pipeline_stages')
-    .select('id, name, is_default')
+    .select('id, name')
     .eq('id', id)
     .eq('organization_id', ctx.orgId)
     .single()
 
   if (!stage) return NextResponse.json({ error: 'Stage not found' }, { status: 404 })
 
-  // Can't delete default stages
-  if (stage.is_default) {
-    return NextResponse.json({ error: 'Cannot delete default stages' }, { status: 400 })
+  // Block deletion while prospects still sit in this stage.
+  const statusKey = stage.name.toLowerCase().replace(/\s+/g, '_')
+  const { count } = await admin
+    .from('prospects')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', ctx.orgId)
+    .eq('outreach_status', statusKey)
+
+  if (count && count > 0) {
+    return NextResponse.json(
+      { error: `Cannot delete "${stage.name}" — ${count} prospect(s) are in this stage. Move them first.` },
+      { status: 400 }
+    )
   }
 
   const { error } = await admin

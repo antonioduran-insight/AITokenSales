@@ -48,9 +48,8 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* AITokenSales — Dark Professional Theme (default) */
-:root,
-[data-theme="dark"] {
+/* AITokenSales — Dark Professional Theme (only theme; light mode removed) */
+:root {
   --crm-background:     #0A0A0F;
   --crm-surface:        #13131A;
   --crm-surface-raised: #1C1C27;
@@ -97,49 +96,6 @@
   --chart-3: #F59E0B;
   --chart-4: #EF4444;
   --chart-5: #60A5FA;
-}
-
-/* Light theme */
-[data-theme="light"] {
-  --crm-background:     #F4F4FA;
-  --crm-surface:        #FFFFFF;
-  --crm-surface-raised: #EFEFF7;
-  --crm-border:         #E0E0EE;
-  --crm-accent:         #6C63FF;
-  --crm-accent-hover:   #5A52E0;
-  --crm-success:        #16A34A;
-  --crm-warning:        #D97706;
-  --crm-danger:         #DC2626;
-  --crm-text-primary:   #0A0A1A;
-  --crm-text-secondary: #52526A;
-  --crm-text-muted:     #8B8BA0;
-
-  --background: #F4F4FA;
-  --foreground: #0A0A1A;
-  --card: #FFFFFF;
-  --card-foreground: #0A0A1A;
-  --popover: #FFFFFF;
-  --popover-foreground: #0A0A1A;
-  --primary: #6C63FF;
-  --primary-foreground: #FFFFFF;
-  --secondary: #EFEFF7;
-  --secondary-foreground: #0A0A1A;
-  --muted: #EFEFF7;
-  --muted-foreground: #52526A;
-  --accent: #6C63FF;
-  --accent-foreground: #FFFFFF;
-  --destructive: #DC2626;
-  --border: #E0E0EE;
-  --input: #E0E0EE;
-  --ring: #6C63FF;
-  --sidebar: #FFFFFF;
-  --sidebar-foreground: #0A0A1A;
-  --sidebar-primary: #6C63FF;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #EFEFF7;
-  --sidebar-accent-foreground: #0A0A1A;
-  --sidebar-border: #E0E0EE;
-  --sidebar-ring: #6C63FF;
 }
 
 @keyframes pulse {

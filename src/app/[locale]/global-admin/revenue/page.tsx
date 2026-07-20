@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useLocale } from 'next-intl'
 import type { Organization, Vendor } from '@/lib/types'
 import { PLAN_PRICES } from '@/lib/types'
 import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
@@ -52,6 +54,7 @@ function saveCosts(costs: MonthlyCosts) {
 
 export default function RevenuePage() {
   const { colors, t } = useGlobalAdminTheme()
+  const locale = useLocale()
   const [orgs, setOrgs] = useState<Organization[]>([])
   const [vendorList, setVendorList] = useState<Vendor[]>([])
   const [loading, setLoading] = useState(true)
@@ -164,6 +167,12 @@ export default function RevenuePage() {
 
   return (
     <div>
+      {/* Sub-nav */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20 }}>
+        <span style={{ padding: '6px 16px', borderRadius: 6, fontSize: 13, fontWeight: 600, backgroundColor: colors.accent, color: '#fff' }}>Overview</span>
+        <Link href={`/${locale}/global-admin/revenue/reports`} style={{ padding: '6px 16px', borderRadius: 6, fontSize: 13, fontWeight: 600, backgroundColor: colors.surfaceRaised, color: colors.textSecondary, textDecoration: 'none' }}>Reports</Link>
+      </div>
+
       <h1 style={{ fontSize: 22, fontWeight: 700, color: colors.textPrimary, marginBottom: 24 }}>{t('revenue')}</h1>
 
       {/* Summary cards */}

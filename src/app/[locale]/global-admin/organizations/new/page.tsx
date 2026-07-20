@@ -56,8 +56,8 @@ export default function NewOrganizationPage() {
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set())
   const [apifyToken, setApifyToken] = useState('')
   const [anthropicKey, setAnthropicKey] = useState('')
-  const [anthropicBaseUrl, setAnthropicBaseUrl] = useState('https://api.aitokenking.com.tw/api/v1')
-  const [anthropicModel, setAnthropicModel] = useState('claude-sonnet-4.6')
+  const [anthropicBaseUrl, setAnthropicBaseUrl] = useState('https://api.aitokenking.com.tw')
+  const [anthropicModel, setAnthropicModel] = useState('')
   const [orgTempId] = useState(() => `new-${Date.now()}`)
 
   useEffect(() => {
@@ -352,7 +352,7 @@ export default function NewOrganizationPage() {
               </div>
               <div>
                 <label style={labelStyle}>Anthropic Base URL</label>
-                <input value={anthropicBaseUrl} onChange={e => setAnthropicBaseUrl(e.target.value)} placeholder="https://api.aitokenking.com.tw/api/v1" style={inputStyle} autoComplete="off" />
+                <input value={anthropicBaseUrl} onChange={e => setAnthropicBaseUrl(e.target.value)} placeholder="https://api.aitokenking.com.tw" style={inputStyle} autoComplete="off" />
               </div>
               <div>
                 <label style={labelStyle}>Anthropic Model</label>

@@ -238,7 +238,7 @@ export function StatsDashboard() {
                           <span style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>
                             {sdr.closed}/{sdr.total}
                           </span>
-                          <span style={{ fontSize: 13, fontWeight: 700, color, fontFamily: 'JetBrains Mono, monospace', minWidth: 44, textAlign: 'right' }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#22C55E', fontFamily: 'JetBrains Mono, monospace', minWidth: 44, textAlign: 'right' }}>
                             {rate.toFixed(1)}%
                           </span>
                         </div>
@@ -269,7 +269,7 @@ export function StatsDashboard() {
                           <span style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>
                             {a.closed}/{a.total}
                           </span>
-                          <span style={{ fontSize: 15, fontWeight: 800, color, fontFamily: 'JetBrains Mono, monospace', minWidth: 52, textAlign: 'right' }}>
+                          <span style={{ fontSize: 15, fontWeight: 800, color: '#22C55E', fontFamily: 'JetBrains Mono, monospace', minWidth: 52, textAlign: 'right' }}>
                             {rate.toFixed(1)}%
                           </span>
                         </div>

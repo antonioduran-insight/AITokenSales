@@ -86,6 +86,25 @@ export async function POST(
   const areaBySdr: Record<string, string | null> = {}
   for (const s of validSdrs) areaBySdr[s.id] = s.area_id ?? null
 
+  // A lead may already be a prospect for a given SDR (e.g. this run was already
+  // assigned, or the lead was sent to that SDR before). Fetch the existing
+  // (linkedin_url → assigned_to) pairs so we can skip those inserts and let the
+  // same lead land on multiple SDR boards without violating the unique key.
+  const leadUrls = [...new Set(leads.map(l => l.linkedin_url).filter(Boolean))] as string[]
+  const existingKeys = new Set<string>()
+  if (leadUrls.length > 0) {
+    for (let i = 0; i < leadUrls.length; i += 200) {
+      const { data: existing } = await admin
+        .from('prospects')
+        .select('linkedin_url, assigned_to')
+        .eq('organization_id', userData.organization_id)
+        .in('linkedin_url', leadUrls.slice(i, i + 200))
+      for (const p of existing ?? []) {
+        if (p.linkedin_url) existingKeys.add(`${p.linkedin_url}||${p.assigned_to ?? ''}`)
+      }
+    }
+  }
+
   // Assign each lead to the SDR the scraper tagged it with (lead.sdr_id) when that
   // SDR is part of this run. Leads with a missing or unknown sdr_id are spread
   // round-robin across the selected SDRs instead of piling onto a single one, so
@@ -96,6 +115,7 @@ export async function POST(
   const prospectRows: Record<string, unknown>[] = []
   const assignedCount: Record<string, number> = {}
   for (const s of validSdrs) assignedCount[s.id] = 0
+  let skipped = 0
 
   const tempMap: Record<string, string> = { 'HOT': 'Hot', 'WARM': 'Warm', 'COLD': 'Cold' }
 
@@ -107,6 +127,13 @@ export async function POST(
       sdrId = validSdrs[fallbackCursor % validSdrs.length].id
       fallbackCursor++
     }
+
+    // Skip if this SDR already has this lead (avoids the duplicate-key error and
+    // keeps the original assignment intact).
+    const key = `${lead.linkedin_url ?? ''}||${sdrId}`
+    if (lead.linkedin_url && existingKeys.has(key)) { skipped++; continue }
+    if (lead.linkedin_url) existingKeys.add(key) // guard against in-batch dupes
+
     assignedCount[sdrId] = (assignedCount[sdrId] ?? 0) + 1
 
     prospectRows.push({
@@ -132,13 +159,25 @@ export async function POST(
     })
   }
 
-  // Insert prospects in batches
+  // Insert prospects in batches. If a batch hits a unique-constraint conflict
+  // (a lead already on that SDR's board slipping through a race), fall back to
+  // row-by-row so one conflict never aborts the whole assignment.
+  const isDuplicateErr = (msg: string) => /duplicate key|unique constraint/i.test(msg)
   let inserted = 0
   for (let i = 0; i < prospectRows.length; i += 100) {
     const batch = prospectRows.slice(i, i + 100)
     const { data, error } = await admin.from('prospects').insert(batch).select('id')
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    inserted += data?.length ?? 0
+    if (!error) { inserted += data?.length ?? 0; continue }
+    if (!isDuplicateErr(error.message)) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    for (const row of batch) {
+      const { data: one, error: rowErr } = await admin.from('prospects').insert(row).select('id')
+      if (!rowErr) { inserted += one?.length ?? 0 }
+      else if (!isDuplicateErr(rowErr.message)) {
+        return NextResponse.json({ error: rowErr.message }, { status: 500 })
+      } else { skipped++ }
+    }
   }
 
   // Manual re-sends don't touch run history, the export flag, or the quota —
@@ -187,5 +226,5 @@ export async function POST(
       )
   }
 
-  return NextResponse.json({ ok: true, assigned: inserted, per_sdr: assignedCount })
+  return NextResponse.json({ ok: true, assigned: inserted, skipped, per_sdr: assignedCount })
 }

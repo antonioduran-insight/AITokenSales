@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { normalizeAnthropicBaseUrl } from '@/lib/utils/anthropic'
 
 async function verifyGlobalAdmin() {
   const cookieStore = await cookies()
@@ -88,6 +89,10 @@ export async function PATCH(
   const patch: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in fields) patch[key] = fields[key]
+  }
+  // Never store a base URL that already ends in /v1 (avoids the /v1/v1 error).
+  if ('anthropic_base_url' in patch) {
+    patch.anthropic_base_url = normalizeAnthropicBaseUrl(patch.anthropic_base_url as string | null)
   }
 
   const admin = createAdminClient(

@@ -310,6 +310,16 @@ export const ADDON_LIST = [
   { type: 'linkedin_auto_messaging', labelKey: 'addOn_linkedin_auto_messaging', price: 'TBD' },
 ] as const
 
+// Recurring monthly price per add-on, used by Revenue Reports. One-time / TBD
+// add-ons (sso, linkedin_auto_messaging) contribute 0 to the monthly run-rate.
+export const ADDON_MONTHLY_PRICE: Record<string, number> = {
+  account_management: 149,
+  multi_workspace: 300,
+  extended_data_retention: 99,
+  sso: 0,
+  linkedin_auto_messaging: 0,
+}
+
 export interface UserArea {
   id: string
   user_id: string

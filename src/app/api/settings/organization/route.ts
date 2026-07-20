@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { normalizeAnthropicBaseUrl } from '@/lib/utils/anthropic'
 
 async function getOrgAdmin() {
   const cookieStore = await cookies()
@@ -47,6 +48,9 @@ export async function PATCH(req: Request) {
   const update: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) update[key] = body[key]
+  }
+  if ('anthropic_base_url' in update) {
+    update.anthropic_base_url = normalizeAnthropicBaseUrl(update.anthropic_base_url as string | null)
   }
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: 'No valid fields' }, { status: 400 })

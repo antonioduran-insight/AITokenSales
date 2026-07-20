@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { normalizeAnthropicBaseUrl } from '@/lib/utils/anthropic'
 
 async function verifyGlobalAdmin() {
   const cookieStore = await cookies()
@@ -72,8 +73,8 @@ export async function POST(req: NextRequest) {
       internal_notes: internal_notes ?? null,
       apify_token: apify_token ?? null,
       anthropic_key: anthropic_key ?? null,
-      anthropic_base_url: anthropic_base_url ?? 'https://api.aitokenking.com.tw/api/v1',
-      anthropic_model: anthropic_model ?? 'claude-sonnet-4.6',
+      anthropic_base_url: normalizeAnthropicBaseUrl(anthropic_base_url),
+      anthropic_model: anthropic_model || null,
       is_active: true,
       billing_day: 10,
     })

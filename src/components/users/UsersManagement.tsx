@@ -66,9 +66,6 @@ export function UsersManagement() {
   const [editName, setEditName] = useState('')
   const [editAreaIds, setEditAreaIds] = useState<string[]>([])
   const [editRole, setEditRole] = useState<'sdr' | 'admin'>('sdr')
-  const [editYearsExp, setEditYearsExp] = useState<number | ''>('')
-  const [editSeniority, setEditSeniority] = useState('')
-  const [editExpertiseArea, setEditExpertiseArea] = useState('')
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
 
@@ -115,9 +112,6 @@ export function UsersManagement() {
     setEditName(u.full_name)
     setEditAreaIds(areas)
     setEditRole(u.role as 'sdr' | 'admin')
-    setEditYearsExp(u.years_experience ?? '')
-    setEditSeniority(u.seniority ?? '')
-    setEditExpertiseArea(u.expertise_area ?? '')
     setEditError('')
   }
 
@@ -134,9 +128,6 @@ export function UsersManagement() {
           full_name: editName.trim(),
           role: editRole,
           area_ids: editAreaIds,
-          years_experience: editYearsExp === '' ? null : Number(editYearsExp),
-          seniority: editSeniority || null,
-          expertise_area: editExpertiseArea.trim() || null,
         }),
       })
       const json = await res.json()
@@ -438,40 +429,6 @@ export function UsersManagement() {
                     </label>
                   ))}
                 </div>
-              </div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <label style={S.label}>Years of experience</label>
-                  <input
-                    style={S.input}
-                    type="number"
-                    min={0}
-                    max={50}
-                    value={editYearsExp}
-                    onChange={e => setEditYearsExp(e.target.value === '' ? '' : Number(e.target.value))}
-                    placeholder="e.g. 3"
-                  />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={S.label}>Seniority</label>
-                  <select value={editSeniority} onChange={e => setEditSeniority(e.target.value)} style={{ ...S.input, cursor: 'pointer' }}>
-                    <option value="">— none —</option>
-                    <option value="Junior">Junior</option>
-                    <option value="Mid">Mid</option>
-                    <option value="Senior">Senior</option>
-                    <option value="Director">Director</option>
-                    <option value="Executive">Executive</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label style={S.label}>Expertise area</label>
-                <input
-                  style={S.input}
-                  value={editExpertiseArea}
-                  onChange={e => setEditExpertiseArea(e.target.value)}
-                  placeholder="e.g. SaaS, FinTech, Real Estate..."
-                />
               </div>
               {editError && (
                 <div style={{ padding: '8px 12px', backgroundColor: '#3A1A1A', border: '1px solid #EF4444', borderRadius: 6, color: '#F87171', fontSize: 12 }}>{editError}</div>

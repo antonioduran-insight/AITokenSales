@@ -203,7 +203,16 @@ function PipelineTab() {
     fetch('/api/settings/pipeline-stages')
       .then(r => r.json())
       .then((d: PipelineStage[]) => {
-        const deduped = d.filter((s, i, arr) => arr.findIndex(x => x.id === s.id) === i)
+        // Guard against both id-level dupes and real duplicate rows that share a
+        // name (different id) — keep the first occurrence (lowest position).
+        const byId = d.filter((s, i, arr) => arr.findIndex(x => x.id === s.id) === i)
+        const seenName = new Set<string>()
+        const deduped = byId.filter(s => {
+          const key = (s.name ?? '').trim().toLowerCase()
+          if (seenName.has(key)) return false
+          seenName.add(key)
+          return true
+        })
         setStages(deduped)
         setLoading(false)
       })
@@ -265,7 +274,6 @@ function PipelineTab() {
   }
 
   async function deleteStage(stage: PipelineStage, idx: number) {
-    if (stage.is_default) { setError('Cannot delete default stages'); return }
     if (stages.length <= 1) { setError('Cannot delete the only stage'); return }
 
     const statusKey = stage.name.toLowerCase().replace(/\s+/g, '_')
@@ -349,18 +357,16 @@ function PipelineTab() {
                 style={{ flex: 1, backgroundColor: 'transparent', border: 'none', color: 'var(--crm-text-primary)', fontSize: 13, outline: 'none' }}
               />
               <span style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontFamily: 'monospace' }}>#{idx}</span>
-              {!stage.is_default && (
-                <button
-                  onClick={() => deleteStage(stage, idx)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', padding: 2 }}
-                  title="Delete stage"
-                >
-                  <Trash2 size={13} />
-                </button>
-              )}
               {stage.is_default && (
                 <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', border: '1px solid var(--crm-border)', borderRadius: 3, padding: '1px 5px' }}>default</span>
               )}
+              <button
+                onClick={() => deleteStage(stage, idx)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', padding: 2, display: 'flex', alignItems: 'center' }}
+                title="Delete stage"
+              >
+                <Trash2 size={14} />
+              </button>
             </div>
           ))}
         </div>
