@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { type Lead } from '@/lib/scraper-api';
 import { TemperatureBadge } from '@/components/scraper/TemperatureBadge';
 import { ICPScore } from '@/components/scraper/ICPScore';
-import { ChevronDown, ChevronUp, Download, Send, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, Send, X, XCircle } from 'lucide-react';
 import type { RunRecord, User, AreaName } from '@/lib/types';
 import { inferAreaFromCountry } from '@/lib/utils/area-inference';
 
@@ -68,6 +68,8 @@ function HistoryContent() {
   const [sendSelected, setSendSelected] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
   const [sendMsg, setSendMsg] = useState<string | null>(null);
+
+  const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
 
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const autoExpanded = useRef(false);
@@ -151,6 +153,24 @@ function HistoryContent() {
     setTimeout(() => rowRefs.current[runParam]?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
   }, [runParam, runs, loading, loadRunDetail]);
 
+  async function handleCancel(e: React.MouseEvent, runId: string) {
+    e.stopPropagation();
+    setCancellingIds(prev => new Set(prev).add(runId));
+    try {
+      const res = await fetch(`/api/runs/${runId}`, { method: 'DELETE' });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setRuns(prev => prev.map(r => r.id === runId ? { ...r, status: 'cancelled' } : r));
+      } else {
+        alert(`Cancel failed: ${body.error ?? res.status}`);
+      }
+    } catch (err) {
+      alert(`Cancel error: ${String(err)}`);
+    } finally {
+      setCancellingIds(prev => { const s = new Set(prev); s.delete(runId); return s; });
+    }
+  }
+
   async function handleSend(runId: string, market: string) {
     if (sendSelected.length === 0 || sending) return;
     setSending(true);
@@ -220,6 +240,12 @@ function HistoryContent() {
                 {isActive && <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'currentColor', animation: 'pulse 1.5s ease-in-out infinite' }} />}
                 {statusLabel}
               </span>
+              {isActive && (
+                <button onClick={e => handleCancel(e, run.id)} disabled={cancellingIds.has(run.id)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: '#EF4444', background: 'transparent', border: '1px solid #EF444440', borderRadius: 6, padding: '3px 9px', cursor: cancellingIds.has(run.id) ? 'default' : 'pointer', opacity: cancellingIds.has(run.id) ? 0.5 : 1, flexShrink: 0 }}>
+                  <XCircle size={12} /> {cancellingIds.has(run.id) ? 'Cancelling…' : 'Cancel'}
+                </button>
+              )}
               {isExpanded ? <ChevronUp size={16} color="var(--crm-text-muted)" /> : <ChevronDown size={16} color="var(--crm-text-muted)" />}
             </div>
 

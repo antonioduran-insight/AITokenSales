@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
-import { Minus, Plus, AlertCircle } from 'lucide-react'
+import { Minus, Plus, AlertCircle, XCircle } from 'lucide-react'
 import type { User, ScraperComboMaster, AreaName } from '@/lib/types'
 import { inferAreaFromCountry } from '@/lib/utils/area-inference'
 
@@ -111,6 +111,7 @@ function RunPageInner() {
   const [selectedSdrIds, setSelectedSdrIds] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [cancelling, setCancelling] = useState(false)
 
   // Kept for the auto-assign call after completion (survives restore)
   const runMetaRef = useRef<{ market: string | null; sdrIds: string[] }>({ market: null, sdrIds: [] })
@@ -325,8 +326,24 @@ function RunPageInner() {
     setSelectedCombos([])
     setSelectedSdrIds([])
     setSubmitError(null)
+    setCancelling(false)
     // Clear the ?run= query param if present
     router.replace(`/${locale}/run`)
+  }
+
+  // Cancel the in-progress run. The poll then picks up the 'cancelled' status.
+  async function handleCancel() {
+    if (!runId || cancelling) return
+    setCancelling(true)
+    try {
+      const res = await fetch(`/api/runs/${runId}`, { method: 'DELETE' })
+      if (res.ok) {
+        setSummary(prev => (prev ? { ...prev, status: 'cancelled' } : { status: 'cancelled' } as RunSummary))
+        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+        try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
+      }
+    } catch { /* ignore */ }
+    finally { setCancelling(false) }
   }
 
   // ── Derived phase ──
@@ -334,7 +351,8 @@ function RunPageInner() {
   const isConfig = !runId
   const isRunning = !!runId && (ACTIVE.has(status) || (status === 'completed' && assignState !== 'done'))
   const isCompleted = !!runId && status === 'completed' && assignState === 'done'
-  const isFailed = !!runId && (status === 'failed' || status === 'cancelled')
+  const isCancelled = !!runId && status === 'cancelled'
+  const isFailed = !!runId && status === 'failed'
 
   const dist = previewDist()
 
@@ -530,6 +548,28 @@ function RunPageInner() {
               {summary.leads_generated} / {summary.total_leads_requested} leads so far
             </p>
           )}
+
+          {assignState !== 'assigning' && (
+            <button onClick={handleCancel} disabled={cancelling}
+              style={{ marginTop: 24, display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#EF4444', background: 'transparent', border: '1px solid #EF444440', borderRadius: 8, padding: '9px 18px', cursor: cancelling ? 'default' : 'pointer', opacity: cancelling ? 0.5 : 1 }}>
+              <XCircle size={14} /> {cancelling ? 'Cancelling…' : 'Cancel run'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ══════════ CANCELLED ══════════ */}
+      {isCancelled && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 60 }}>
+          <div style={{ width: 88, height: 88, borderRadius: '50%', backgroundColor: 'var(--crm-surface-raised)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+            <XCircle size={44} color="var(--crm-text-muted)" />
+          </div>
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>Run cancelled</h2>
+          <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0, textAlign: 'center' }}>This run was stopped before it finished.</p>
+          <button onClick={resetToConfig}
+            style={{ marginTop: 20, fontSize: 13, fontWeight: 700, color: '#FFF', backgroundColor: 'var(--crm-accent)', padding: '11px 22px', borderRadius: 9, border: 'none', cursor: 'pointer' }}>
+            New Run
+          </button>
         </div>
       )}
 
