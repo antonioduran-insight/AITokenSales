@@ -8,6 +8,7 @@ import { Minus, Plus, AlertCircle, XCircle } from 'lucide-react'
 import type { User, ScraperComboMaster, AreaName } from '@/lib/types'
 import { inferAreaFromCountry } from '@/lib/utils/area-inference'
 import { useOrgMarkets } from '@/lib/hooks/useOrgMarkets'
+import { useMarketAreaMap } from '@/lib/hooks/useMarketAreaMap'
 import { MarketSelect } from '@/components/markets/MarketSelect'
 
 // An SDR row plus the flattened set of area names it covers (primary area_id +
@@ -108,6 +109,7 @@ function RunPageInner() {
 
   // ── Phase 1: config ──
   const { markets: orgMarkets, loading: marketsLoading, error: marketsError } = useOrgMarkets()
+  const marketAreaMap = useMarketAreaMap()
   const [market, setMarket] = useState<string | null>(null)
   const [activeCombos, setActiveCombos] = useState<ScraperComboMaster[]>([])
   const [combosLoading, setCombosLoading] = useState(true)
@@ -196,7 +198,7 @@ function RunPageInner() {
   }, [])
 
   // Market → area mapping. "Global" (or no market) → null → show every SDR.
-  const marketArea: AreaName | null = market ? inferAreaFromCountry(market) : null
+  const marketArea: AreaName | null = inferAreaFromCountry(market, marketAreaMap)
   const visibleSdrs = marketArea ? sdrs.filter(s => s.areaNames.includes(marketArea)) : sdrs
 
   // ── Auto-assign once the run completes (idempotent) ──

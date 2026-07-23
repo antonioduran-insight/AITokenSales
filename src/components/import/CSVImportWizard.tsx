@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button'
 import { UploadCloud, CheckCircle, ChevronRight, ChevronLeft, SkipForward, AlertTriangle } from 'lucide-react'
 import Papa from 'papaparse'
 import type { AreaName } from '@/lib/types'
+import { AREA_NAMES } from '@/lib/types'
+import { AREA_LABELS } from '@/lib/utils/area-inference'
 import { SEARCH_COMBOS, LEAD_TEMPERATURES } from '@/lib/types'
 
 const PROSPECT_FIELDS = [
@@ -63,18 +65,14 @@ interface ParsedRow {
 
 type Step = 1 | 2 | 3 | 4 | 5
 
-const AREA_OPTIONS: { name: AreaName; label: string; disabled?: boolean; disabledReason?: string }[] = [
-  { name: 'taiwan', label: 'Taiwan / SEA' },
-  { name: 'latam', label: 'LATAM' },
-  { name: 'vietnam', label: 'Vietnam' },
-  { name: 'europe', label: 'Europe', disabled: true, disabledReason: 'Area not yet active' },
-]
+const AREA_OPTIONS: { name: AreaName; label: string; disabled?: boolean; disabledReason?: string }[] =
+  AREA_NAMES.map(name => ({ name, label: AREA_LABELS[name] }))
 
 const AREA_COLORS: Record<AreaName, string> = {
-  taiwan: '#6C63FF',
-  latam: '#22C55E',
-  vietnam: '#F59E0B',
+  asia: '#6C63FF',
+  latin_america: '#22C55E',
   europe: '#3B82F6',
+  usa: '#C084FC',
 }
 
 const S: Record<string, React.CSSProperties> = {

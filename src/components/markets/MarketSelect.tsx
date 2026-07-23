@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { useLocale } from 'next-intl'
-import { MARKET_REGIONS, type Market } from '@/lib/types'
+import { AREA_NAMES, type Market } from '@/lib/types'
+import { areaLabel } from '@/lib/utils/area-inference'
 import { AlertCircle } from 'lucide-react'
 
 interface Props {
@@ -26,7 +27,7 @@ function chip(active: boolean): React.CSSProperties {
 // Regions in their canonical order, with anything unexpected last.
 function orderRegions(markets: Market[]): string[] {
   const present = [...new Set(markets.map(m => m.region))]
-  const known = MARKET_REGIONS.filter(r => present.includes(r)) as string[]
+  const known = (AREA_NAMES as readonly string[]).filter(r => present.includes(r))
   const rest = present.filter(r => !known.includes(r)).sort()
   return [...known, ...rest]
 }
@@ -72,7 +73,7 @@ export function MarketSelect({ markets, loading, error, value, onChange }: Props
       {regions.map(region => (
         <div key={region}>
           <div style={{ fontSize: 10, color: 'var(--crm-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
-            {region}
+            {areaLabel(region)}
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {markets.filter(m => m.region === region).map(m => (

@@ -8,6 +8,7 @@ import { ICPScore } from '@/components/scraper/ICPScore';
 import { ChevronDown, ChevronUp, Download, Send, X, XCircle } from 'lucide-react';
 import type { RunRecord, User, AreaName, Lead } from '@/lib/types';
 import { inferAreaFromCountry } from '@/lib/utils/area-inference';
+import { useMarketAreaMap } from '@/lib/hooks/useMarketAreaMap';
 
 const ACTIVE = new Set(['pending', 'running', 'scraping', 'scoring', 'drafting']);
 
@@ -69,6 +70,7 @@ function HistoryContent() {
   const [sendMsg, setSendMsg] = useState<string | null>(null);
 
   const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
+  const marketAreaMap = useMarketAreaMap();
 
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const autoExpanded = useRef(false);
@@ -212,7 +214,7 @@ function HistoryContent() {
         const markets = run.markets?.length ? run.markets : [run.market];
         const generated = (run.run_sdr_assignments ?? []).reduce((s, a) => s + (a.leads_assigned || 0), 0);
         const statusLabel = isActive ? 'Running' : run.status.charAt(0).toUpperCase() + run.status.slice(1);
-        const runArea: AreaName | null = inferAreaFromCountry(run.market);
+        const runArea: AreaName | null = inferAreaFromCountry(run.market, marketAreaMap);
         // A run belongs to exactly ONE SDR.
         const assignment = (run.run_sdr_assignments ?? [])[0];
         const assignedSdrName = assignment?.user?.full_name

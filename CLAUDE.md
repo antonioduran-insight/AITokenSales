@@ -134,7 +134,9 @@ ultra:      { max_seats: MAX_INT, max_leads_per_month: MAX_INT }
 
 **Markets are per-org, never hardcoded** — the catalogue lives in the backend-owned `markets` table (~49 countries across Asia / Latin America / Europe / USA) and each org activates a subset in `organization_markets`. Any surface that asks for a market must read the org's list via `useOrgMarkets()` and render `<MarketSelect>` — never a literal array of country names. Because the backend owns the table, `/api/markets` normalises the column names it reads (`name|country|label`, `region|area|continent`).
 
-SDR filtering still runs the chosen country through `inferAreaFromCountry()`; unmapped countries return `null`, which shows every SDR rather than none.
+**Areas and market regions share one vocabulary** — `AreaName = 'asia' | 'latin_america' | 'europe' | 'usa'`, and `areas.name` (how SDRs are classified) uses exactly the same values as `markets.region`. A market's region *is* an area; there is no translation layer.
+
+`inferAreaFromCountry(marketName, map)` is **synchronous** and takes a prebuilt `MarketAreaMap`. Build it once per page with `useMarketAreaMap()` (which reads the full catalogue) — never query per call, since list views resolve an area per row. Unknown markets return `null`, which callers treat as "no filter" (show every SDR) rather than "no matches". The old hardcoded `countryToArea` dictionary is gone.
 
 **Add-ons** — `addon_type` is constrained in the DB. Adding a new one requires both an `ADDON_LIST` entry in `src/lib/types.ts` (which auto-renders it in Global Admin) **and** a migration widening the CHECK constraint.
 
@@ -157,7 +159,8 @@ SDR filtering still runs the chosen country through `inferAreaFromCountry()`; un
 | Lead quota for current period | `src/lib/utils/lead-quota.ts` |
 | Fiscal quarters + billable months | `src/lib/utils/quarter.ts` |
 | Anthropic base URL normaliser | `src/lib/utils/anthropic.ts` |
-| Country/market → area mapping | `src/lib/utils/area-inference.ts` |
+| Area normalisation + market→area lookup | `src/lib/utils/area-inference.ts` |
+| Market→area map for a page | `src/lib/hooks/useMarketAreaMap.ts` |
 | i18n messages | `src/messages/{en,zh,es,vi}.json` |
 
 ## Sidebar

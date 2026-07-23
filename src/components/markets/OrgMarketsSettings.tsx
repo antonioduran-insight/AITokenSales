@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useUser } from '@/contexts/UserContext'
-import { MARKET_REGIONS, type Market } from '@/lib/types'
+import { AREA_NAMES, type Market } from '@/lib/types'
+import { areaLabel } from '@/lib/utils/area-inference'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 
 const S: Record<string, React.CSSProperties> = {
@@ -14,7 +15,7 @@ const S: Record<string, React.CSSProperties> = {
 
 function orderRegions(markets: Market[]): string[] {
   const present = [...new Set(markets.map(m => m.region))]
-  const known = MARKET_REGIONS.filter(r => present.includes(r)) as string[]
+  const known = (AREA_NAMES as readonly string[]).filter(r => present.includes(r))
   const rest = present.filter(r => !known.includes(r)).sort()
   return [...known, ...rest]
 }
@@ -144,7 +145,7 @@ export function OrgMarketsSettings() {
                     <button onClick={() => toggleCollapse(region)}
                       style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-primary)', flex: 1, textAlign: 'left', padding: 0 }}>
                       {isCollapsed ? <ChevronRight size={15} color="var(--crm-text-muted)" /> : <ChevronDown size={15} color="var(--crm-text-muted)" />}
-                      <span style={{ fontSize: 13, fontWeight: 700 }}>{region}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700 }}>{areaLabel(region)}</span>
                       <span style={{ fontSize: 11, color: chosen > 0 ? 'var(--crm-accent)' : 'var(--crm-text-muted)', fontWeight: 600 }}>
                         {chosen}/{inRegion.length}
                       </span>

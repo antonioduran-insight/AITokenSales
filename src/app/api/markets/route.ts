@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { Market } from '@/lib/types'
+import { normalizeAreaName } from '@/lib/utils/area-inference'
 
 /**
  * Full market catalogue (~49 countries grouped into 4 regions).
@@ -31,7 +32,7 @@ export async function GET() {
     .map((row: Record<string, unknown>) => ({
       id: String(row.id ?? ''),
       name: String(row.name ?? row.country ?? row.label ?? ''),
-      region: String(row.region ?? row.area ?? row.continent ?? 'Other'),
+      region: normalizeAreaName(String(row.region ?? row.area ?? row.continent ?? '')) ?? 'other',
     }))
     .filter(m => m.id && m.name)
     .sort((a, b) => a.region.localeCompare(b.region) || a.name.localeCompare(b.name))

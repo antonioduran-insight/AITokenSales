@@ -13,7 +13,12 @@ export type SearchCombo = 'A' | 'B' | 'C' | 'D' | 'E' | 'F'
 
 export type UserRole = 'admin_global' | 'admin' | 'sdr' | 'support'
 
-export type AreaName = 'taiwan' | 'latam' | 'vietnam' | 'europe'
+/**
+ * The four geographic regions. Shared vocabulary: `areas.name` (how SDRs are
+ * classified) and `markets.region` (how the ~49 countries are grouped) both use
+ * exactly these values, so a market's region IS an area.
+ */
+export type AreaName = 'asia' | 'latin_america' | 'europe' | 'usa'
 
 export type AuditEventType =
   | 'prospect_created'
@@ -145,7 +150,8 @@ export const OUTREACH_STATUSES: OutreachStatus[] = [
 
 export const LEAD_TEMPERATURES: LeadTemperature[] = ['Cold', 'Warm', 'Hot']
 export const SEARCH_COMBOS: SearchCombo[] = ['A', 'B', 'C', 'D', 'E', 'F']
-export const AREA_NAMES: AreaName[] = ['taiwan', 'latam', 'vietnam', 'europe']
+/** Canonical display order for regions, used by both area and market UIs. */
+export const AREA_NAMES: AreaName[] = ['asia', 'latin_america', 'europe', 'usa']
 
 export interface Organization {
   id: string
@@ -240,11 +246,10 @@ export interface RunRecord {
 export interface Market {
   id: string
   name: string
+  /** One of AreaName. Kept as string so an unexpected backend value still
+   *  renders instead of breaking the page. */
   region: string
 }
-
-/** Display order for the market regions. Anything else falls under "Other". */
-export const MARKET_REGIONS = ['Asia', 'Latin America', 'Europe', 'USA'] as const
 
 /** Lifecycle of a scraper run, as reported by the Python backend. */
 export type RunStatus = 'pending' | 'running' | 'scoring' | 'drafting' | 'completed' | 'failed' | 'cancelled'

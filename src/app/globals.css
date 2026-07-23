@@ -122,23 +122,22 @@
   100% { transform: scale(1); opacity: 1; }
 }
 
-/* Area badge colors */
-.area-badge-taiwan {
+/* Area badge colors — keyed by AreaName (same vocabulary as markets.region) */
+.area-badge-asia {
   background-color: #1E3A5F;
   color: #60A5FA;
 }
-.area-badge-latam {
+.area-badge-latin_america {
   background-color: #1A3A2A;
   color: #4ADE80;
-}
-.area-badge-vietnam {
-  background-color: #3A1A1A;
-  color: #F87171;
 }
 .area-badge-europe {
   background-color: #2A2A1A;
   color: #FCD34D;
-  opacity: 0.6;
+}
+.area-badge-usa {
+  background-color: #3A1A3A;
+  color: #C084FC;
 }
 
 /* JetBrains Mono for ICP Score and timestamps */

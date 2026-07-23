@@ -289,7 +289,7 @@ Core tables:
 ```sql
 organizations        -- Multi-tenant root: plan, seats, billing_day, company_context, API credentials
 users                -- Auth mirror: role, area_id, organization_id, is_active
-areas                -- Sales regions (Taiwan, LATAM, Vietnam, Europe, Global)
+areas                -- Sales regions (asia, latin_america, europe, usa) — same vocabulary as markets.region
 user_areas           -- Extra areas an SDR covers beyond their primary area_id
 prospects            -- Core lead: status, temperature, ICP score, messages, assigned_to
 notes                -- Per-prospect timestamped notes
@@ -369,7 +369,7 @@ src/
 │       ├── billing-period.ts   # currentBillingPeriod(billing_day)
 │       ├── lead-quota.ts       # getLeadQuota — usage in the current billing period
 │       ├── quarter.ts          # Fiscal quarters + billable months (day-15 rollover)
-│       └── area-inference.ts   # Country/market → area mapping
+│       └── area-inference.ts   # Area normalisation + market→area lookup
 ├── middleware.ts               # Auth gate + role/org cookies
 └── messages/                   # en.json · zh.json · es.json · vi.json
 ```
