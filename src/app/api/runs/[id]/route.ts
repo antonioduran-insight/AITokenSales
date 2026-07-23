@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { backendHeaders } from '@/lib/scraper-backend'
 
 const SCRAPER_API = process.env.SCRAPER_API_URL ?? ''
 
@@ -111,7 +112,7 @@ export async function DELETE(
 
   // Best-effort: tell Railway to stop processing
   if (SCRAPER_API) {
-    fetch(`${SCRAPER_API}/runs/${id}`, { method: 'DELETE' }).catch(() => {})
+    fetch(`${SCRAPER_API}/runs/${id}`, { method: 'DELETE', headers: backendHeaders() }).catch(() => {})
   }
 
   return NextResponse.json({ ok: true })

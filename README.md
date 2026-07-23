@@ -270,9 +270,13 @@ NEXT_PUBLIC_APP_URL=https://ai-token-sales.vercel.app
 SCRAPER_API_URL=https://pwa-aitokensales-production.up.railway.app
 NEXT_PUBLIC_SCRAPER_API_URL=https://pwa-aitokensales-production.up.railway.app
 NEXT_PUBLIC_SCRAPER_WS_URL=wss://pwa-aitokensales-production.up.railway.app
+
+# Shared secret sent as X-Internal-Api-Key on every backend call.
+# Must match INTERNAL_API_KEY on the Railway backend. Server-only.
+INTERNAL_API_KEY=your-internal-api-key
 ```
 
-> `SUPABASE_SERVICE_ROLE_KEY` must never reach the browser. It is server-only.
+> `SUPABASE_SERVICE_ROLE_KEY` and `INTERNAL_API_KEY` must never reach the browser. They are server-only — never prefix them with `NEXT_PUBLIC_`.
 
 Per-org credentials (**Apify token**, **Anthropic key / base URL / model**) are stored on the `organizations` row, not in env vars — set them in Settings → Scraper or in Global Admin.
 

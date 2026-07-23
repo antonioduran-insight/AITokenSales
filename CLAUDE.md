@@ -82,6 +82,8 @@ The scraper backend has **no** catch-all proxy — a `/api/scraper/[...path]` pa
 
 **Never add a generic passthrough proxy.** If a new backend endpoint is needed, either add a purpose-built route or follow the Bridge shape: verify session → verify role from the DB → gate on whatever the feature requires → overwrite `organization_id` server-side. Never trust a client-supplied `organization_id`.
 
+**Every outbound backend call must use `backendHeaders()`** from `src/lib/scraper-backend.ts` — it adds the `X-Internal-Api-Key` shared secret (`INTERNAL_API_KEY`, server-only) that the backend requires. Never hand-write `{ 'Content-Type': 'application/json' }` for a backend fetch.
+
 **When adding an add-on-gated feature, gate it in the UI *and* re-check server-side in the API route.** UI gating is never the security boundary.
 
 ### Styling Convention

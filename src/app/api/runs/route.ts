@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { getLeadQuota } from '@/lib/utils/lead-quota'
+import { backendHeaders } from '@/lib/scraper-backend'
 
 const SCRAPER_API = process.env.SCRAPER_API_URL ?? ''
 
@@ -185,7 +186,7 @@ export async function POST(req: NextRequest) {
 
       const scraperRes = await fetch(`${SCRAPER_API}/runs`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: backendHeaders(),
         body: JSON.stringify(scraperPayload),
       })
 

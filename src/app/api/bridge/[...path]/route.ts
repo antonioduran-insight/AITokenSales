@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { backendHeaders, SCRAPER_API_URL } from '@/lib/scraper-backend'
 
-const BACKEND = process.env.SCRAPER_API_URL || process.env.NEXT_PUBLIC_SCRAPER_API_URL || 'http://localhost:8000'
+const BACKEND = SCRAPER_API_URL || 'http://localhost:8000'
 
 // Authenticated reverse proxy to the Bridge endpoints on the Python backend.
 //
@@ -52,7 +53,7 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
   search.set('organization_id', orgId)
   const url = `${BACKEND}${pathStr}?${search.toString()}`
 
-  const init: RequestInit = { method: req.method, headers: { 'Content-Type': 'application/json' } }
+  const init: RequestInit = { method: req.method, headers: backendHeaders() }
 
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     let body: Record<string, unknown> = {}

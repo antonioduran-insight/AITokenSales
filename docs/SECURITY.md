@@ -209,6 +209,12 @@ Because step 5 overwrites rather than validates, an authenticated admin of Org A
 
 Per-org third-party credentials (Apify token, Anthropic key) live on the `organizations` row and are only ever read server-side in API routes.
 
+### Backend authentication
+
+Every outbound call to the Python backend carries `X-Internal-Api-Key`, a shared secret from the server-only `INTERNAL_API_KEY` env var. All three call sites (`POST /runs`, the best-effort `DELETE /runs/{id}` cancel, and the whole Bridge proxy) go through `backendHeaders()` in `src/lib/scraper-backend.ts`, so a new call site cannot silently omit it.
+
+When the variable is unset the header is **omitted** rather than sent as the string `"undefined"` — a misconfigured deploy is then rejected by the backend instead of appearing to authenticate. This is defence in depth: the CRM already authenticates and org-scopes the caller before forwarding, and the key stops anything that is not the CRM from reaching the backend directly.
+
 ### CORS
 
 Next.js API routes do not set permissive CORS headers by default. Cross-origin requests from unauthorized domains cannot call these endpoints with cookies.
@@ -229,7 +235,8 @@ No application-level rate limiting is currently implemented. Rate limiting shoul
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public (browser) | Client + Server |
 | `SUPABASE_SERVICE_ROLE_KEY` | **Private** (server only) | API routes only |
 | `NEXT_PUBLIC_APP_URL` | Public | Redirects |
-| `SCRAPER_API_URL` | Private (server) | Scraper proxy |
+| `SCRAPER_API_URL` | Private (server) | Scraper / Bridge backend base URL |
+| `INTERNAL_API_KEY` | **Private** (server only) | Sent as `X-Internal-Api-Key` on every backend call |
 
 `NEXT_PUBLIC_*` variables are bundled into the client JS. All others are server-only. Never add sensitive values to `NEXT_PUBLIC_*` variables.
 
