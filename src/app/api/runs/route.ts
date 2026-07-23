@@ -20,12 +20,13 @@ export async function POST(req: NextRequest) {
 
     const { data: userData } = await supabase
       .from('users')
-      .select('organization_id, role, scraper_access')
+      .select('organization_id, role')
       .eq('id', user.id)
       .single()
 
-    if (!userData?.scraper_access && userData?.role !== 'admin') {
-      return NextResponse.json({ error: 'Scraper access not enabled for this user' }, { status: 403 })
+    // Only org admins can run the scraper. SDRs have no scraper access at all.
+    if (userData?.role !== 'admin') {
+      return NextResponse.json({ error: 'Only the organization admin can run the scraper' }, { status: 403 })
     }
 
     const { data: org } = await supabase
@@ -42,10 +43,16 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { combos, market, markets, total_leads, sdr_ids, sdr_market_assignments } = body
+    const { combos, market, markets, total_leads } = body
+    // One SDR per run. `sdr_ids` is still accepted (first element wins) so an
+    // older client can't silently send a multi-SDR payload.
+    const sdrId: string | null = body.sdr_id ?? body.sdr_ids?.[0] ?? null
 
     if (!combos?.length || !total_leads) {
       return NextResponse.json({ error: 'combos and total_leads are required' }, { status: 400 })
+    }
+    if (!sdrId) {
+      return NextResponse.json({ error: 'sdr_id is required — pick the SDR this run is for' }, { status: 400 })
     }
     const primaryMarket: string = markets?.[0] ?? market ?? 'global'
     const allMarkets: string[] = markets?.length ? markets : (market ? [market] : [])
@@ -67,9 +74,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Build SDR assignments
-    const isBasic = org.plan === 'basic'
-
+    // Build the single SDR assignment for this run. The chosen SDR is ALWAYS
+    // honoured (no plan-based fallback to the admin) — the leads and the
+    // personalised messages both belong to them.
     interface BuiltAssignment {
       sdr_id: string
       sender_profile_id: string | null
@@ -87,70 +94,38 @@ export async function POST(req: NextRequest) {
       } | null
     }
 
-    let sdrAssignments: BuiltAssignment[] = []
-
-    if (sdr_ids?.length > 0 && !isBasic) {
-      for (const sdrId of sdr_ids as string[]) {
-        const [{ data: profile }, { data: sdrCtx }] = await Promise.all([
-          supabase
-            .from('sender_profiles')
-            .select('id, display_name, title, company, style_hint, icp_focus, language')
-            .eq('user_id', sdrId)
-            .eq('organization_id', userData.organization_id)
-            .eq('is_default', true)
-            .eq('is_active', true)
-            .maybeSingle(),
-          supabase
-            .from('users')
-            .select('years_experience, seniority, expertise_area')
-            .eq('id', sdrId)
-            .single(),
-        ])
-
-        sdrAssignments.push({
-          sdr_id: sdrId,
-          sender_profile_id: profile?.id ?? null,
-          sender_profile: profile ? {
-            id: profile.id,
-            display_name: profile.display_name,
-            title: profile.title,
-            company: profile.company,
-            style_hint: profile.style_hint ?? null,
-            icp_focus: profile.icp_focus ?? [],
-            language: profile.language ?? 'en',
-            years_experience: sdrCtx?.years_experience ?? null,
-            seniority: sdrCtx?.seniority ?? null,
-            expertise_area: sdrCtx?.expertise_area ?? null,
-          } : null,
-        })
-      }
-    } else {
-      const { data: selfCtx } = await supabase
+    const [{ data: profile }, { data: sdrCtx }] = await Promise.all([
+      supabase
+        .from('sender_profiles')
+        .select('id, display_name, title, company, style_hint, icp_focus, language')
+        .eq('user_id', sdrId)
+        .eq('organization_id', userData.organization_id)
+        .eq('is_default', true)
+        .eq('is_active', true)
+        .maybeSingle(),
+      supabase
         .from('users')
         .select('years_experience, seniority, expertise_area')
-        .eq('id', user.id)
-        .single()
-      sdrAssignments = [{
-        sdr_id: user.id,
-        sender_profile_id: null,
-        sender_profile: null,
-      }]
-      // attach context to a dummy profile shape if we have it
-      if (selfCtx) {
-        sdrAssignments[0].sender_profile = {
-          id: null,
-          display_name: '',
-          title: '',
-          company: '',
-          style_hint: null,
-          icp_focus: [],
-          language: 'en',
-          years_experience: selfCtx.years_experience ?? null,
-          seniority: selfCtx.seniority ?? null,
-          expertise_area: selfCtx.expertise_area ?? null,
-        }
-      }
-    }
+        .eq('id', sdrId)
+        .maybeSingle(),
+    ])
+
+    const sdrAssignments: BuiltAssignment[] = [{
+      sdr_id: sdrId,
+      sender_profile_id: profile?.id ?? null,
+      sender_profile: profile ? {
+        id: profile.id,
+        display_name: profile.display_name,
+        title: profile.title,
+        company: profile.company,
+        style_hint: profile.style_hint ?? null,
+        icp_focus: profile.icp_focus ?? [],
+        language: profile.language ?? 'en',
+        years_experience: sdrCtx?.years_experience ?? null,
+        seniority: sdrCtx?.seniority ?? null,
+        expertise_area: sdrCtx?.expertise_area ?? null,
+      } : null,
+    }]
 
     const admin = adminClient()
 
@@ -175,19 +150,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: runError?.message ?? 'Failed to create run' }, { status: 500 })
     }
 
-    // Create SDR assignment records
-    if (sdrAssignments.length > 0) {
-      await admin.from('run_sdr_assignments').insert(
-        sdrAssignments.map(a => ({
-          run_id: run.id,
-          sdr_id: a.sdr_id,
-          sender_profile_id: a.sender_profile_id,
-          assigned_markets: sdr_market_assignments?.[a.sdr_id]?.length
-            ? sdr_market_assignments[a.sdr_id]
-            : allMarkets,
-        }))
-      )
-    }
+    // Single SDR assignment record for this run
+    await admin.from('run_sdr_assignments').insert({
+      run_id: run.id,
+      sdr_id: sdrId,
+      sender_profile_id: sdrAssignments[0].sender_profile_id,
+      assigned_markets: allMarkets,
+    })
 
     // Call Railway scraper backend
     if (SCRAPER_API) {
@@ -202,9 +171,7 @@ export async function POST(req: NextRequest) {
           sdr_id: a.sdr_id,
           sender_profile_id: a.sender_profile_id ?? null,
           sender_profile: a.sender_profile ?? null,
-          assigned_markets: sdr_market_assignments?.[a.sdr_id]?.length
-            ? sdr_market_assignments[a.sdr_id]
-            : allMarkets,
+          assigned_markets: allMarkets,
         })),
         apify_token: org.apify_token,
         anthropic_key: org.anthropic_key,

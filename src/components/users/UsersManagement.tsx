@@ -183,11 +183,6 @@ export function UsersManagement() {
     } finally { setDeactivating(false) }
   }
 
-  async function handleScraperToggle(u: UserWithArea) {
-    await createClient().from('users').update({ scraper_access: !u.scraper_access }).eq('id', u.id)
-    fetchUsers()
-  }
-
   async function confirmUnassign() {
     if (!unassignUser) return
     setUnassigning(true)
@@ -286,17 +281,6 @@ export function UsersManagement() {
                       {u.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </div>
-                  {!isAdminUser && (
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={u.scraper_access ?? false}
-                        onChange={() => handleScraperToggle(u)}
-                        style={{ accentColor: 'var(--crm-accent)', width: 13, height: 13 }}
-                      />
-                      <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>Scraper</span>
-                    </label>
-                  )}
                   <span style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginLeft: 'auto' }}>
                     {format(new Date(u.created_at), 'MMM d, yyyy')}
                   </span>

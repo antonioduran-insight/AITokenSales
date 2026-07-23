@@ -28,17 +28,18 @@ export async function POST(
   }
 
   const { id: runId } = await params
-  const { sdr_ids, sdr_market_assignments, manual } = await req.json()
+  const body = await req.json()
+  const { market, manual } = body
+  // One SDR per run. `sdr_ids` still accepted (first element wins) for safety.
+  const sdrId: string | null = body.sdr_id ?? body.sdr_ids?.[0] ?? null
 
-  if (!Array.isArray(sdr_ids) || sdr_ids.length === 0) {
-    return NextResponse.json({ error: 'sdr_ids is required' }, { status: 400 })
+  if (!sdrId) {
+    return NextResponse.json({ error: 'sdr_id is required' }, { status: 400 })
   }
 
-  // Manual mode = "Send to another SDR" from History. Re-assigns the run's leads
-  // to additional SDRs on demand: it targets ALL leads of the run (not just the
-  // not-yet-exported ones), does NOT flip exported_to_crm, and does NOT bump the
-  // monthly counter — so the same lead can reach an extra SDR without being
-  // double-counted against the quota or removed from its original SDR.
+  // Manual mode = "Send to another SDR" from History: it targets ALL leads of
+  // the run (not just the not-yet-exported ones) and MOVES them to the chosen
+  // SDR, without flipping exported_to_crm or bumping the monthly counter.
   const isManual = manual === true
 
   const admin = adminClient()
@@ -72,28 +73,27 @@ export async function POST(
     )
   }
 
-  // Fetch each SDR's primary area so prospects land in their kanban
-  const { data: sdrRows } = await admin
+  // Fetch the SDR's primary area so the prospects land in their kanban
+  const { data: sdrRow } = await admin
     .from('users')
     .select('id, area_id, organization_id')
-    .in('id', sdr_ids)
+    .eq('id', sdrId)
     .eq('organization_id', userData.organization_id)
+    .maybeSingle()
 
-  const validSdrs = (sdrRows ?? []).filter(s => sdr_ids.includes(s.id))
-  if (validSdrs.length === 0) {
-    return NextResponse.json({ error: 'No valid SDRs' }, { status: 400 })
+  if (!sdrRow) {
+    return NextResponse.json({ error: 'SDR not found in this organization' }, { status: 400 })
   }
-  const areaBySdr: Record<string, string | null> = {}
-  for (const s of validSdrs) areaBySdr[s.id] = s.area_id ?? null
+  const sdrAreaId: string | null = sdrRow.area_id ?? null
 
   const leadUrls = [...new Set(leads.map(l => l.linkedin_url).filter(Boolean))] as string[]
   const existingKeys = new Set<string>()
 
   if (isManual) {
-    // "Send to another SDR" = distribute & MOVE. Wipe every existing scraper
-    // copy of these leads first so they end up ONLY on the newly chosen SDRs
-    // (split evenly), with no leftover duplicate on their previous owner. This
-    // also cleans up any duplicate rows from earlier sends.
+    // "Send to another SDR" = MOVE. Wipe every existing scraper copy of these
+    // leads first so they end up ONLY on the newly chosen SDR, with no leftover
+    // duplicate on their previous owner. Also cleans up duplicate rows from
+    // earlier sends.
     for (let i = 0; i < leadUrls.length; i += 200) {
       await admin
         .from('prospects')
@@ -118,39 +118,21 @@ export async function POST(
     }
   }
 
-  // Auto-assign (run completion): honour the SDR the scraper tagged each lead
-  // with (lead.sdr_id) when that SDR is in the run; otherwise round-robin.
-  //
-  // Manual "Send to another SDR": ALWAYS round-robin across the chosen SDRs so
-  // the run's leads are SPLIT evenly among them (each lead → exactly one SDR).
-  // We never copy every lead to every selected SDR — that would put the same
-  // lead on multiple people's boards and break the no-duplicate rule.
-  const validSdrIds = new Set(validSdrs.map(s => s.id))
-  let fallbackCursor = 0
-
+  // A run has exactly ONE SDR: every generated lead goes to them. No splitting,
+  // no round-robin, and the scraper's per-lead sdr_id tag is irrelevant here.
   const prospectRows: Record<string, unknown>[] = []
-  const assignedCount: Record<string, number> = {}
-  for (const s of validSdrs) assignedCount[s.id] = 0
+  let assigned = 0
   let skipped = 0
 
   const tempMap: Record<string, string> = { 'HOT': 'Hot', 'WARM': 'Warm', 'COLD': 'Cold' }
 
   for (const lead of leads) {
-    let sdrId: string
-    if (!isManual && lead.sdr_id && validSdrIds.has(lead.sdr_id)) {
-      sdrId = lead.sdr_id
-    } else {
-      sdrId = validSdrs[fallbackCursor % validSdrs.length].id
-      fallbackCursor++
-    }
-
-    // Skip if this SDR already has this lead (avoids the duplicate-key error and
-    // keeps the original assignment intact).
+    // Skip if this SDR already has this lead (avoids the duplicate-key error).
     const key = `${lead.linkedin_url ?? ''}||${sdrId}`
     if (lead.linkedin_url && existingKeys.has(key)) { skipped++; continue }
     if (lead.linkedin_url) existingKeys.add(key) // guard against in-batch dupes
 
-    assignedCount[sdrId] = (assignedCount[sdrId] ?? 0) + 1
+    assigned++
 
     prospectRows.push({
       name: lead.full_name,
@@ -168,7 +150,7 @@ export async function POST(
       market: lead.market ?? null,
       source: 'scraper',
       outreach_status: 'new',
-      area_id: areaBySdr[sdrId],
+      area_id: sdrAreaId,
       assigned_to: sdrId,
       organization_id: userData.organization_id,
       flag_tomorrow: false,
@@ -196,23 +178,21 @@ export async function POST(
     }
   }
 
-  // Manual re-sends don't touch run history, the export flag, or the quota —
-  // they only push extra copies of the leads onto additional SDR boards.
+  // Manual re-sends don't touch the export flag or the quota — they only move
+  // the leads onto a different SDR's board.
   if (!isManual) {
-    // Record per-SDR assignment counts (and the markets each SDR was assigned)
-    for (const sdrId of Object.keys(assignedCount)) {
-      await admin
-        .from('run_sdr_assignments')
-        .upsert(
-          {
-            run_id: runId,
-            sdr_id: sdrId,
-            leads_assigned: assignedCount[sdrId],
-            assigned_markets: sdr_market_assignments?.[sdrId] ?? [],
-          },
-          { onConflict: 'run_id,sdr_id' }
-        )
-    }
+    // Record the run's single SDR assignment + how many leads it got
+    await admin
+      .from('run_sdr_assignments')
+      .upsert(
+        {
+          run_id: runId,
+          sdr_id: sdrId,
+          leads_assigned: inserted,
+          assigned_markets: market ? [market] : [],
+        },
+        { onConflict: 'run_id,sdr_id' }
+      )
 
     // Mark these leads as exported so they aren't assigned twice
     await admin
@@ -242,5 +222,5 @@ export async function POST(
       )
   }
 
-  return NextResponse.json({ ok: true, assigned: inserted, skipped, per_sdr: assignedCount })
+  return NextResponse.json({ ok: true, sdr_id: sdrId, assigned: inserted, queued: assigned, skipped })
 }

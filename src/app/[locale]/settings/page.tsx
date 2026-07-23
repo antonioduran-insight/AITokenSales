@@ -617,7 +617,6 @@ function ScraperTab() {
       .select('*')
       .eq('role', 'sdr')
       .eq('is_active', true)
-      .eq('scraper_access', true)
       .then(({ data }) => { if (data) setSdrs(data as User[]) })
 
     fetch('/api/sender-profiles')

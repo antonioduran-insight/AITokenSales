@@ -108,19 +108,20 @@ function RunPageInner() {
   const [available, setAvailable] = useState(MAX_INT)
   const [unlimited, setUnlimited] = useState(true)
   const [sdrs, setSdrs] = useState<SdrOption[]>([])
-  const [selectedSdrIds, setSelectedSdrIds] = useState<string[]>([])
+  // Exactly ONE SDR per run — every generated lead goes to them.
+  const [selectedSdrId, setSelectedSdrId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [cancelling, setCancelling] = useState(false)
 
   // Kept for the auto-assign call after completion (survives restore)
-  const runMetaRef = useRef<{ market: string | null; sdrIds: string[] }>({ market: null, sdrIds: [] })
+  const runMetaRef = useRef<{ market: string | null; sdrId: string | null }>({ market: null, sdrId: null })
 
   const effectiveMax = unlimited ? MAX_LEADS : Math.min(MAX_LEADS, available)
   const overLimit = !unlimited && totalLeads > available
 
   const canRun = !!market && selectedCombos.length > 0 && totalLeads >= MIN_LEADS &&
-    selectedSdrIds.length > 0 && !overLimit
+    !!selectedSdrId && !overLimit
 
   // ── Load combos + quota ──
   useEffect(() => {
@@ -143,7 +144,8 @@ function RunPageInner() {
   useEffect(() => {
     const supabase = createClient()
     Promise.all([
-      supabase.from('users').select('*').eq('role', 'sdr').eq('is_active', true).eq('scraper_access', true),
+      // scraper_access is no longer a concept — any active SDR can receive a run.
+      supabase.from('users').select('*').eq('role', 'sdr').eq('is_active', true),
       supabase.from('areas').select('id, name'),
       supabase.from('user_areas').select('user_id, area_id'),
     ]).then(([usersRes, areasRes, uaRes]) => {
@@ -169,7 +171,7 @@ function RunPageInner() {
   // ── Restore an in-progress run when returning to the page ──
   useEffect(() => {
     const fromQuery = searchParams.get('run')
-    let stored: { runId: string; market: string | null; sdrIds: string[] } | null = null
+    let stored: { runId: string; market: string | null; sdrId: string | null } | null = null
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
       if (raw) stored = JSON.parse(raw)
@@ -179,7 +181,7 @@ function RunPageInner() {
     if (!id) return
     runMetaRef.current = {
       market: stored?.market ?? null,
-      sdrIds: stored?.sdrIds ?? [],
+      sdrId: stored?.sdrId ?? null,
     }
     setRunId(id)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -190,18 +192,18 @@ function RunPageInner() {
   const visibleSdrs = marketArea ? sdrs.filter(s => s.areaNames.includes(marketArea)) : sdrs
 
   // ── Auto-assign once the run completes (idempotent) ──
+  // Every lead of the run goes to the single SDR picked in Phase 1.
   const runAssign = useCallback(async (id: string) => {
     const meta = runMetaRef.current
+    if (!meta.sdrId) { setAssignState('done'); return }
     setAssignState('assigning')
     try {
       await fetch(`/api/runs/${id}/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sdr_ids: meta.sdrIds,
-          sdr_market_assignments: Object.fromEntries(
-            meta.sdrIds.map(sid => [sid, meta.market ? [meta.market] : []])
-          ),
+          sdr_id: meta.sdrId,
+          market: meta.market,
         }),
       })
     } catch { /* the exported flag keeps this safe on retry */ }
@@ -228,12 +230,12 @@ function RunPageInner() {
         try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
         if (data.status === 'completed' && !assignFiredRef.current) {
           assignFiredRef.current = true
-          const alreadyAssigned = (data.run_sdr_assignments ?? []).some(a => a.leads_assigned > 0)
-          if (alreadyAssigned || runMetaRef.current.sdrIds.length === 0) {
-            setAssignState('done')
-          } else {
-            await runAssign(id)
-          }
+          // Always run the assign. We must NOT use run_sdr_assignments as proof
+          // that leads were pushed to the CRM: the Railway backend writes those
+          // rows itself when the run finishes, which used to make us skip the
+          // assign entirely — the leads never reached prospects. The endpoint is
+          // idempotent (it skips leads the SDR already has), so calling it is safe.
+          await runAssign(id)
         }
       }
     } catch { /* transient */ }
@@ -250,15 +252,12 @@ function RunPageInner() {
   // ── Config actions ──
   function selectMarket(m: string) {
     setMarket(m)
-    setSelectedSdrIds([])
+    setSelectedSdrId(null)
     setSubmitError(null)
   }
   function toggleCombo(code: string) {
     setSelectedCombos(prev => prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code])
     setSubmitError(null)
-  }
-  function toggleSdr(id: string) {
-    setSelectedSdrIds(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id])
   }
   function setLeads(v: number) {
     let x = v
@@ -267,18 +266,8 @@ function RunPageInner() {
     setTotalLeads(x)
   }
 
-  function previewDist(): Record<string, number> {
-    const out: Record<string, number> = {}
-    const n = selectedSdrIds.length
-    if (!n) return out
-    const base = Math.floor(totalLeads / n)
-    const rem = totalLeads % n
-    selectedSdrIds.forEach((id, i) => { out[id] = base + (i < rem ? 1 : 0) })
-    return out
-  }
-
   async function handleRun() {
-    if (!canRun || submitting) return
+    if (!canRun || submitting || !selectedSdrId) return
     setSubmitting(true)
     setSubmitError(null)
     try {
@@ -290,10 +279,8 @@ function RunPageInner() {
           markets: [market],
           combos: selectedCombos,
           total_leads: totalLeads,
-          sdr_ids: selectedSdrIds,
-          sdr_market_assignments: Object.fromEntries(
-            selectedSdrIds.map(id => [id, market ? [market] : []])
-          ),
+          // One SDR per run — every generated lead goes to them.
+          sdr_id: selectedSdrId,
         }),
       })
       const data = await res.json()
@@ -301,9 +288,9 @@ function RunPageInner() {
         setSubmitError(typeof data.error === 'string' ? data.error : JSON.stringify(data))
         return
       }
-      runMetaRef.current = { market, sdrIds: selectedSdrIds }
+      runMetaRef.current = { market, sdrId: selectedSdrId }
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ runId: data.run_id, market, sdrIds: selectedSdrIds }))
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ runId: data.run_id, market, sdrId: selectedSdrId }))
       } catch { /* ignore */ }
       assignFiredRef.current = false
       setSummary(null)
@@ -324,7 +311,7 @@ function RunPageInner() {
     setSummary(null)
     setAssignState('idle')
     setSelectedCombos([])
-    setSelectedSdrIds([])
+    setSelectedSdrId(null)
     setSubmitError(null)
     setCancelling(false)
     // Clear the ?run= query param if present
@@ -353,8 +340,6 @@ function RunPageInner() {
   const isCompleted = !!runId && status === 'completed' && assignState === 'done'
   const isCancelled = !!runId && status === 'cancelled'
   const isFailed = !!runId && status === 'failed'
-
-  const dist = previewDist()
 
   // ══════════════════════════════════════════
   return (
@@ -448,42 +433,36 @@ function RunPageInner() {
             )}
           </div>
 
-          {/* SDRs — only after a market is picked */}
+          {/* SDR — a single recipient; every lead this run generates goes to them */}
           {market && (
             <div style={S.card}>
-              <span style={S.label}>Assign to SDRs</span>
+              <span style={S.label}>Assign to SDR</span>
               {visibleSdrs.length === 0 ? (
                 <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
-                  No SDRs with scraper access are assigned to {market}. Assign an area to an SDR in Settings → Users.
+                  No SDRs are assigned to {market}. Assign an area to an SDR in Settings → Users.
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {visibleSdrs.map(sdr => {
-                    const sel = selectedSdrIds.includes(sdr.id)
+                    const sel = selectedSdrId === sdr.id
                     return (
                       <label key={sdr.id} style={{
                         display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 8, cursor: 'pointer',
                         backgroundColor: sel ? '#6C63FF10' : 'var(--crm-surface-raised)',
                         border: `1px solid ${sel ? '#6C63FF40' : 'var(--crm-border)'}`, transition: 'all .15s',
                       }}>
-                        <input type="checkbox" checked={sel} onChange={() => toggleSdr(sdr.id)}
+                        <input type="radio" name="sdr" checked={sel} onChange={() => setSelectedSdrId(sdr.id)}
                           style={{ accentColor: 'var(--crm-accent)', width: 15, height: 15 }} />
                         <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--crm-text-primary)' }}>{sdr.full_name}</span>
                         <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>{sdr.areaNames.join(', ') || '—'}</span>
-                        {sel && dist[sdr.id] != null && (
-                          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-accent)' }}>{dist[sdr.id]}</span>
-                        )}
                       </label>
                     )
                   })}
                 </div>
               )}
-              {selectedSdrIds.length > 0 && (
+              {selectedSdrId && (
                 <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: '12px 0 0' }}>
-                  {totalLeads} leads → {selectedSdrIds.map(id => {
-                    const s = sdrs.find(x => x.id === id)
-                    return `${s?.full_name ?? '?'}: ${dist[id] ?? 0}`
-                  }).join(' · ')}
+                  {totalLeads} leads → {sdrs.find(s => s.id === selectedSdrId)?.full_name ?? '?'}
                 </p>
               )}
             </div>
@@ -603,27 +582,23 @@ function RunPageInner() {
             ))}
           </div>
 
-          {/* Per-SDR distribution bars */}
-          {(summary.run_sdr_assignments ?? []).some(a => a.leads_assigned > 0) && (
-            <div style={{ width: '100%', maxWidth: 420, marginBottom: 28 }}>
-              <span style={S.label}>Distribution</span>
-              {(() => {
-                const rows = (summary.run_sdr_assignments ?? []).filter(a => a.leads_assigned > 0)
-                const maxN = Math.max(1, ...rows.map(a => a.leads_assigned))
-                return rows.map(a => (
-                  <div key={a.sdr_id} style={{ marginBottom: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                      <span style={{ color: 'var(--crm-text-primary)', fontWeight: 600 }}>{a.user?.full_name ?? a.sdr_id}</span>
-                      <span style={{ color: 'var(--crm-text-secondary)', fontWeight: 700 }}>{a.leads_assigned}</span>
-                    </div>
-                    <div style={{ height: 8, backgroundColor: 'var(--crm-surface-raised)', borderRadius: 4, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${(a.leads_assigned / maxN) * 100}%`, backgroundColor: 'var(--accent)', borderRadius: 4 }} />
-                    </div>
-                  </div>
-                ))
-              })()}
-            </div>
-          )}
+          {/* The single SDR this run was assigned to */}
+          {(() => {
+            // run_sdr_assignments always holds this run's single SDR (inserted
+            // when the run is created), joined with the user's name.
+            const a = (summary.run_sdr_assignments ?? [])[0]
+            const name = a?.user?.full_name ?? sdrs.find(s => s.id === a?.sdr_id)?.full_name
+            if (!name) return null
+            return (
+              <div style={{ ...S.card, width: '100%', maxWidth: 420, marginBottom: 28, textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Assigned to</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--crm-text-primary)' }}>{name}</div>
+                <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)', marginTop: 4 }}>
+                  {a?.leads_assigned ?? summary.leads_generated} leads
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Actions */}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>

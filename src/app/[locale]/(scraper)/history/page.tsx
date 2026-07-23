@@ -65,7 +65,7 @@ function HistoryContent() {
 
   // "Send to another SDR" picker state
   const [sendOpenFor, setSendOpenFor] = useState<string | null>(null);
-  const [sendSelected, setSendSelected] = useState<string[]>([]);
+  const [sendSelected, setSendSelected] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sendMsg, setSendMsg] = useState<string | null>(null);
 
@@ -87,7 +87,7 @@ function HistoryContent() {
   useEffect(() => {
     const supabase = createClient();
     Promise.all([
-      supabase.from('users').select('*').eq('role', 'sdr').eq('is_active', true).eq('scraper_access', true),
+      supabase.from('users').select('*').eq('role', 'sdr').eq('is_active', true),
       supabase.from('areas').select('id, name'),
       supabase.from('user_areas').select('user_id, area_id'),
     ]).then(([usersRes, areasRes, uaRes]) => {
@@ -172,30 +172,20 @@ function HistoryContent() {
   }
 
   async function handleSend(runId: string, market: string) {
-    if (sendSelected.length === 0 || sending) return;
+    if (!sendSelected || sending) return;
     setSending(true);
     setSendMsg(null);
     try {
       const res = await fetch(`/api/runs/${runId}/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          manual: true,
-          sdr_ids: sendSelected,
-          sdr_market_assignments: Object.fromEntries(sendSelected.map(id => [id, market ? [market] : []])),
-        }),
+        body: JSON.stringify({ manual: true, sdr_id: sendSelected, market }),
       });
       const data = await res.json();
       if (!res.ok) { setSendMsg(data.error ?? 'Send failed'); return; }
-      // Show the real split, e.g. "Distributed 18 leads · Lauren 5 · Antonio 5 · …"
-      const perSdr = (data.per_sdr ?? {}) as Record<string, number>;
-      const breakdown = Object.entries(perSdr)
-        .filter(([, n]) => n > 0)
-        .map(([id, n]) => `${sdrs.find(s => s.id === id)?.full_name ?? 'SDR'} ${n}`)
-        .join(' · ');
-      const suffix = data.skipped > 0 ? ` (${data.skipped} already assigned, skipped)` : '';
-      setSendMsg(`Distributed ${data.assigned} leads${breakdown ? ` · ${breakdown}` : ''}${suffix}.`);
-      setSendSelected([]);
+      const name = sdrs.find(s => s.id === sendSelected)?.full_name ?? 'SDR';
+      setSendMsg(`Moved ${data.assigned} leads to ${name}.`);
+      setSendSelected(null);
       setSendOpenFor(null);
       // Refresh detail so re-sent SDRs drop out of the picker / assignee column.
       setRunLeads(prev => { const c = { ...prev }; delete c[runId]; return c; });
@@ -224,9 +214,12 @@ function HistoryContent() {
         const generated = (run.run_sdr_assignments ?? []).reduce((s, a) => s + (a.leads_assigned || 0), 0);
         const statusLabel = isActive ? 'Running' : run.status.charAt(0).toUpperCase() + run.status.slice(1);
         const runArea: AreaName | null = inferAreaFromCountry(run.market);
-        // Any SDR covering the run's market can be picked. "Send to another SDR"
-        // moves + splits the leads across the chosen SDRs, so it's fine to
-        // include SDRs who already hold some (they just get redistributed).
+        // A run belongs to exactly ONE SDR.
+        const assignment = (run.run_sdr_assignments ?? [])[0];
+        const assignedSdrName = assignment?.user?.full_name
+          ?? sdrs.find(s => s.id === assignment?.sdr_id)?.full_name
+          ?? null;
+        // Any SDR covering the run's market can receive the leads.
         const pickableSdrs = runArea ? sdrs.filter(s => s.areaNames.includes(runArea)) : sdrs;
 
         return (
@@ -272,9 +265,14 @@ function HistoryContent() {
                   <>
                     {/* Toolbar */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
-                      <span style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{leads.length} leads</span>
+                      <span style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>
+                        {leads.length} leads
+                        {assignedSdrName && (
+                          <> · Assigned to: <strong style={{ color: 'var(--crm-text-primary)' }}>{assignedSdrName}</strong></>
+                        )}
+                      </span>
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={() => { setSendOpenFor(sendOpenFor === run.id ? null : run.id); setSendSelected([]); setSendMsg(null); }}
+                        <button onClick={() => { setSendOpenFor(sendOpenFor === run.id ? null : run.id); setSendSelected(null); setSendMsg(null); }}
                           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--crm-text-secondary)', border: '1px solid var(--crm-border)', padding: '7px 14px', borderRadius: 8, background: 'transparent', cursor: 'pointer' }}>
                           <Send size={13} /> Send to another SDR
                         </button>
@@ -289,18 +287,18 @@ function HistoryContent() {
                     {sendOpenFor === run.id && (
                       <div style={{ backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 10, padding: 14, marginBottom: 14 }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--crm-text-primary)' }}>Send this run&apos;s leads to additional SDRs</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--crm-text-primary)' }}>Move this run&apos;s leads to another SDR</span>
                           <button onClick={() => setSendOpenFor(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)' }}><X size={15} /></button>
                         </div>
                         {pickableSdrs.length === 0 ? (
-                          <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: 0 }}>No SDRs with scraper access for {run.market}.</p>
+                          <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: 0 }}>No SDRs assigned to {run.market}.</p>
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
                             {pickableSdrs.map(sdr => {
-                              const sel = sendSelected.includes(sdr.id);
+                              const sel = sendSelected === sdr.id;
                               return (
                                 <label key={sdr.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, cursor: 'pointer', backgroundColor: sel ? '#6C63FF10' : 'var(--crm-surface)', border: `1px solid ${sel ? '#6C63FF40' : 'var(--crm-border)'}` }}>
-                                  <input type="checkbox" checked={sel} onChange={() => setSendSelected(p => p.includes(sdr.id) ? p.filter(x => x !== sdr.id) : [...p, sdr.id])} style={{ accentColor: 'var(--crm-accent)' }} />
+                                  <input type="radio" name={`send-${run.id}`} checked={sel} onChange={() => setSendSelected(sdr.id)} style={{ accentColor: 'var(--crm-accent)' }} />
                                   <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{sdr.full_name}</span>
                                   <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>{sdr.areaNames.join(', ')}</span>
                                 </label>
@@ -309,9 +307,9 @@ function HistoryContent() {
                           </div>
                         )}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <button onClick={() => handleSend(run.id, run.market)} disabled={sendSelected.length === 0 || sending}
-                            style={{ fontSize: 12, fontWeight: 700, color: '#FFF', backgroundColor: sendSelected.length === 0 || sending ? 'var(--crm-border)' : 'var(--crm-accent)', padding: '8px 18px', borderRadius: 8, border: 'none', cursor: sendSelected.length === 0 || sending ? 'default' : 'pointer' }}>
-                            {sending ? 'Sending…' : `Send to ${sendSelected.length || ''} SDR${sendSelected.length !== 1 ? 's' : ''}`.trim()}
+                          <button onClick={() => handleSend(run.id, run.market)} disabled={!sendSelected || sending}
+                            style={{ fontSize: 12, fontWeight: 700, color: '#FFF', backgroundColor: !sendSelected || sending ? 'var(--crm-border)' : 'var(--crm-accent)', padding: '8px 18px', borderRadius: 8, border: 'none', cursor: !sendSelected || sending ? 'default' : 'pointer' }}>
+                            {sending ? 'Moving…' : 'Move leads'}
                           </button>
                           {sendMsg && <span style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>{sendMsg}</span>}
                         </div>

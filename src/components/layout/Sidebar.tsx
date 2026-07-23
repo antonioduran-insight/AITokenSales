@@ -154,8 +154,8 @@ export function Sidebar({ user }: Props) {
           )
         })}
 
-        {/* Scraper section — admin always, SDR only if scraper_access = true */}
-        {(isAdmin || (user?.role === 'sdr' && user?.scraper_access)) && !isImpersonating && (
+        {/* Scraper section — admin only. SDRs never have scraper access. */}
+        {isAdmin && !isImpersonating && (
           <>
             <div style={{ margin: '10px 4px 6px', display: 'flex', alignItems: 'center', gap: 8 }}>
               {!collapsed && <div style={{ flex: 1, height: 1, backgroundColor: 'var(--crm-border)' }} />}

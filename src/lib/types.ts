@@ -45,7 +45,9 @@ export interface User {
   area_id: string | null
   organization_id: string | null
   is_active: boolean
-  scraper_access: boolean
+  /** @deprecated SDRs never have scraper access — only the org admin runs the
+   *  scraper. The column still exists in the DB but nothing reads it. */
+  scraper_access?: boolean
   created_at: string
   years_experience?: number | null
   seniority?: string | null
