@@ -286,6 +286,10 @@ For each feature, verify behavior for all applicable roles:
 - [ ] Navigating away and returning to New Run restores the in-progress run
 - [ ] Closing and reopening the tab restores it too (state comes from the DB)
 - [ ] **Cancel run** sets the run to cancelled and shows the "Run cancelled" state
+- [ ] **Transient status-read failures never show the failure screen** — block `/api/runs/[id]` (DevTools → Network → block request, or throttle to offline) for a few polls: the ring keeps spinning and a "📡 Reconnecting…" banner appears instead of "This run failed". Unblock it and confirm polling picks the run back up without any user action.
+- [ ] While in the reconnecting state, `localStorage`'s `scraper_active_run` pointer is **not** cleared — reload the tab mid-block and the run still restores
+- [ ] A genuine 404 (bad run id) or 403 (wrong org) **does** stop polling and route to the failure screen — these are the only cases that should
+- [ ] **Recovery from a lost local pointer**: manually clear `localStorage.scraper_active_run`, then visit `/run?run=<a completed run's id>` — the leads should still get assigned (confirms the `run_sdr_assignments[0].sdr_id` server-side fallback in `runAssign()`)
 
 **New Run — Phase 3 (result) — CRITICAL**
 - [ ] Shows total generated + HOT/WARM/COLD cards

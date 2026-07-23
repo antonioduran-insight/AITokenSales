@@ -100,9 +100,18 @@ function RunPageInner() {
   const [runId, setRunId] = useState<string | null>(null)
   const [summary, setSummary] = useState<RunSummary | null>(null)
   const [assignState, setAssignState] = useState<'idle' | 'assigning' | 'done'>('idle')
-  // Set when the run's status can't be read at all (404/403, or repeated
-  // network failures). Without this the screen sat on "Initializing…" forever.
+  // Authoritative failure to read this run at all: 404 (run doesn't exist /
+  // isn't ours) or 403 (lost access). These stop polling for good and route
+  // to the failure screen — there's nothing to wait out.
   const [pollError, setPollError] = useState<string | null>(null)
+  // Transient status-read failures (network blip, backend redeploy, 5xx).
+  // These do NOT stop polling and do NOT route to the failure screen — a
+  // Railway redeploy can take minutes, and treating that gap as "the run
+  // failed" used to make the user hit "Try Again", which wiped the
+  // localStorage pointer while the run went on to complete successfully in
+  // the background with nothing left to catch it. We just keep polling and
+  // show a soft "reconnecting" indicator instead.
+  const [reconnecting, setReconnecting] = useState(false)
   const assignFiredRef = useRef(false)
   const pollFailuresRef = useRef(0)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -217,21 +226,29 @@ function RunPageInner() {
   const visibleSdrs = region ? sdrs.filter(s => s.areaNames.includes(region)) : sdrs
 
   // ── Auto-assign once the run completes (idempotent) ──
-  // Every lead of the run goes to the single SDR picked in Phase 1.
-  const runAssign = useCallback(async (id: string) => {
+  // Every lead of the run goes to the single SDR picked in Phase 1. `data` is
+  // the freshly-polled run, used as a fallback source of truth: if the local
+  // in-memory/localStorage pointer is gone (tab was closed and reopened days
+  // later, or a second run overwrote the single localStorage slot), the SDR
+  // and markets are still recoverable from run_sdr_assignments — the row the
+  // server wrote when the run was created — so this isn't purely
+  // client-memory-dependent.
+  const runAssign = useCallback(async (id: string, data: RunSummary) => {
     const meta = runMetaRef.current
-    if (!meta.sdrId) { setAssignState('done'); return }
+    const serverAssignment = data.run_sdr_assignments?.[0]
+    const sdrId = meta.sdrId ?? serverAssignment?.sdr_id ?? null
+    if (!sdrId) { setAssignState('done'); return }
+    const markets = meta.markets.length > 0
+      ? meta.markets
+      : (data.markets?.length ? data.markets : (data.market ? [data.market] : []))
     setAssignState('assigning')
     try {
       await fetch(`/api/runs/${id}/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sdr_id: meta.sdrId,
-          markets: meta.markets,
-        }),
+        body: JSON.stringify({ sdr_id: sdrId, markets }),
       })
-    } catch { /* the exported flag keeps this safe on retry */ }
+    } catch { /* the assignFiredRef guard is per-mount only — a retry on next poll cycle isn't automatic, but revisiting this page is (see fallback above) */ }
     // Re-fetch the final summary (now with per-SDR counts)
     try {
       const res = await fetch(`/api/runs/${id}`)
@@ -242,42 +259,43 @@ function RunPageInner() {
 
   // ── Poll the run while it's active ──
   const poll = useCallback(async (id: string) => {
-    const stopPolling = () => {
-      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
-    }
-
     let data: RunSummary
     try {
       const res = await fetch(`/api/runs/${id}`)
       if (!res.ok) {
-        // Never swallow this: a persistently failing status read used to leave
-        // the screen on "Initializing…" forever with no feedback.
         const body = await res.json().catch(() => ({}))
         const msg = typeof body?.error === 'string' ? body.error : `Status request failed (${res.status})`
-        pollFailuresRef.current += 1
-        if (res.status === 404 || res.status === 403 || pollFailuresRef.current >= 3) {
-          stopPolling()
+        if (res.status === 404 || res.status === 403) {
+          // Authoritative: the run doesn't exist or we lost access. Nothing to
+          // wait out — stop for real and show the failure screen.
+          if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+          setReconnecting(false)
           setPollError(msg)
+          return
         }
+        // Transient (5xx, gateway errors during a backend redeploy, etc.).
+        // Keep polling — do NOT stop, do NOT touch localStorage, do NOT show
+        // the failure screen. The run may complete on the backend while we're
+        // in this gap; when it does, the next successful poll picks it up.
+        pollFailuresRef.current += 1
+        if (pollFailuresRef.current >= 3) setReconnecting(true)
         return
       }
       data = await res.json()
-    } catch (e) {
+    } catch {
       pollFailuresRef.current += 1
-      if (pollFailuresRef.current >= 3) {
-        stopPolling()
-        setPollError(e instanceof Error ? e.message : 'Could not reach the server')
-      }
+      if (pollFailuresRef.current >= 3) setReconnecting(true)
       return
     }
 
     pollFailuresRef.current = 0
+    setReconnecting(false)
     setPollError(null)
     setSummary(data)
 
     try {
       if (!ACTIVE.has(data.status)) {
-        stopPolling()
+        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
         // Only a successful run clears the persisted pointer. A failed or
         // cancelled run keeps it so reloading the page still shows the error
         // instead of dropping the user back on an empty form.
@@ -291,7 +309,7 @@ function RunPageInner() {
           // rows itself when the run finishes, which used to make us skip the
           // assign entirely — the leads never reached prospects. The endpoint is
           // idempotent (it skips leads the SDR already has), so calling it is safe.
-          await runAssign(id)
+          await runAssign(id, data)
         }
       }
     } catch { /* transient */ }
@@ -356,6 +374,7 @@ function RunPageInner() {
       assignFiredRef.current = false
       pollFailuresRef.current = 0
       setPollError(null)
+      setReconnecting(false)
       setSummary(null)
       setAssignState('idle')
       setRunId(data.run_id)
@@ -372,6 +391,7 @@ function RunPageInner() {
     assignFiredRef.current = false
     pollFailuresRef.current = 0
     setPollError(null)
+    setReconnecting(false)
     setRunId(null)
     setSummary(null)
     setAssignState('idle')
@@ -573,9 +593,18 @@ function RunPageInner() {
                 strokeDasharray="300" style={{ animation: 'scraper-ring 1.6s ease-in-out infinite' }} />
             </svg>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: 15, fontWeight: 700, padding: 20 }}>
-              {assignState === 'assigning' ? 'Distributing leads to SDRs…' : (STATUS_LABEL[status] ?? 'Working…')}
+              {reconnecting ? '📡 Reconnecting…' : assignState === 'assigning' ? 'Distributing leads to SDRs…' : (STATUS_LABEL[status] ?? 'Working…')}
             </div>
           </div>
+
+          {reconnecting && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 9, backgroundColor: '#F59E0B15', border: '1px solid #F59E0B40', marginBottom: 20, maxWidth: 420 }}>
+              <AlertCircle size={14} color="#F59E0B" style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: 'var(--crm-text-secondary)', lineHeight: 1.5 }}>
+                Having trouble reaching the server — this often happens during a brief backend redeploy. Still checking every few seconds; the run keeps processing in the background either way.
+              </span>
+            </div>
+          )}
 
           {/* 4-dot progress */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 24 }}>

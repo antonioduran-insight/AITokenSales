@@ -118,6 +118,10 @@ Global Admin has its own theme system (`GlobalAdminThemeContext`) with dark/ligh
 
 **Never treat `run_sdr_assignments` as proof of assignment** — the Railway backend writes those rows itself when a run completes. Gating the auto-assign on `leads_assigned > 0` caused leads to never reach `prospects`. The assign endpoint is idempotent, so always call it.
 
+**Auto-assign is entirely client-driven — there is no server-side cron or webhook.** New Run's `poll()` (`src/app/[locale]/(scraper)/run/page.tsx`) is the only thing that calls `/api/runs/[id]/assign` on completion. Two consequences to keep in mind when touching this file:
+- A transient status-read failure (backend redeploy, 5xx, network blip) must **never** be treated the same as `status === 'failed'`. Only an authoritative 404/403 (run gone / access lost) should stop polling and route to the failure screen; everything else should keep polling indefinitely and show a soft "reconnecting" state. Conflating the two used to make a mid-run Railway redeploy look like a failure, and clicking "Try Again" would wipe the `localStorage` run pointer while the run went on to complete in the background with nothing left to catch it.
+- `runAssign()` must not depend solely on `localStorage`/in-memory state for the `sdr_id` — that state is lost if the tab is closed and reopened later, or if a second run overwrites the single `scraper_active_run` localStorage key. Always fall back to `run_sdr_assignments[0].sdr_id` from the freshly-polled run (already returned by `GET /api/runs/[id]`), since that row is written server-side when the run is created.
+
 **Prospect uniqueness** — `prospects` is unique on `(organization_id, linkedin_url, assigned_to)`, so the same lead can live on more than one SDR's board. Insert paths must tolerate `23505` row-by-row rather than aborting a whole batch.
 
 **Anthropic base URL** — Always run values through `normalizeAnthropicBaseUrl()` (`src/lib/utils/anthropic.ts`) before persisting. The backend appends `/v1` itself; storing a URL that already ends in `/v1` produces the `/v1/v1` error.
