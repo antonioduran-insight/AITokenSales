@@ -199,8 +199,10 @@ Every org has isolated data via `organization_id` columns and RLS. Admins are sc
 
 | Proxy | Auth | Notes |
 |---|---|---|
-| `/api/scraper/[...path]` | none (legacy passthrough) | Generic reverse proxy to the Python backend |
+| `/api/scraper/[...path]` | session + `admin` | Verifies `/runs/{id}` ownership, injects `organization_id` |
 | `/api/bridge/[...path]` | session + `admin` + `bridge` add-on | Injects `organization_id` and `apify_token` server-side |
+
+Both overwrite any client-supplied `organization_id` with the session-derived value.
 
 ---
 
@@ -417,7 +419,7 @@ npm run lint         # ESLint
 | POST | `/api/runs/[id]/assign` | admin | Assign the run's leads to its SDR (`manual: true` moves them) |
 | GET | `/api/runs/quota` | any | Lead quota for the current billing period |
 | GET/POST | `/api/scraper-combos` | admin | Search strategies enabled per org |
-| ALL | `/api/scraper/[...path]` | none | Legacy passthrough proxy |
+| ALL | `/api/scraper/[...path]` | admin | Proxy to the Python backend; checks run ownership, injects `organization_id` |
 
 ### Bridge
 

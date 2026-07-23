@@ -76,8 +76,10 @@ Two proxies to the external Python backend:
 
 | Proxy | Auth | Behaviour |
 |---|---|---|
-| `/api/scraper/[...path]` | none | Legacy passthrough. `scraperApi` in `src/lib/scraper-api.ts` wraps it. |
+| `/api/scraper/[...path]` | session + `admin` | Verifies any `/runs/{id}` in the path belongs to the caller's org, then injects `organization_id`. `scraperApi` in `src/lib/scraper-api.ts` wraps it. |
 | `/api/bridge/[...path]` | session + `admin` + `bridge` add-on | Injects `organization_id` (and `apify_token` on `POST /bridge/runs`) server-side. `bridgeApi` in `src/lib/bridge-api.ts` wraps it. |
+
+Both proxies **overwrite** `organization_id` in the query and body with the session-derived value — never trust a client-supplied one. Any new backend-facing route must follow the same shape.
 
 **When adding an add-on-gated feature, gate it in the UI *and* re-check server-side in the API route.** UI gating is never the security boundary.
 
