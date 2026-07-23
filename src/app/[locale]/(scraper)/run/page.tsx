@@ -45,6 +45,8 @@ interface RunSummary {
   markets?: string[]
   total_leads_requested: number
   leads_generated: number
+  /** Set by the backend when the run fails — surfaced verbatim in the UI. */
+  error_message?: string | null
   temperature: { HOT: number; WARM: number; COLD: number }
   run_sdr_assignments?: Array<{ sdr_id: string; leads_assigned: number; user?: { full_name: string } }>
 }
@@ -96,7 +98,11 @@ function RunPageInner() {
   const [runId, setRunId] = useState<string | null>(null)
   const [summary, setSummary] = useState<RunSummary | null>(null)
   const [assignState, setAssignState] = useState<'idle' | 'assigning' | 'done'>('idle')
+  // Set when the run's status can't be read at all (404/403, or repeated
+  // network failures). Without this the screen sat on "Initializing…" forever.
+  const [pollError, setPollError] = useState<string | null>(null)
   const assignFiredRef = useRef(false)
+  const pollFailuresRef = useRef(0)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // ── Phase 1: config ──
@@ -217,17 +223,48 @@ function RunPageInner() {
 
   // ── Poll the run while it's active ──
   const poll = useCallback(async (id: string) => {
+    const stopPolling = () => {
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+    }
+
+    let data: RunSummary
     try {
       const res = await fetch(`/api/runs/${id}`)
-      if (!res.ok) return
-      const data: RunSummary = await res.json()
-      setSummary(data)
+      if (!res.ok) {
+        // Never swallow this: a persistently failing status read used to leave
+        // the screen on "Initializing…" forever with no feedback.
+        const body = await res.json().catch(() => ({}))
+        const msg = typeof body?.error === 'string' ? body.error : `Status request failed (${res.status})`
+        pollFailuresRef.current += 1
+        if (res.status === 404 || res.status === 403 || pollFailuresRef.current >= 3) {
+          stopPolling()
+          setPollError(msg)
+        }
+        return
+      }
+      data = await res.json()
+    } catch (e) {
+      pollFailuresRef.current += 1
+      if (pollFailuresRef.current >= 3) {
+        stopPolling()
+        setPollError(e instanceof Error ? e.message : 'Could not reach the server')
+      }
+      return
+    }
 
+    pollFailuresRef.current = 0
+    setPollError(null)
+    setSummary(data)
+
+    try {
       if (!ACTIVE.has(data.status)) {
-        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
-        // Terminal state: drop the persisted pointer so a fresh visit starts at
-        // the config form (the current view keeps its in-memory result state).
-        try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
+        stopPolling()
+        // Only a successful run clears the persisted pointer. A failed or
+        // cancelled run keeps it so reloading the page still shows the error
+        // instead of dropping the user back on an empty form.
+        if (data.status === 'completed') {
+          try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
+        }
         if (data.status === 'completed' && !assignFiredRef.current) {
           assignFiredRef.current = true
           // Always run the assign. We must NOT use run_sdr_assignments as proof
@@ -293,6 +330,8 @@ function RunPageInner() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ runId: data.run_id, market, sdrId: selectedSdrId }))
       } catch { /* ignore */ }
       assignFiredRef.current = false
+      pollFailuresRef.current = 0
+      setPollError(null)
       setSummary(null)
       setAssignState('idle')
       setRunId(data.run_id)
@@ -307,6 +346,8 @@ function RunPageInner() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
     try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
     assignFiredRef.current = false
+    pollFailuresRef.current = 0
+    setPollError(null)
     setRunId(null)
     setSummary(null)
     setAssignState('idle')
@@ -336,10 +377,16 @@ function RunPageInner() {
   // ── Derived phase ──
   const status = summary?.status ?? 'pending'
   const isConfig = !runId
-  const isRunning = !!runId && (ACTIVE.has(status) || (status === 'completed' && assignState !== 'done'))
-  const isCompleted = !!runId && status === 'completed' && assignState === 'done'
-  const isCancelled = !!runId && status === 'cancelled'
-  const isFailed = !!runId && status === 'failed'
+  // A failed status OR an unreadable status both end the progress screen —
+  // otherwise an unknown/unreachable run sits on "Initializing…" indefinitely.
+  const isFailed = !!runId && (status === 'failed' || !!pollError)
+  const isCancelled = !!runId && !isFailed && status === 'cancelled'
+  const isRunning = !!runId && !isFailed && !isCancelled &&
+    (ACTIVE.has(status) || (status === 'completed' && assignState !== 'done'))
+  const isCompleted = !!runId && !isFailed && status === 'completed' && assignState === 'done'
+
+  // Prefer the backend's own explanation, then the status-read failure.
+  const failureDetail = summary?.error_message?.trim() || pollError || null
 
   // ══════════════════════════════════════════
   return (
@@ -626,10 +673,29 @@ function RunPageInner() {
               <circle cx="12" cy="12" r="10" /><path d="M15 9l-6 6M9 9l6 6" />
             </svg>
           </div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>This run failed. Contact support.</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px', textAlign: 'center' }}>This run failed</h2>
+
+          {failureDetail ? (
+            <div style={{ width: '100%', maxWidth: 520, marginTop: 4 }}>
+              <div style={{ backgroundColor: '#EF444410', border: '1px solid #EF444430', borderRadius: 10, padding: '12px 14px' }}>
+                <p style={{ fontSize: 11, color: '#EF4444', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 6px' }}>Error</p>
+                <p style={{ fontSize: 12.5, color: 'var(--crm-text-secondary)', margin: 0, fontFamily: 'monospace', lineHeight: 1.6, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                  {failureDetail}
+                </p>
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: '10px 0 0', textAlign: 'center' }}>
+                If this keeps happening, send this message to support.
+              </p>
+            </div>
+          ) : (
+            <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0, textAlign: 'center' }}>
+              No error details were reported. Contact support.
+            </p>
+          )}
+
           <button onClick={resetToConfig}
-            style={{ marginTop: 16, fontSize: 13, fontWeight: 700, color: '#FFF', backgroundColor: 'var(--crm-accent)', padding: '11px 22px', borderRadius: 9, border: 'none', cursor: 'pointer' }}>
-            New Run
+            style={{ marginTop: 20, fontSize: 13, fontWeight: 700, color: '#FFF', backgroundColor: 'var(--crm-accent)', padding: '11px 22px', borderRadius: 9, border: 'none', cursor: 'pointer' }}>
+            Try Again
           </button>
         </div>
       )}
