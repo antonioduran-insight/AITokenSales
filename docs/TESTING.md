@@ -266,13 +266,19 @@ For each feature, verify behavior for all applicable roles:
 
 **New Run — Phase 1 (config)**
 - [ ] Header shows the remaining leads for the current **billing period** (not calendar month)
-- [ ] Market chips are single-select; changing market clears the SDR selection
+- [ ] All 4 region chips (Asia / Latin America / Europe / USA) are always visible and single-select; picking one clears the SDR selection
+- [ ] Selecting a region shows a checkbox grid of only that region's **org-activated** countries, **all preselected**
+- [ ] Unchecking a country removes it from the run; "Select all" / "Clear" toggles the whole region
+- [ ] Switching to a different region resets the checkboxes to that region's full activated list (doesn't keep the old region's picks)
+- [ ] A region with zero activated countries shows "No markets configured for [Region]" with a working link to Settings, and Run stays disabled
 - [ ] Only search strategies enabled for the org appear
 - [ ] Total Leads: presets 100–500 work; +/− steps by 10; clamps to min 10 / max 500
 - [ ] Asking for more than the remaining allowance disables the Run button and shows the limit message
 - [ ] **SDR picker is single-select (radio)** — you cannot select two
-- [ ] Only SDRs covering the selected market are listed
-- [ ] Run button stays disabled until market + strategy + leads + one SDR are all set
+- [ ] SDR list is filtered by **region**, not by the individual countries checked — an SDR in that region appears regardless of which specific countries are ticked
+- [ ] Run button stays disabled until region + ≥1 country + strategy + leads + one SDR are all set
+- [ ] `POST /api/runs` payload has `markets` as the array of checked countries and `region` as the picked region
+- [ ] `run_sdr_assignments.assigned_markets` holds the full country array — check both right after creation AND after the run completes (the auto-assign call used to collapse this to a single country on completion; confirm it still has all of them post-completion)
 
 **New Run — Phase 2 (progress)**
 - [ ] Ring animates; centre text matches the backend status mapping
@@ -358,11 +364,10 @@ For each feature, verify behavior for all applicable roles:
 - [ ] As admin of Org A, `GET /api/organizations/{org-B-id}/markets` returns 403
 - [ ] `PUT` with an unknown market id returns 400 and writes nothing
 
-**New Run / Bridge**
+**Bridge** (still single-market — see the New Run checklist above for the region + multi-country picker)
 - [ ] Market chips show only the org's activated countries, grouped by region
-- [ ] With zero markets configured: both show "No markets configured" with a working link to Settings
+- [ ] With zero markets configured: shows "No markets configured" with a working link to Settings
 - [ ] Market stays single-select
-- [ ] Picking a market still filters the SDR list; a country with no area mapping shows all SDRs rather than none
 
 ### Settings
 

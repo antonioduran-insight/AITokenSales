@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { combos, market, markets, total_leads } = body
+    const { combos, market, markets, total_leads, region } = body
     // One SDR per run. `sdr_ids` is still accepted (first element wins) so an
     // older client can't silently send a multi-SDR payload.
     const sdrId: string | null = body.sdr_id ?? body.sdr_ids?.[0] ?? null
@@ -139,6 +139,10 @@ export async function POST(req: NextRequest) {
         combos,
         market: primaryMarket,
         markets: allMarkets,
+        // The region the admin picked in Phase 1 (e.g. 'latin_america').
+        // Reference/logging only — `markets` (the specific countries) is what
+        // drives SDR assignment and the backend scrape.
+        region: region ?? null,
         total_leads_requested: total_leads,
         sdr_count: sdrAssignments.length,
         plan: org.plan,
@@ -166,6 +170,7 @@ export async function POST(req: NextRequest) {
         organization_id: userData.organization_id,
         plan: org.plan,
         markets: allMarkets,
+        region: region ?? null,
         combos: combos as string[],
         total_leads: Number(total_leads),
         // What the org sells / to whom — lets the backend personalise messages.

@@ -6,10 +6,9 @@ import { useLocale } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { Minus, Plus, AlertCircle, XCircle } from 'lucide-react'
 import type { User, ScraperComboMaster, AreaName } from '@/lib/types'
-import { inferAreaFromCountry } from '@/lib/utils/area-inference'
+import { areaLabel } from '@/lib/utils/area-inference'
 import { useOrgMarkets } from '@/lib/hooks/useOrgMarkets'
-import { useMarketAreaMap } from '@/lib/hooks/useMarketAreaMap'
-import { MarketSelect } from '@/components/markets/MarketSelect'
+import { RegionMarketSelect } from '@/components/markets/RegionMarketSelect'
 
 // An SDR row plus the flattened set of area names it covers (primary area_id +
 // any user_areas), used to filter the SDR list by the selected market.
@@ -45,6 +44,7 @@ interface RunSummary {
   status: string
   market: string
   markets?: string[]
+  region?: string | null
   total_leads_requested: number
   leads_generated: number
   /** Set by the backend when the run fails — surfaced verbatim in the UI. */
@@ -109,8 +109,13 @@ function RunPageInner() {
 
   // ── Phase 1: config ──
   const { markets: orgMarkets, loading: marketsLoading, error: marketsError } = useOrgMarkets()
-  const marketAreaMap = useMarketAreaMap()
-  const [market, setMarket] = useState<string | null>(null)
+  // A run targets exactly one region; the admin then picks which of that
+  // region's activated countries to include (all preselected by default).
+  const [region, setRegion] = useState<AreaName | null>(null)
+  const [selectedMarkets, setSelectedMarkets] = useState<string[]>([])
+  // Tracks which region we've already auto-selected "all countries" for, so a
+  // manual uncheck isn't clobbered by a late-arriving markets fetch.
+  const autoAppliedRegionRef = useRef<AreaName | null>(null)
   const [activeCombos, setActiveCombos] = useState<ScraperComboMaster[]>([])
   const [combosLoading, setCombosLoading] = useState(true)
   const [selectedCombos, setSelectedCombos] = useState<string[]>([])
@@ -125,13 +130,13 @@ function RunPageInner() {
   const [cancelling, setCancelling] = useState(false)
 
   // Kept for the auto-assign call after completion (survives restore)
-  const runMetaRef = useRef<{ market: string | null; sdrId: string | null }>({ market: null, sdrId: null })
+  const runMetaRef = useRef<{ markets: string[]; sdrId: string | null }>({ markets: [], sdrId: null })
 
   const effectiveMax = unlimited ? MAX_LEADS : Math.min(MAX_LEADS, available)
   const overLimit = !unlimited && totalLeads > available
 
-  const canRun = !!market && selectedCombos.length > 0 && totalLeads >= MIN_LEADS &&
-    !!selectedSdrId && !overLimit
+  const canRun = !!region && selectedMarkets.length > 0 && selectedCombos.length > 0 &&
+    totalLeads >= MIN_LEADS && !!selectedSdrId && !overLimit
 
   // ── Load combos + quota ──
   useEffect(() => {
@@ -149,6 +154,16 @@ function RunPageInner() {
       })
       .catch(() => {})
   }, [])
+
+  // Default to "all activated countries in this region" once the org's
+  // markets have loaded. Guarded so a manual uncheck by the admin isn't
+  // overwritten by a markets fetch that resolves after the click.
+  useEffect(() => {
+    if (!region || marketsLoading) return
+    if (autoAppliedRegionRef.current === region) return
+    setSelectedMarkets(orgMarkets.filter(m => m.region === region).map(m => m.name))
+    autoAppliedRegionRef.current = region
+  }, [region, marketsLoading, orgMarkets])
 
   // ── Load SDRs + the areas they cover ──
   useEffect(() => {
@@ -181,7 +196,7 @@ function RunPageInner() {
   // ── Restore an in-progress run when returning to the page ──
   useEffect(() => {
     const fromQuery = searchParams.get('run')
-    let stored: { runId: string; market: string | null; sdrId: string | null } | null = null
+    let stored: { runId: string; markets?: string[]; sdrId: string | null } | null = null
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
       if (raw) stored = JSON.parse(raw)
@@ -190,16 +205,16 @@ function RunPageInner() {
     const id = fromQuery ?? stored?.runId ?? null
     if (!id) return
     runMetaRef.current = {
-      market: stored?.market ?? null,
+      markets: stored?.markets ?? [],
       sdrId: stored?.sdrId ?? null,
     }
     setRunId(id)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Market → area mapping. "Global" (or no market) → null → show every SDR.
-  const marketArea: AreaName | null = inferAreaFromCountry(market, marketAreaMap)
-  const visibleSdrs = marketArea ? sdrs.filter(s => s.areaNames.includes(marketArea)) : sdrs
+  // SDR eligibility is by REGION, not by the individual countries picked
+  // within it — the region is chosen explicitly, so no inference is needed.
+  const visibleSdrs = region ? sdrs.filter(s => s.areaNames.includes(region)) : sdrs
 
   // ── Auto-assign once the run completes (idempotent) ──
   // Every lead of the run goes to the single SDR picked in Phase 1.
@@ -213,7 +228,7 @@ function RunPageInner() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sdr_id: meta.sdrId,
-          market: meta.market,
+          markets: meta.markets,
         }),
       })
     } catch { /* the exported flag keeps this safe on retry */ }
@@ -291,10 +306,15 @@ function RunPageInner() {
   }, [runId])
 
   // ── Config actions ──
-  function selectMarket(m: string) {
-    setMarket(m)
+  function selectRegion(r: AreaName) {
+    setRegion(r)
+    // Force the auto-select effect to re-run for the newly chosen region.
+    autoAppliedRegionRef.current = null
     setSelectedSdrId(null)
     setSubmitError(null)
+  }
+  function toggleMarket(name: string) {
+    setSelectedMarkets(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name])
   }
   function toggleCombo(code: string) {
     setSelectedCombos(prev => prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code])
@@ -316,8 +336,8 @@ function RunPageInner() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          market,
-          markets: [market],
+          markets: selectedMarkets,
+          region,
           combos: selectedCombos,
           total_leads: totalLeads,
           // One SDR per run — every generated lead goes to them.
@@ -329,9 +349,9 @@ function RunPageInner() {
         setSubmitError(typeof data.error === 'string' ? data.error : JSON.stringify(data))
         return
       }
-      runMetaRef.current = { market, sdrId: selectedSdrId }
+      runMetaRef.current = { markets: selectedMarkets, sdrId: selectedSdrId }
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ runId: data.run_id, market, sdrId: selectedSdrId }))
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ runId: data.run_id, markets: selectedMarkets, sdrId: selectedSdrId }))
       } catch { /* ignore */ }
       assignFiredRef.current = false
       pollFailuresRef.current = 0
@@ -355,6 +375,9 @@ function RunPageInner() {
     setRunId(null)
     setSummary(null)
     setAssignState('idle')
+    setRegion(null)
+    setSelectedMarkets([])
+    autoAppliedRegionRef.current = null
     setSelectedCombos([])
     setSelectedSdrId(null)
     setSubmitError(null)
@@ -405,15 +428,17 @@ function RunPageInner() {
             </p>
           </div>
 
-          {/* Market — only the countries this org activated in Settings */}
+          {/* Market — pick a region, then which of its activated countries to include */}
           <div style={S.card}>
             <span style={S.label}>Market</span>
-            <MarketSelect
+            <RegionMarketSelect
               markets={orgMarkets}
               loading={marketsLoading}
               error={marketsError}
-              value={market}
-              onChange={selectMarket}
+              region={region}
+              onRegionChange={selectRegion}
+              selectedMarkets={selectedMarkets}
+              onToggleMarket={toggleMarket}
             />
           </div>
 
@@ -487,12 +512,12 @@ function RunPageInner() {
           </div>
 
           {/* SDR — a single recipient; every lead this run generates goes to them */}
-          {market && (
+          {region && (
             <div style={S.card}>
               <span style={S.label}>Assign to SDR</span>
               {visibleSdrs.length === 0 ? (
                 <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
-                  No SDRs are assigned to {market}. Assign an area to an SDR in Settings → Users.
+                  No SDRs are assigned to {areaLabel(region)}. Assign an area to an SDR in Settings → Users.
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

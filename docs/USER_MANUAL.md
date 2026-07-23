@@ -457,7 +457,7 @@ New Run is a three-phase flow on a single page. The sidebar stays visible throug
 
 The header shows how many leads you have left in the current billing period.
 
-1. **Market** — the countries your org activated in Settings → Markets, grouped by region. Pick one (single-select); it filters the SDR list below. If nothing appears, no markets are configured yet — the screen links straight to Settings.
+1. **Market** — two steps. First pick one **region** (Asia / Latin America / Europe / USA — always all four, single-select; a run can't mix regions). Then, below it, every country your org activated in that region (Settings → Markets) appears with a checkbox, **all preselected by default** — uncheck any you want to exclude from this run, or leave them all on to search the whole region. If the org hasn't activated any country in that region yet, you'll see "No markets configured for [Region]" with a link straight to Settings. The region (not the individual countries) is what filters the SDR list below.
 2. **Search Strategy** — choose one or more strategies (only the ones enabled for your org in Settings → Scraper appear).
 3. **Total Leads** — presets 100–500, or use the input with the +/− buttons (steps of 10, minimum 10, maximum 500). If you ask for more than your remaining allowance, the Run button is disabled and shows the limit.
 4. **Assign to SDR** — pick **exactly one** SDR. Every lead this run generates goes to them, with messages personalised from their sender profile. Only SDRs covering the selected market are listed.

@@ -227,6 +227,8 @@ export interface RunRecord {
   combos: string[]
   market: string
   markets?: string[]
+  /** Region picked in New Run Phase 1 (e.g. 'latin_america') — reference/logging only. */
+  region?: string | null
   total_leads_requested: number
   sdr_count: number
   plan: string

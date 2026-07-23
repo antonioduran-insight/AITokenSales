@@ -114,6 +114,8 @@ Global Admin has its own theme system (`GlobalAdminThemeContext`) with dark/ligh
 
 **One SDR per scraper run** — A run has exactly one recipient. `POST /api/runs` and `/api/runs/[id]/assign` take **`sdr_id` (singular)**; `sdr_ids[0]` is still accepted defensively. There is no round-robin or split — every lead goes to that SDR. Exactly one `run_sdr_assignments` row per run.
 
+**New Run market picker is region-first** — Phase 1 picks one region (`AreaName`), then multi-selects specific countries within it (all preselected from the org's activated markets, admin can uncheck). `POST /api/runs` takes `markets: string[]` (the checked countries) and `region` (reference/logging only, stored on `runs.region`). SDR eligibility filters on `region` directly — never re-infer it from a country name when the region was already explicitly chosen. `assigned_markets` on `run_sdr_assignments` must receive the full `markets` array both at creation **and** when `/api/runs/[id]/assign` re-upserts it on completion — sending only `market` (singular) there silently collapses a multi-country run down to one country.
+
 **Never treat `run_sdr_assignments` as proof of assignment** — the Railway backend writes those rows itself when a run completes. Gating the auto-assign on `leads_assigned > 0` caused leads to never reach `prospects`. The assign endpoint is idempotent, so always call it.
 
 **Prospect uniqueness** — `prospects` is unique on `(organization_id, linkedin_url, assigned_to)`, so the same lead can live on more than one SDR's board. Insert paths must tolerate `23505` row-by-row rather than aborting a whole batch.

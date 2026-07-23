@@ -32,6 +32,13 @@ export async function POST(
   const { market, manual } = body
   // One SDR per run. `sdr_ids` still accepted (first element wins) for safety.
   const sdrId: string | null = body.sdr_id ?? body.sdr_ids?.[0] ?? null
+  // New Run's Phase 1 now picks several countries within one region. Prefer
+  // the full array; fall back to the legacy singular `market` (still sent by
+  // History's "Send to another SDR", which only ever moves within one run's
+  // original market).
+  const assignedMarkets: string[] = Array.isArray(body.markets) && body.markets.length
+    ? body.markets
+    : (market ? [market] : [])
 
   if (!sdrId) {
     return NextResponse.json({ error: 'sdr_id is required' }, { status: 400 })
@@ -189,7 +196,7 @@ export async function POST(
           run_id: runId,
           sdr_id: sdrId,
           leads_assigned: inserted,
-          assigned_markets: market ? [market] : [],
+          assigned_markets: assignedMarkets,
         },
         { onConflict: 'run_id,sdr_id' }
       )
