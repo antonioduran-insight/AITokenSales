@@ -80,6 +80,57 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
       body.apify_token = org.apify_token
     }
 
+    // Batch-confirming candidates generates personalised partnership messages,
+    // so the backend needs the org's Anthropic credentials and Bridge context —
+    // all resolved here so none of them travel through the browser.
+    if (pathStr === '/bridge/candidates/confirm-batch') {
+      const { data: org } = await admin
+        .from('organizations')
+        .select('anthropic_key, anthropic_base_url, anthropic_model, bridge_context')
+        .eq('id', orgId)
+        .single()
+
+      if (!org?.anthropic_key) {
+        return NextResponse.json(
+          { error: 'Anthropic key must be configured in Settings → Scraper before confirming candidates.' },
+          { status: 400 }
+        )
+      }
+      body.anthropic_key = org.anthropic_key
+      body.anthropic_base_url = org.anthropic_base_url ?? null
+      body.anthropic_model = org.anthropic_model ?? null
+      body.bridge_context = org.bridge_context ?? ''
+
+      // The SDR must belong to this org — never take the client's word for it.
+      const sdrId = typeof body.sdr_id === 'string' ? body.sdr_id : null
+      if (!sdrId) {
+        return NextResponse.json({ error: 'sdr_id is required' }, { status: 400 })
+      }
+      const { data: sdr } = await admin
+        .from('users')
+        .select('id')
+        .eq('id', sdrId)
+        .eq('organization_id', orgId)
+        .eq('is_active', true)
+        .maybeSingle()
+      if (!sdr) {
+        return NextResponse.json({ error: 'SDR not found in this organization' }, { status: 400 })
+      }
+
+      // Resolve the SDR's default sender profile so the client never has to.
+      if (!body.sender_profile_id) {
+        const { data: profile } = await admin
+          .from('sender_profiles')
+          .select('id')
+          .eq('user_id', sdrId)
+          .eq('organization_id', orgId)
+          .eq('is_default', true)
+          .eq('is_active', true)
+          .maybeSingle()
+        body.sender_profile_id = profile?.id ?? null
+      }
+    }
+
     init.body = JSON.stringify(body)
   }
 

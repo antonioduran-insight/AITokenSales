@@ -6,6 +6,7 @@ import {
   type SeedList, type BridgeRun, type BridgeCandidate, type BridgeLog, type VerificationStatus,
 } from '@/lib/bridge-api'
 import { Plus, X, ExternalLink, Check, Ban, RotateCcw, AlertCircle, Handshake } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import { useOrgMarkets } from '@/lib/hooks/useOrgMarkets'
 import { MarketSelect } from '@/components/markets/MarketSelect'
 
@@ -83,6 +84,16 @@ export default function BridgePage() {
   const [filter, setFilter] = useState<'all' | VerificationStatus>('all')
   const [updating, setUpdating] = useState<string | null>(null)
 
+  // ── Batch confirmation ──
+  // Bridge is not tied to scraper access or assigned markets, so any active SDR
+  // in the org can receive candidates.
+  const [sdrs, setSdrs] = useState<Array<{ id: string; full_name: string }>>([])
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [batchSdrId, setBatchSdrId] = useState('')
+  const [confirming, setConfirming] = useState(false)
+  const [batchMsg, setBatchMsg] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
   // ── History ──
   const [runs, setRuns] = useState<BridgeRun[]>([])
   const [loadingRuns, setLoadingRuns] = useState(false)
@@ -95,6 +106,16 @@ export default function BridgePage() {
   }, [])
 
   useEffect(() => { loadSeedLists() }, [loadSeedLists])
+
+  // Any active SDR in the org can receive Bridge candidates.
+  useEffect(() => {
+    createClient()
+      .from('users')
+      .select('id, full_name')
+      .eq('role', 'sdr')
+      .eq('is_active', true)
+      .then(({ data }) => setSdrs(data ?? []))
+  }, [])
 
   const loadCandidates = useCallback(async (id: string) => {
     setLoadingCandidates(true)
@@ -200,10 +221,49 @@ export default function BridgePage() {
     } finally { setUpdating(null) }
   }
 
+  function toggleSelected(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+    setBatchMsg(null)
+  }
+
+  function toggleExpanded(id: string) {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  // Confirm every selected candidate at once; the backend generates a
+  // personalised message per candidate and assigns them all to the chosen SDR.
+  async function confirmBatch() {
+    if (selectedIds.size === 0 || !batchSdrId || confirming) return
+    setConfirming(true); setError(null); setBatchMsg(null)
+    const ids = [...selectedIds]
+    try {
+      await bridgeApi.confirmBatch(ids, batchSdrId)
+      const name = sdrs.find(s => s.id === batchSdrId)?.full_name ?? 'the SDR'
+      setBatchMsg(`${ids.length} candidate${ids.length !== 1 ? 's' : ''} confirmed and assigned to ${name}.`)
+      setSelectedIds(new Set())
+      // Re-read so the confirmed rows show their generated messages.
+      if (runId) await loadCandidates(runId)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setConfirming(false)
+    }
+  }
+
   function openRun(r: BridgeRun) {
     setRunId(r.id)
     setRun(r)
     setTab('search')
+    setSelectedIds(new Set())
+    setBatchMsg(null)
     loadCandidates(r.id)
   }
 
@@ -481,6 +541,56 @@ export default function BridgePage() {
                 </div>
               </div>
 
+              {batchMsg && (
+                <p style={{ fontSize: 13, color: '#22C55E', fontWeight: 600, margin: '0 0 12px' }}>✅ {batchMsg}</p>
+              )}
+
+              {/* Batch action bar — appears once something is selected */}
+              {selectedIds.size > 0 && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+                  padding: '12px 14px', marginBottom: 14, borderRadius: 10,
+                  backgroundColor: '#6C63FF12', border: '1px solid #6C63FF40',
+                  position: 'sticky', top: 12, zIndex: 5,
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text-primary)' }}>
+                    {selectedIds.size} candidate{selectedIds.size !== 1 ? 's' : ''} selected
+                  </span>
+
+                  <select value={batchSdrId} onChange={e => setBatchSdrId(e.target.value)} disabled={confirming}
+                    style={{ ...S.input, width: 'auto', minWidth: 190, padding: '7px 10px' }}>
+                    <option value="">Assign to SDR…</option>
+                    {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+                  </select>
+
+                  <button onClick={confirmBatch} disabled={!batchSdrId || confirming}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#FFF',
+                      backgroundColor: !batchSdrId || confirming ? 'var(--crm-border)' : '#22C55E',
+                      border: 'none', borderRadius: 8, padding: '9px 18px',
+                      cursor: !batchSdrId || confirming ? 'default' : 'pointer',
+                    }}>
+                    <Check size={14} /> Confirm &amp; Send Messages
+                  </button>
+
+                  <button onClick={() => setSelectedIds(new Set())} disabled={confirming}
+                    style={{ fontSize: 12, color: 'var(--crm-text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                    Clear
+                  </button>
+
+                  {confirming && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--crm-text-secondary)' }}>
+                      <span style={{
+                        width: 13, height: 13, borderRadius: '50%', flexShrink: 0,
+                        border: '2px solid var(--crm-border)', borderTopColor: 'var(--crm-accent)',
+                        animation: 'spin .8s linear infinite', display: 'inline-block',
+                      }} />
+                      Generating personalized messages for {selectedIds.size} candidate{selectedIds.size !== 1 ? 's' : ''}…
+                    </span>
+                  )}
+                </div>
+              )}
+
               {loadingCandidates ? (
                 <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>Loading candidates…</p>
               ) : shown.length === 0 ? (
@@ -493,9 +603,27 @@ export default function BridgePage() {
                     const sc = STATUS_COLORS[c.verification_status] ?? STATUS_COLORS.pending
                     const busy = updating === c.id
                     const isRejected = c.verification_status === 'rejected'
+                    const isConfirmed = c.verification_status === 'confirmed'
+                    const isPending = !isRejected && !isConfirmed
+                    const isSelected = selectedIds.has(c.id)
+                    const hasDetail = !!(c.custom1 || c.custom2 || c.assigned_to)
+                    const isOpen = expanded.has(c.id)
                     return (
-                      <div key={c.id} style={{ padding: '14px 16px', borderRadius: 10, backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)' }}>
+                      <div key={c.id} style={{
+                        padding: '14px 16px', borderRadius: 10, backgroundColor: 'var(--crm-surface-raised)',
+                        border: `1px solid ${isSelected ? '#6C63FF60' : 'var(--crm-border)'}`,
+                      }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                          {/* Only pending candidates can be batch-confirmed */}
+                          {isPending && (
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelected(c.id)}
+                              aria-label={`Select ${c.full_name ?? 'candidate'}`}
+                              style={{ accentColor: 'var(--crm-accent)', width: 16, height: 16, marginTop: 3, flexShrink: 0, cursor: 'pointer' }}
+                            />
+                          )}
                           <div style={{ flex: 1, minWidth: 220 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                               <span style={{ fontSize: 14, fontWeight: 700 }}>{c.full_name || '—'}</span>
@@ -529,25 +657,50 @@ export default function BridgePage() {
                               </button>
                             ) : (
                               <>
-                                <button onClick={() => setStatus(c, 'confirmed')} disabled={busy || c.verification_status === 'confirmed'} style={{
-                                  display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700,
-                                  color: '#FFF', backgroundColor: '#22C55E', border: 'none', borderRadius: 7, padding: '7px 14px',
-                                  cursor: busy || c.verification_status === 'confirmed' ? 'default' : 'pointer',
-                                  opacity: busy || c.verification_status === 'confirmed' ? 0.45 : 1,
-                                }}>
-                                  <Check size={13} /> Confirm
-                                </button>
-                                <button onClick={() => setStatus(c, 'rejected')} disabled={busy} style={{
-                                  display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700,
-                                  color: '#EF4444', background: 'transparent', border: '1px solid #EF444440', borderRadius: 7, padding: '7px 14px',
-                                  cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1,
-                                }}>
-                                  <Ban size={13} /> Reject
-                                </button>
+                                {isConfirmed && hasDetail && (
+                                  <button onClick={() => toggleExpanded(c.id)} style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600,
+                                    color: 'var(--crm-text-secondary)', background: 'transparent', border: '1px solid var(--crm-border)',
+                                    borderRadius: 7, padding: '6px 12px', cursor: 'pointer',
+                                  }}>
+                                    {isOpen ? 'Hide message' : 'View message'}
+                                  </button>
+                                )}
+                                {isPending && (
+                                  <button onClick={() => setStatus(c, 'rejected')} disabled={busy} style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700,
+                                    color: '#EF4444', background: 'transparent', border: '1px solid #EF444440', borderRadius: 7, padding: '7px 14px',
+                                    cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1,
+                                  }}>
+                                    <Ban size={13} /> Reject
+                                  </button>
+                                )}
                               </>
                             )}
                           </div>
                         </div>
+
+                        {/* Confirmed detail: who it went to + the generated messages */}
+                        {isConfirmed && isOpen && (
+                          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--crm-border)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>
+                              Assigned to:{' '}
+                              <strong style={{ color: 'var(--crm-text-primary)' }}>
+                                {sdrs.find(s => s.id === c.assigned_to)?.full_name ?? c.assigned_to ?? '—'}
+                              </strong>
+                            </div>
+                            {([['Connection request', c.custom1], ['Value message', c.custom2]] as const)
+                              .filter(([, v]) => !!v)
+                              .map(([label, v]) => (
+                                <div key={label}>
+                                  <div style={{ fontSize: 10, color: 'var(--crm-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>{label}</div>
+                                  <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: 'var(--crm-text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                                    {v}
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        )}
                       </div>
                     )
                   })}

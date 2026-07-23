@@ -164,6 +164,9 @@ export interface Organization {
   /** What the org sells and to whom — fed to the scraper so outreach messages
    *  can reference real products / focus. */
   company_context: string | null
+  /** What the org wants out of partnerships — fed to Bridge when generating
+   *  messages for confirmed candidates. */
+  bridge_context: string | null
   billing_day: number
   apify_token: string | null
   anthropic_key: string | null

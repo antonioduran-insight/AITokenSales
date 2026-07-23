@@ -310,9 +310,18 @@ For each feature, verify behavior for all applicable roles:
 - [ ] Save is blocked until a name and at least one populated source exist
 - [ ] Run a search: progress ring + logs poll every 3s
 - [ ] On completion, candidate count shown and candidates load
-- [ ] **Confirm** turns the candidate green and persists after reload
-- [ ] **Reject** turns it red and persists
+- [ ] **Reject** turns a candidate red and persists after reload
 - [ ] **Restore** on a rejected candidate returns it to Pending
+- [ ] Checkboxes appear **only** on pending candidates (not confirmed/rejected)
+- [ ] Action bar appears once ≥1 is selected, with the correct count
+- [ ] SDR dropdown lists **all active SDRs** of the org (not filtered by market or scraper access)
+- [ ] Confirm button stays disabled until an SDR is chosen
+- [ ] While confirming: "Generating personalized messages for X candidates…"
+- [ ] On success: "X candidates confirmed and assigned to [SDR]" and the rows become Confirmed
+- [ ] **View message** on a confirmed candidate shows custom1/custom2 and the assigned SDR
+- [ ] Batch confirm with **Bridge Context** empty still works (context is optional)
+- [ ] With no Anthropic key configured, confirm-batch returns a clear 400
+- [ ] Passing an `sdr_id` from another org returns 400 (the proxy validates it)
 - [ ] Filter chips (All / Pending / Confirmed / Rejected) show correct counts
 - [ ] **Past Searches** lists previous runs; opening one loads its candidates
 

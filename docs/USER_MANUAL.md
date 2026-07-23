@@ -385,6 +385,8 @@ When you close a deal:
 - **Logo** — click **Upload Logo** to upload an image (stored in Supabase Storage). Formats: PNG, JPG, GIF, SVG, WebP.
 - **Company Context** — free text describing what your company does, who you sell to, and any product or focus you want mentioned in outreach. This is sent to the scraper so generated messages reference your real offering.
   > Example: *"We sell AI-powered CRM software to B2B sales teams in Asia. Right now we're pushing our new automation feature — mention it when relevant."*
+- **Bridge Context** — what you're after in a partnership: what you offer as a partner, what you want in return, and which deal type to prioritise. Used when Bridge generates messages for confirmed candidates.
+  > Example: *"We're looking for reseller partners in the SaaS space who serve mid-market companies. We offer 20% commission and full onboarding support."*
 - **Domain Blacklist** — one domain or company name per line; blocks these from CSV imports and manual prospect creation
 
 Click **Save Changes** to apply — one button saves all of the above.
@@ -526,11 +528,20 @@ A seed list defines who you're looking for. Click **+ New Seed List**:
 
 Each candidate card shows name, company, title, location, a LinkedIn link and a short bio.
 
-| Action | Effect |
-|---|---|
-| **Confirm** (green) | Marks the candidate as a real partnership prospect |
-| **Reject** (red) | Discards the candidate |
-| **Restore** | Appears on rejected candidates — sends them back to Pending |
+**Rejecting** is one at a time: click **Reject** (red) on any pending candidate. **Restore** appears on rejected candidates and sends them back to Pending.
+
+**Confirming is done in batches**, because confirming also generates a personalised message for each candidate:
+
+1. Tick the checkbox on every pending candidate you want
+2. An action bar appears showing how many are selected
+3. Pick the **SDR** the candidates should go to (any active SDR in your org — Bridge is not restricted by market or scraper access)
+4. Click **Confirm & Send Messages**
+5. While it runs you'll see *"Generating personalized messages for X candidates…"*
+6. On completion: *"X candidates confirmed and assigned to [SDR]."*
+
+The messages are written using your **Bridge Context** from Settings, so fill that in first.
+
+On a confirmed candidate, click **View message** to see the generated connection request and value message, plus which SDR it was assigned to.
 
 Use the filter chips at the top (**All / Pending / Confirmed / Rejected**) to work through the list; each chip shows its count.
 

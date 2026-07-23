@@ -55,6 +55,11 @@ export interface BridgeCandidate {
   linkedin_url?: string
   bio?: string
   verification_status: VerificationStatus | string
+  /** SDR the candidate was assigned to when confirmed. */
+  assigned_to?: string | null
+  /** Personalised partnership messages generated on batch confirmation. */
+  custom1?: string | null
+  custom2?: string | null
 }
 
 export interface BridgeLog {
@@ -119,5 +124,16 @@ export const bridgeApi = {
     request<BridgeCandidate>(`/candidates/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ verification_status: status }),
+    }),
+
+  /**
+   * Confirm several candidates at once and generate a personalised message for
+   * each. `organization_id`, the Anthropic credentials, the Bridge context and
+   * the SDR's sender profile are all injected server-side by the proxy.
+   */
+  confirmBatch: (candidateIds: string[], sdrId: string) =>
+    request<{ confirmed?: number; candidates?: BridgeCandidate[] }>('/candidates/confirm-batch', {
+      method: 'POST',
+      body: JSON.stringify({ candidate_ids: candidateIds, sdr_id: sdrId }),
     }),
 }

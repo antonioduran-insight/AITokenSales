@@ -57,6 +57,7 @@ function OrgTab() {
   const [logoUrl, setLogoUrl] = useState('')
   const [blacklist, setBlacklist] = useState('')
   const [companyContext, setCompanyContext] = useState('')
+  const [bridgeContext, setBridgeContext] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -74,6 +75,7 @@ function OrgTab() {
         setLogoUrl(d.logo_url ?? '')
         setBlacklist(d.domain_blacklist ?? '')
         setCompanyContext(d.company_context ?? '')
+        setBridgeContext(d.bridge_context ?? '')
       })
   }, [])
 
@@ -82,7 +84,7 @@ function OrgTab() {
     const res = await fetch('/api/settings/organization', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, default_language: language, logo_url: logoUrl || null, domain_blacklist: blacklist || null, company_context: companyContext }),
+      body: JSON.stringify({ name, default_language: language, logo_url: logoUrl || null, domain_blacklist: blacklist || null, company_context: companyContext, bridge_context: bridgeContext }),
     })
     const data = await res.json()
     if (!res.ok) { setError(data.error); setSaving(false); return }
@@ -176,6 +178,20 @@ function OrgTab() {
           onChange={e => setCompanyContext(e.target.value)}
           rows={8}
           placeholder={"Describe what your company does, who you sell to, and any specific products or focus you want your outreach messages to mention. Example: We sell AI-powered CRM software to B2B sales teams in Asia. Right now we're pushing our new automation feature — mention it when relevant."}
+          style={{ ...S.input, resize: 'vertical', minHeight: 140, lineHeight: 1.6 }}
+        />
+      </div>
+
+      <div style={S.card}>
+        <p style={S.sectionTitle}>Bridge Context</p>
+        <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginBottom: 12 }}>
+          Used to personalise the partnership messages Bridge generates when you confirm candidates.
+        </p>
+        <textarea
+          value={bridgeContext}
+          onChange={e => setBridgeContext(e.target.value)}
+          rows={8}
+          placeholder={"Describe what kind of partnerships you're looking for through Bridge — what you offer as a partner, what you're looking for in return, and any specific type of deal you want to prioritize right now. Example: We're looking for reseller partners in the SaaS space who serve mid-market companies. We offer 20% commission and full onboarding support."}
           style={{ ...S.input, resize: 'vertical', minHeight: 140, lineHeight: 1.6 }}
         />
       </div>
