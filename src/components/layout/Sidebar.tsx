@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
   LayoutGrid, Users2, ClipboardList, BarChart3, Users, LogOut, Trophy,
-  LayoutDashboard, Play, History, Headphones, Settings2,
+  LayoutDashboard, Play, History, Headphones, Settings2, Handshake,
 } from 'lucide-react'
 import { AreaBadge } from '@/components/ui/AreaBadge'
 import type { UserWithArea } from '@/contexts/UserContext'
@@ -25,10 +25,19 @@ export function Sidebar({ user }: Props) {
   const searchParams = useSearchParams()
 
   const [collapsed, setCollapsed] = useState(false)
+  const [addons, setAddons] = useState<string[]>([])
 
   useEffect(() => {
     const saved = localStorage.getItem('sidebar_collapsed')
     if (saved !== null) setCollapsed(saved === 'true')
+  }, [])
+
+  // Add-on-gated sections (Bridge) only appear when the org has them active.
+  useEffect(() => {
+    fetch('/api/settings/addons')
+      .then(r => r.json())
+      .then(d => setAddons(Array.isArray(d.addons) ? d.addons : []))
+      .catch(() => {})
   }, [])
 
   const toggleCollapsed = () => {
@@ -193,6 +202,38 @@ export function Sidebar({ user }: Props) {
             })}
           </>
         )}
+
+        {/* Bridge — admin only, and only when the org has the add-on active */}
+        {isAdmin && !isImpersonating && addons.includes('bridge') && (() => {
+          const fullHref = `/${locale}/bridge`
+          const isActive = pathname === fullHref || pathname.startsWith(fullHref + '/')
+          return (
+            <>
+              <div style={{ margin: '10px 4px 6px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                {!collapsed && <div style={{ flex: 1, height: 1, backgroundColor: 'var(--crm-border)' }} />}
+                {!collapsed && <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Bridge</span>}
+                {!collapsed && <div style={{ flex: 1, height: 1, backgroundColor: 'var(--crm-border)' }} />}
+                {collapsed && <div style={{ width: '100%', height: 1, backgroundColor: 'var(--crm-border)' }} />}
+              </div>
+              <Link
+                href={fullHref}
+                title={collapsed ? 'Partnerships' : undefined}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: 10,
+                  padding: collapsed ? '10px 0' : '8px 12px', borderRadius: 8, marginBottom: 2,
+                  fontSize: 13,
+                  fontWeight: isActive ? 600 : 400,
+                  color: isActive ? '#A78BFA' : 'var(--crm-text-muted)',
+                  backgroundColor: isActive ? '#6C63FF15' : 'transparent',
+                  textDecoration: 'none', transition: 'all 0.15s',
+                }}
+              >
+                <Handshake size={14} strokeWidth={isActive ? 2.2 : 1.8} />
+                {!collapsed && 'Partnerships'}
+              </Link>
+            </>
+          )
+        })()}
       </nav>
 
       {/* User footer */}

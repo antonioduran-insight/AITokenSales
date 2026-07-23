@@ -253,7 +253,7 @@ export interface PipelineStage {
 export interface OrganizationAddon {
   id: string
   organization_id: string
-  addon_type: 'account_management' | 'multi_workspace' | 'extended_data_retention' | 'sso' | 'linkedin_auto_messaging'
+  addon_type: 'account_management' | 'multi_workspace' | 'extended_data_retention' | 'sso' | 'linkedin_auto_messaging' | 'bridge'
   is_active: boolean
   price_monthly: number | null
   activated_at: string
@@ -313,6 +313,7 @@ export const ADDON_LIST = [
   { type: 'extended_data_retention', labelKey: 'addOn_extended_data_retention', price: '$99/mo' },
   { type: 'sso', labelKey: 'addOn_sso', price: '$299 one-time' },
   { type: 'linkedin_auto_messaging', labelKey: 'addOn_linkedin_auto_messaging', price: 'TBD' },
+  { type: 'bridge', labelKey: 'addOn_bridge', price: 'TBD' },
 ] as const
 
 // Recurring monthly price per add-on, used by Revenue Reports. One-time / TBD
@@ -323,6 +324,7 @@ export const ADDON_MONTHLY_PRICE: Record<string, number> = {
   extended_data_retention: 99,
   sso: 99,
   linkedin_auto_messaging: 0,
+  bridge: 0, // TBD
 }
 
 export interface UserArea {
