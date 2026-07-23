@@ -336,6 +336,25 @@ For each feature, verify behavior for all applicable roles:
 - [ ] By Vendor filters to that vendor and shows commission with **no** mention of infrastructure costs
 - [ ] Export PDF opens the print dialog with the table and summary
 
+### Markets
+
+- [ ] Settings → Organization shows a **Markets** card with 4 collapsible regions (Asia / Latin America / Europe / USA)
+- [ ] Regions render in that canonical order regardless of DB row order; unexpected regions sort last
+- [ ] Region header count (`3/12`) updates as you tick countries
+- [ ] **Select all** / **Clear** toggles the whole region
+- [ ] Save button is disabled until something changes, and re-disables after saving
+- [ ] Reload shows the saved selection
+- [ ] Save is a true sync: newly ticked are added, unticked are removed, untouched rows are left alone
+- [ ] As `sdr`, `PUT /api/organizations/{own-org}/markets` returns 403 (read is allowed, write is admin-only)
+- [ ] As admin of Org A, `GET /api/organizations/{org-B-id}/markets` returns 403
+- [ ] `PUT` with an unknown market id returns 400 and writes nothing
+
+**New Run / Bridge**
+- [ ] Market chips show only the org's activated countries, grouped by region
+- [ ] With zero markets configured: both show "No markets configured" with a working link to Settings
+- [ ] Market stays single-select
+- [ ] Picking a market still filters the SDR list; a country with no area mapping shows all SDRs rather than none
+
 ### Settings
 
 - [ ] **Company Context** textarea saves with the existing Save Changes button and survives reload

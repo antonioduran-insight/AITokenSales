@@ -130,6 +130,10 @@ ultra:      { max_seats: MAX_INT, max_leads_per_month: MAX_INT }
 
 **Billing day default** — Always `10` (not 1).
 
+**Markets are per-org, never hardcoded** — the catalogue lives in the backend-owned `markets` table (~49 countries across Asia / Latin America / Europe / USA) and each org activates a subset in `organization_markets`. Any surface that asks for a market must read the org's list via `useOrgMarkets()` and render `<MarketSelect>` — never a literal array of country names. Because the backend owns the table, `/api/markets` normalises the column names it reads (`name|country|label`, `region|area|continent`).
+
+SDR filtering still runs the chosen country through `inferAreaFromCountry()`; unmapped countries return `null`, which shows every SDR rather than none.
+
 **Add-ons** — `addon_type` is constrained in the DB. Adding a new one requires both an `ADDON_LIST` entry in `src/lib/types.ts` (which auto-renders it in Global Admin) **and** a migration widening the CHECK constraint.
 
 **`scraper_access` is dead** — the column still exists on `users` but nothing reads it. Do not reintroduce it as a filter or toggle.

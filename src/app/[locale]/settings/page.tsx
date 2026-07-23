@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { useUser } from '@/contexts/UserContext'
 import { GripVertical, Plus, Trash2, X } from 'lucide-react'
+import { OrgMarketsSettings } from '@/components/markets/OrgMarketsSettings'
 import type { Organization, PipelineStage, OrganizationAddon, ScraperComboMaster, User, SenderProfile } from '@/lib/types'
 
 const PLAN_COLORS: Record<string, string> = {
@@ -162,6 +163,8 @@ function OrgTab() {
           </div>
         </div>
       </div>
+
+      <OrgMarketsSettings />
 
       <div style={S.card}>
         <p style={S.sectionTitle}>Company Context</p>

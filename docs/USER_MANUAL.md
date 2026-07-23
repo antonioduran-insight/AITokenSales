@@ -389,6 +389,17 @@ When you close a deal:
 
 Click **Save Changes** to apply — one button saves all of the above.
 
+### Markets
+
+Below the General card, the **Markets** section lists every country the platform supports (~49), grouped into four collapsible regions: **Asia**, **Latin America**, **Europe** and **USA**.
+
+- Tick the countries your team targets
+- **Select all / Clear** toggles a whole region at once
+- Each region header shows how many of its countries you've picked
+- Click **Save Markets** (this section has its own save button)
+
+These markets are what appear when starting a scraper run or building a Bridge seed list. **If you don't select any, New Run and Bridge will show "No markets configured" with a link back here.**
+
 ### Pipeline Tab
 
 Customize the Kanban stage names and colors:
@@ -444,7 +455,7 @@ New Run is a three-phase flow on a single page. The sidebar stays visible throug
 
 The header shows how many leads you have left in the current billing period.
 
-1. **Market** — Taiwan / LATAM / Vietnam / Global. Picking one filters the SDR list below.
+1. **Market** — the countries your org activated in Settings → Markets, grouped by region. Pick one (single-select); it filters the SDR list below. If nothing appears, no markets are configured yet — the screen links straight to Settings.
 2. **Search Strategy** — choose one or more strategies (only the ones enabled for your org in Settings → Scraper appear).
 3. **Total Leads** — presets 100–500, or use the input with the +/− buttons (steps of 10, minimum 10, maximum 500). If you ask for more than your remaining allowance, the Run button is disabled and shows the limit.
 4. **Assign to SDR** — pick **exactly one** SDR. Every lead this run generates goes to them, with messages personalised from their sender profile. Only SDRs covering the selected market are listed.
@@ -501,7 +512,7 @@ A seed list defines who you're looking for. Click **+ New Seed List**:
 2. **Channel Family** — Reseller / Referral / Technology Integration / Affiliate / Channel Distribution
 3. **Sources** — you can use either or **both**:
    - **Specific companies** — paste company names, one per line or comma-separated
-   - **Search criteria** — industry, company headcount (1-10, 11-50, 51-200, …) and market
+   - **Search criteria** — industry, company headcount (1-10, 11-50, 51-200, …) and market (the same org-specific market list as New Run)
 4. **Save Seed List**
 
 ### Running a search

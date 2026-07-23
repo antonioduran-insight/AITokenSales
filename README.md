@@ -401,6 +401,9 @@ npm run lint         # ESLint
 | GET/POST/PATCH/DELETE | `/api/sender-profiles` | admin | Per-SDR sender personas |
 | GET | `/api/settings/plan` | admin | Plan & usage stats |
 | GET/PATCH | `/api/settings/organization` | admin | Org settings (incl. `company_context`) |
+| GET | `/api/markets` | any | Full market catalogue (~49 countries by region) |
+| GET | `/api/organizations/[id]/markets` | own org | Markets this org activated |
+| PUT | `/api/organizations/[id]/markets` | admin (own org) | Sync the org's market selection |
 | GET | `/api/settings/addons` | any | Active add-on types for the caller's org |
 | GET/POST/PATCH/DELETE | `/api/settings/pipeline-stages` | admin | Pipeline stage CRUD |
 | GET/POST | `/api/support/tickets` | admin/sdr | Support tickets |

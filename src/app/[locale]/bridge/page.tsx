@@ -6,8 +6,9 @@ import {
   type SeedList, type BridgeRun, type BridgeCandidate, type BridgeLog, type VerificationStatus,
 } from '@/lib/bridge-api'
 import { Plus, X, ExternalLink, Check, Ban, RotateCcw, AlertCircle, Handshake } from 'lucide-react'
+import { useOrgMarkets } from '@/lib/hooks/useOrgMarkets'
+import { MarketSelect } from '@/components/markets/MarketSelect'
 
-const MARKETS = ['Taiwan', 'LATAM', 'Vietnam', 'Global']
 const ACTIVE = new Set(['pending', 'running', 'searching'])
 
 const STATUS_LABEL: Record<string, string> = {
@@ -50,6 +51,7 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
 export default function BridgePage() {
   const [tab, setTab] = useState<'search' | 'history'>('search')
   const [error, setError] = useState<string | null>(null)
+  const { markets: orgMarkets, loading: marketsLoading, error: marketsError } = useOrgMarkets()
 
   // ── Seed lists ──
   const [seedLists, setSeedLists] = useState<SeedList[]>([])
@@ -371,11 +373,13 @@ export default function BridgePage() {
                     </div>
                     <div>
                       <label style={S.label}>Market</label>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {MARKETS.map(m => (
-                          <button key={m} onClick={() => setMarket(market === m ? null : m)} style={chip(market === m)}>{m}</button>
-                        ))}
-                      </div>
+                      <MarketSelect
+                        markets={orgMarkets}
+                        loading={marketsLoading}
+                        error={marketsError}
+                        value={market}
+                        onChange={m => setMarket(market === m ? null : m)}
+                      />
                     </div>
                   </div>
                 )}

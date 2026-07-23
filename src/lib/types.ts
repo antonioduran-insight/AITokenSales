@@ -229,6 +229,20 @@ export interface RunRecord {
   run_sdr_assignments?: RunSdrAssignment[]
 }
 
+/**
+ * A country an organization can target. The catalogue lives in the `markets`
+ * table (owned by the scraper backend, ~49 countries); each org activates the
+ * subset it cares about via `organization_markets`.
+ */
+export interface Market {
+  id: string
+  name: string
+  region: string
+}
+
+/** Display order for the market regions. Anything else falls under "Other". */
+export const MARKET_REGIONS = ['Asia', 'Latin America', 'Europe', 'USA'] as const
+
 /** Lifecycle of a scraper run, as reported by the Python backend. */
 export type RunStatus = 'pending' | 'running' | 'scoring' | 'drafting' | 'completed' | 'failed' | 'cancelled'
 

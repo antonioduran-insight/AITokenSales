@@ -7,12 +7,13 @@ import { createClient } from '@/lib/supabase/client'
 import { Minus, Plus, AlertCircle, XCircle } from 'lucide-react'
 import type { User, ScraperComboMaster, AreaName } from '@/lib/types'
 import { inferAreaFromCountry } from '@/lib/utils/area-inference'
+import { useOrgMarkets } from '@/lib/hooks/useOrgMarkets'
+import { MarketSelect } from '@/components/markets/MarketSelect'
 
 // An SDR row plus the flattened set of area names it covers (primary area_id +
 // any user_areas), used to filter the SDR list by the selected market.
 type SdrOption = User & { areaNames: string[] }
 
-const MARKETS = ['Taiwan', 'LATAM', 'Vietnam', 'Global']
 const MAX_INT = 2147483647
 const STEP = 10
 const MIN_LEADS = 10
@@ -106,6 +107,7 @@ function RunPageInner() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // ── Phase 1: config ──
+  const { markets: orgMarkets, loading: marketsLoading, error: marketsError } = useOrgMarkets()
   const [market, setMarket] = useState<string | null>(null)
   const [activeCombos, setActiveCombos] = useState<ScraperComboMaster[]>([])
   const [combosLoading, setCombosLoading] = useState(true)
@@ -401,14 +403,16 @@ function RunPageInner() {
             </p>
           </div>
 
-          {/* Market */}
+          {/* Market — only the countries this org activated in Settings */}
           <div style={S.card}>
             <span style={S.label}>Market</span>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              {MARKETS.map(m => (
-                <button key={m} onClick={() => selectMarket(m)} style={chip(market === m)}>{m}</button>
-              ))}
-            </div>
+            <MarketSelect
+              markets={orgMarkets}
+              loading={marketsLoading}
+              error={marketsError}
+              value={market}
+              onChange={selectMarket}
+            />
           </div>
 
           {/* Combos */}
