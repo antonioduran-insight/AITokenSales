@@ -26,10 +26,19 @@ There are no automated tests. All testing is manual against the staging or produ
 git clone https://github.com/antonioduran-insight/AITokenSales.git
 cd AITokenSales
 npm install
-cp .env.example .env   # Fill in staging Supabase keys
+cp .env.example .env.local   # Fill in staging Supabase keys
 npm run dev
 # Open http://localhost:3000
 ```
+
+**Migrations are not automatic.** Before testing, run every `.sql` in `supabase/migrations/` in the Supabase SQL editor. Several recent features fail without theirs:
+
+| Migration | Needed for |
+|---|---|
+| `20260720_logos_bucket.sql` | Logo upload (otherwise "Bucket not found") |
+| `20260720_prospects_linkedin_per_sdr.sql` | Moving leads between SDRs |
+| `20260721_company_context.sql` | Company Context field in Settings |
+| `20260721_bridge_addon.sql` | Enabling the Bridge add-on |
 
 **Build verification** (runs TypeScript check):
 ```bash
@@ -78,7 +87,9 @@ For each feature, verify behavior for all applicable roles:
 | Conversations | ✗ | ✓ | ✗ |
 | Closed Deals | ✗ | ✓ | ✓ (own leads only) |
 | Settings | ✗ | ✓ | ✗ |
-| Scraper | ✗ | ✓ | ✓ |
+| Scraper | ✗ | ✓ | **✗ (no sidebar entry, API returns 403)** |
+| Bridge / Partnerships | ✗ | ✓ *(only with the `bridge` add-on active)* | ✗ |
+| Revenue → Reports | ✓ | ✗ | ✗ |
 | Impersonate org | ✓ | ✗ | ✗ |
 
 ---
@@ -248,17 +259,98 @@ For each feature, verify behavior for all applicable roles:
 
 ### LinkedIn Scraper
 
-- [ ] Dashboard: total runs and total leads correct
-- [ ] Active run banner appears and auto-refreshes while run is active
-- [ ] No HOT Leads card in stats (only Total Runs + Total Leads)
-- [ ] No temperature emojis/bars anywhere in dashboard
-- [ ] New Run: combo multi-select, market select, limit field all work
-- [ ] Run launches and status progresses through pending → running → scoring → drafting → completed
-- [ ] History: run rows show lead count (not HOT/WARM/COLD chips)
-- [ ] Expanding a run shows Name/Company/Title/ICP/Temp headers (English)
-- [ ] Import to CRM: area required; SDR optional; result shows Imported/Duplicates/No name
-- [ ] Scraper Leads: "All Runs" and "All Temps" dropdowns filter correctly
-- [ ] Lead detail drawer: Details/Messages section headers in English; copy buttons work
+**Access**
+- [ ] Logged in as SDR: no **Scraper** section in the sidebar at all
+- [ ] As SDR, `POST /api/runs` returns 403
+- [ ] As admin: Scraper section visible (hidden during impersonation)
+
+**New Run — Phase 1 (config)**
+- [ ] Header shows the remaining leads for the current **billing period** (not calendar month)
+- [ ] Market chips are single-select; changing market clears the SDR selection
+- [ ] Only search strategies enabled for the org appear
+- [ ] Total Leads: presets 100–500 work; +/− steps by 10; clamps to min 10 / max 500
+- [ ] Asking for more than the remaining allowance disables the Run button and shows the limit message
+- [ ] **SDR picker is single-select (radio)** — you cannot select two
+- [ ] Only SDRs covering the selected market are listed
+- [ ] Run button stays disabled until market + strategy + leads + one SDR are all set
+
+**New Run — Phase 2 (progress)**
+- [ ] Ring animates; centre text matches the backend status mapping
+- [ ] 4-step dot bar advances (Scraping · Scoring · Messages · Done)
+- [ ] Navigating away and returning to New Run restores the in-progress run
+- [ ] Closing and reopening the tab restores it too (state comes from the DB)
+- [ ] **Cancel run** sets the run to cancelled and shows the "Run cancelled" state
+
+**New Run — Phase 3 (result) — CRITICAL**
+- [ ] Shows total generated + HOT/WARM/COLD cards
+- [ ] Shows **Assigned to: [SDR name]** (singular, no distribution bars)
+- [ ] **The generated leads actually appear in that SDR's Kanban** — this is the regression that previously failed silently
+- [ ] Leads are assigned to the SDR chosen in Phase 1, not to the admin (test on a `basic` plan org too — that path used to fall back to the admin)
+- [ ] Download CSV exports the run's leads
+- [ ] View Detailed opens History with the run expanded
+
+**History**
+- [ ] Runs listed newest-first with market/strategy badges, lead count and status badge
+- [ ] `?run=<id>` auto-expands that run and scrolls to it
+- [ ] Expanded run shows **Assigned to: [name]** and the lead grid with per-lead assignee
+- [ ] Download CSV works
+- [ ] **Send to another SDR** moves the leads: the new SDR gets them AND the previous holder no longer has them
+- [ ] After a move, no lead exists on two SDRs' boards
+- [ ] Active runs show a Cancel button; failed runs show only the support message
+- [ ] There is no Scraper "Leads" page or sidebar entry
+
+### Bridge / Partnerships
+
+- [ ] With the `bridge` add-on **off**: no Partnerships entry in the sidebar; `GET /api/bridge/seed-lists` returns 403
+- [ ] Turn the add-on on in Global Admin → entry appears after reload
+- [ ] As SDR (add-on on): still no entry; API returns 403
+- [ ] Create a seed list with **companies only** — saves and appears in the list
+- [ ] Create one with **criteria only** (industry / headcount / market)
+- [ ] Create one with **both** — both are stored
+- [ ] Save is blocked until a name and at least one populated source exist
+- [ ] Run a search: progress ring + logs poll every 3s
+- [ ] On completion, candidate count shown and candidates load
+- [ ] **Confirm** turns the candidate green and persists after reload
+- [ ] **Reject** turns it red and persists
+- [ ] **Restore** on a rejected candidate returns it to Pending
+- [ ] Filter chips (All / Pending / Confirmed / Rejected) show correct counts
+- [ ] **Past Searches** lists previous runs; opening one loads its candidates
+
+### Billing-period lead quota
+
+- [ ] `GET /api/runs/quota` returns `used`, `max`, `available`, `period_start`, `period_end`
+- [ ] With `billing_day = 23` and today the 15th, the period starts on the 23rd of the **previous** month
+- [ ] Month-end clamping: `billing_day = 31` works in a 30-day month and in February
+- [ ] Ultra plan reports `unlimited: true`
+- [ ] Starting a run that exceeds the remaining allowance returns 429
+
+### Global Admin — Revenue Reports
+
+- [ ] Overview | Reports sub-tabs navigate correctly
+- [ ] By Quarter lists orgs sold in earlier quarters that are still active (New this Q = No, 3 months)
+- [ ] Day-15 rule: created in July → 3 months; 10 Aug → 2 months; 20 Sep → moves to Q2 with 3 months
+- [ ] Setup fee only charged when New this Q = Yes
+- [ ] Split maths: vendor at 15% → partners 42.5% each; vendor at 30% → 35% each; direct → 50/50
+- [ ] Infrastructure costs subtracted **once**, half from each partner; vendor amounts unchanged
+- [ ] Only vendors with sales that quarter appear in the split
+- [ ] By Vendor filters to that vendor and shows commission with **no** mention of infrastructure costs
+- [ ] Export PDF opens the print dialog with the table and summary
+
+### Settings
+
+- [ ] **Company Context** textarea saves with the existing Save Changes button and survives reload
+- [ ] Anthropic base URL ending in `/v1` is stored **without** the `/v1` (check the DB)
+- [ ] Pipeline: every stage has a delete button
+- [ ] Deleting a stage with prospects in it is blocked with a count message (test with the API directly too, not just the UI)
+- [ ] Deleting an empty stage works after confirmation
+- [ ] No duplicate stages render
+- [ ] Logo upload succeeds (bucket `logos` must exist)
+
+### User Management
+
+- [ ] Edit User modal contains only name, email, markets/areas and role
+- [ ] No `years_experience` / `seniority` / `expertise_area` fields
+- [ ] No **Scraper Access** toggle anywhere in the list or modal
 
 ### Sidebar
 
@@ -267,7 +359,9 @@ For each feature, verify behavior for all applicable roles:
 - [ ] Expanded state: 240px, labels visible
 - [ ] State persists across page navigation (localStorage `sidebar_collapsed`)
 - [ ] State persists on page refresh
-- [ ] Scraper section only visible for admin and SDR roles (not during impersonation)
+- [ ] **Scraper section visible only to `admin`** (never to SDRs, never during impersonation)
+- [ ] **Bridge section visible only to `admin` with the `bridge` add-on active**
+- [ ] No light/dark theme toggle anywhere in the CRM header
 
 ---
 
@@ -279,13 +373,18 @@ For each feature, verify behavior for all applicable roles:
 - Display: any value ≥ `2147483647` must show `∞` not the raw number
 
 ### Duplicate LinkedIn URLs
-- `linkedin_url` has a global UNIQUE constraint across ALL orgs
-- Importing the same LinkedIn URL from a different org = `23505` Postgres error
-- Must be counted as a failed import row, not cause the entire import to fail
+- `prospects` is unique on `(organization_id, linkedin_url, assigned_to)` — the same lead **can** sit on two SDRs' boards when deliberately moved
+- A conflicting row raises `23505`; insert paths must skip that row and continue, never abort the batch
+- Requires the `20260720_prospects_linkedin_per_sdr.sql` migration. Without it the old org-wide unique key is still in place and moving leads between SDRs silently skips them.
 
-### Monthly Lead Counts
-- Lead limits are enforced via `monthly_lead_counts` table, not by counting `prospects`
+### Lead counting
 - `prospects` table has NO `organization_id` column — never query it this way
+- `monthly_lead_counts` holds calendar-month totals (reporting)
+- The **quota that gates runs** is billing-period based: `scraper_leads` with `exported_to_crm = true` inside the `billing_day` window. Test month-end clamping (`billing_day = 31`).
+
+### Add-on gating
+- Add-on-only features (Bridge) must be blocked **server-side**, not just hidden in the UI
+- Test by calling `/api/bridge/seed-lists` directly with the add-on disabled — expect 403
 
 ### RLS and Service Role
 - Browser-side Supabase calls (anon key) respect RLS — SDRs cannot see other areas' data
@@ -337,6 +436,28 @@ curl -X POST http://localhost:3000/api/global-admin/create-org \
 # Plan usage stats
 curl http://localhost:3000/api/settings/plan -b 'cookie-here'
 # Expected: { org: { plan, max_seats, max_leads_per_month, ... }, seats_used, leads_this_month }
+
+# Lead quota for the current billing period
+curl http://localhost:3000/api/runs/quota -b 'cookie-here'
+# Expected: { used, max, available, unlimited, period_start, period_end }
+
+# Start a scraper run (admin only, single SDR)
+curl -X POST http://localhost:3000/api/runs \
+  -H 'Content-Type: application/json' -b 'admin-cookie' \
+  -d '{"market":"Taiwan","markets":["Taiwan"],"combos":["combo_A"],"total_leads":100,"sdr_id":"<sdr-uuid>"}'
+# As SDR: 403 "Only the organization admin can run the scraper"
+# Missing sdr_id: 400
+# Over the period allowance: 429
+
+# Bridge (admin + bridge add-on required)
+curl http://localhost:3000/api/bridge/seed-lists -b 'admin-cookie'
+# Add-on disabled: 403 "The Bridge add-on is not active for this organization"
+# As SDR: 403 "Only the organization admin can use Bridge"
+# NOTE: organization_id is injected server-side — passing your own is ignored
+
+# Active add-ons for the caller's org (drives sidebar gating)
+curl http://localhost:3000/api/settings/addons -b 'cookie-here'
+# Expected: { addons: ["bridge", ...] }
 ```
 
 ### Expected HTTP codes
@@ -403,4 +524,8 @@ Changes in these areas have historically caused regressions. Pay extra attention
 | `src/app/api/global-admin/create-org/route.ts` | Rollback on partial failure (auth user created but org fails) |
 | `src/lib/hooks/useOrgId.ts` | Impersonation mode — any change here affects all CRM writes |
 | Supabase RLS policies | SDR seeing other areas' data; cross-org leakage |
-| `monthly_lead_counts` logic | Plan limit enforcement; billing display accuracy |
+| `src/lib/utils/lead-quota.ts` | Plan limit enforcement; billing-period boundaries |
+| `src/app/api/runs/[id]/assign/route.ts` | **Leads silently never reaching the SDR.** Never gate the assign on `run_sdr_assignments` — the Railway backend writes those rows itself. |
+| `src/app/[locale]/(scraper)/run/page.tsx` | Phase transitions, run restore, single-SDR payload |
+| `src/app/api/bridge/[...path]/route.ts` | Add-on gate + `organization_id` injection — a bug here is a cross-org data leak |
+| `src/lib/utils/quarter.ts` | Reports billable-month maths (day-15 rollover, fiscal-year boundaries) |

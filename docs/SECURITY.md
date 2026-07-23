@@ -38,8 +38,10 @@ Browser
   │      ├─ auth.users                 (email/password credentials, JWTs)
   │      └─ storage: logos bucket      (public org logos)
   │
-  └─── Python Scraper Backend (optional, external service)
-         └─ /api/scraper/** proxies all requests server-side
+  └─── Python Scraper + Bridge Backend (external service, Railway)
+         ├─ /api/scraper/**  unauthenticated passthrough proxy (legacy)
+         └─ /api/bridge/**   authenticated proxy: session + admin role +
+                             add-on check, injects organization_id server-side
 ```
 
 **Trust boundary**: The Next.js API layer is the security enforcement boundary. The browser has the Supabase anon key (safe, limited by RLS) and never has the service role key.
@@ -83,9 +85,11 @@ No custom password policy is enforced at the application layer. Password complex
 | Role | Stored in | Scope | Trust Level |
 |---|---|---|---|
 | `admin_global` | `public.users.role` | All organizations | Highest — full system access |
-| `admin` | `public.users.role` | Own organization | High — all data within org |
-| `sdr` | `public.users.role` | Own area within org | Limited — own area's prospects only |
+| `admin` | `public.users.role` | Own organization | High — all data within org, plus Scraper and Bridge |
+| `sdr` | `public.users.role` | Own area within org | Limited — own area's prospects only. **No Scraper or Bridge access.** |
 | `support` | `public.users.role` | TBD | Limited |
+
+Scraper and Bridge are **admin-only**. `POST /api/runs` and every `/api/bridge/*` call reject non-`admin` callers with 403. The old per-user `scraper_access` flag has been retired: the column still exists on `public.users` but no code path reads it, so it can no longer grant access.
 
 ### How authorization is enforced
 
@@ -145,14 +149,24 @@ Within a single org, SDRs are further isolated to their assigned `area_id`. An S
 
 ### Cross-tenant uniqueness
 
-`prospects.linkedin_url` has a global UNIQUE constraint across all orgs. This means:
-1. A LinkedIn profile can only exist in the system once
-2. If Org A has scraped and stored a profile, Org B's import will get a `23505` constraint violation for that row
-3. This is handled gracefully — the row is skipped and counted as a failed import, and the error does not reveal which org owns the existing record
+`prospects` is unique on `(organization_id, linkedin_url, assigned_to)`. This means:
+1. Within one org, a LinkedIn profile exists at most once per SDR — the same lead can be deliberately moved or held by more than one rep without a constraint error
+2. Uniqueness is scoped **per organization**, so one org's data no longer influences another's imports
+3. Conflicts raise `23505`, which is handled row-by-row — a single conflict never aborts a batch, and the error never reveals another org's data
 
-### Monthly lead counting
+### Lead counting
 
-Lead counts are cached in `monthly_lead_counts` scoped to `organization_id`. There is no cross-org data exposure through this mechanism.
+Two independent mechanisms, both scoped to `organization_id`, neither exposing cross-org data:
+- `monthly_lead_counts` — cached calendar-month totals for reporting
+- **Billing-period quota** — counts `scraper_leads` with `exported_to_crm = true` inside the org's current `billing_day` window (`src/lib/utils/lead-quota.ts`). This is what gates run creation.
+
+### Add-on gating
+
+Feature add-ons (currently `bridge`) are enforced at two layers, mirroring the role model:
+- **UI**: the sidebar entry only renders when `/api/settings/addons` reports the add-on active
+- **API**: `/api/bridge/[...path]` independently re-queries `organization_addons` on every request
+
+The UI check is a convenience only. Removing it client-side does not grant access.
 
 ---
 
@@ -167,9 +181,27 @@ The Supabase service role key (`SUPABASE_SERVICE_ROLE_KEY`) bypasses all RLS pol
 
 Verify: run `grep -r "SERVICE_ROLE" src/` — results should only be in `src/app/api/` files.
 
-### Scraper proxy
+### Backend proxies
 
-The scraper backend (`SCRAPER_API_URL`) is proxied through `/api/scraper/[...path]`. The browser never communicates with the scraper directly. The scraper API key (`SCRAPER_API_KEY` env var, if used) is injected server-side in the proxy handler.
+The Python backend (`SCRAPER_API_URL`) is never called directly from the browser. Two proxies exist with **different** security postures:
+
+| Proxy | Auth | Notes |
+|---|---|---|
+| `/api/scraper/[...path]` | **None** | Legacy passthrough: forwards method, path, query and body verbatim with no session check. See [Known Limitations](#known-limitations--accepted-risks). |
+| `/api/bridge/[...path]` | Session + `admin` role + active `bridge` add-on | Hardened pattern |
+
+The Bridge proxy is the reference implementation for new backend-facing routes:
+
+1. Resolves the session via `supabase.auth.getUser()`
+2. Reads the caller's role and `organization_id` **from the database**
+3. Rejects non-`admin` callers (403)
+4. Verifies the `bridge` add-on is active for that org (403 otherwise)
+5. **Overwrites** `organization_id` in both the query string and the JSON body with the value from the session — a client-supplied value is always discarded
+6. Injects the org's `apify_token` from the DB on `POST /bridge/runs`, so the credential never reaches the browser
+
+Because step 5 overwrites rather than validates, there is no way for an authenticated admin of Org A to read or mutate Org B's seed lists, runs or candidates through this route.
+
+Per-org third-party credentials (Apify token, Anthropic key) live on the `organizations` row and are only ever read server-side in API routes.
 
 ### CORS
 
@@ -304,6 +336,8 @@ A compromised `admin_global` account has full read access to all organizations' 
 
 | Item | Risk level | Notes |
 |---|---|---|
+| **`/api/scraper/[...path]` is unauthenticated** | **High** | This legacy proxy performs no session, role or org check and forwards the request verbatim to the Python backend. Any visitor who can reach the Next.js app can call arbitrary backend paths through it. Mitigation depends entirely on the backend authenticating requests itself. **Recommendation**: port it to the `/api/bridge/[...path]` pattern (session + role + server-side `organization_id` injection) or remove it if unused. |
+| Backend trusts the injected `organization_id` | Medium | The Bridge proxy guarantees the value is server-derived, but the Python backend must scope its queries by it. If the backend ignores `organization_id`, cross-org exposure is possible despite a correct proxy. |
 | No MFA enforcement at app layer | Medium | Must be enforced in Supabase Auth project settings |
 | No rate limiting on import API | Low | Supabase's auth rate limits apply; large imports are bounded by file size limit (5 MB) |
 | Client-side audit for some events | Low | Status changes and notes are audit-logged from the browser. A motivated user could skip the call. |
@@ -335,6 +369,9 @@ A compromised `admin_global` account has full read access to all organizations' 
 - [ ] New Supabase queries on `prospects` do NOT filter or join on `organization_id` (column doesn't exist)
 - [ ] New forms with user input use controlled React state (not `innerHTML` or `eval`)
 - [ ] Any new write operation checks `isImpersonating` and returns early if true
+- [ ] Any new backend proxy derives `organization_id` from the session and **overwrites** any client-supplied value
+- [ ] Add-on-gated or role-gated features are enforced server-side, not only hidden in the UI
+- [ ] Third-party credentials (Apify / Anthropic) are read from the DB server-side and never returned to the browser
 
 ### Penetration testing targets
 
@@ -349,6 +386,15 @@ Priority areas for security testing:
    - Call `admin`-only API routes (bulk delete, user management)
    - Call `admin_global` routes (create org, edit org)
    - Access `/admin/users`, `/audit`, `/stats` pages
+   - Start a scraper run via `POST /api/runs` (expect 403)
+   - Reach Bridge via `/api/bridge/seed-lists` (expect 403)
+
+2b. **Add-on bypass** — as an `admin` of an org **without** the `bridge` add-on:
+   - Navigate directly to `/{locale}/bridge`
+   - Call any `/api/bridge/*` endpoint (expect 403)
+   - Pass another org's `organization_id` in the query or body and confirm it is ignored
+
+2c. **Unauthenticated proxy** — with no session at all, call `/api/scraper/<path>` and record what the backend returns. This route has no auth layer; the result defines the real exposure.
 
 3. **RLS bypass** — using the anon key directly (bypassing the Next.js layer), verify no data is accessible beyond the user's scope
 

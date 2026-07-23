@@ -12,6 +12,7 @@ Complete guide for all user roles: Global Admin, CRM Admin, and SDR.
 - [SDR Guide](#sdr-guide)
 - [Settings](#settings)
 - [LinkedIn Scraper](#linkedin-scraper)
+- [Bridge — Partnerships](#bridge--partnerships)
 - [Support](#support)
 
 ---
@@ -24,7 +25,9 @@ Complete guide for all user roles: Global Admin, CRM Admin, and SDR.
    - **Global Admin** → Global Admin panel (`/global-admin`)
    - **Admin / SDR** → Kanban board (`/kanban`)
 
-To change the interface language, click the language switcher in the sidebar footer (CRM) or the navbar (Global Admin). Supported: English, 中文, Español, Tiếng Việt.
+To change the interface language, click the language switcher in the CRM header or the Global Admin navbar. Supported: English, 中文, Español, Tiếng Việt.
+
+> The CRM uses a single dark theme — there is no light/dark toggle. (The Global Admin panel keeps its own independent theme toggle.)
 
 ---
 
@@ -50,12 +53,14 @@ The Global Admin panel is only accessible to accounts with the `admin_global` ro
 
 #### Plan Defaults
 
-| Plan | Max Seats | Leads/Month |
+| Plan | Max Seats | Leads/period |
 |---|---|---|
 | Basic | 3 | 1,000 |
-| Premium | 10 | 3,000 |
+| Premium | 7 | 3,000 |
 | Enterprise | 15 | 10,000 |
 | Ultra | Unlimited | Unlimited |
+
+> The lead allowance renews on the org's **billing day**, not on the 1st of the month. With `billing_day = 23`, the current period runs from the 23rd of one month to the 22nd of the next.
 
 ### Creating a New Organization
 
@@ -74,11 +79,26 @@ This provisions the organization and its first admin user in a single operation.
 ### Org Detail Page
 
 Click an org name to open its detail page:
-- **Info card** — edit all fields inline
+- **Info card** — edit all fields inline (including the Anthropic base URL / model and Apify token)
 - **Usage stats** — leads this month, open tickets, SDR count
 - **Add-ons** — checkboxes to toggle features
 - **Internal Notes** — auto-saves as you type (debounced)
 - **Danger Zone** — deactivate/reactivate the org
+
+#### Add-ons
+
+| Add-on | Effect |
+|---|---|
+| Account Management | Dedicated account manager (commercial) |
+| Multi Workspace | Multiple workspaces (commercial) |
+| Extended Data Retention | Longer data retention (commercial) |
+| SSO | SSO integration (commercial) |
+| LinkedIn Auto-messaging | Automated messaging (commercial) |
+| **Bridge (Partnerships)** | **Unlocks the Bridge partnership-discovery module in the org's CRM sidebar** |
+
+Bridge is the only add-on that changes the product UI today: turning it on makes the **Partnerships** section appear for that org's admin.
+
+> **Anthropic base URL**: paste the plain host (e.g. `https://api.aitokenking.com.tw`). If you paste a URL ending in `/v1`, the app strips it automatically before saving — the backend appends the version path itself.
 
 ### Support Tickets
 
@@ -90,11 +110,41 @@ View and respond to support tickets from all organizations.
 
 ### Revenue
 
-Per-org MRR breakdown with plan distribution charts and vendor commission tracking.
+Two sub-tabs: **Overview** and **Reports**.
+
+#### Overview
+
+Per-org MRR breakdown with quarter selector, plan distribution chart, monthly infrastructure/API cost inputs (saved in your browser), and the profit-sharing summary.
+
+#### Reports
+
+**By Quarter** — pick a quarter to get a table of every organization that bills in it, including orgs sold in earlier quarters that are still active.
+
+| Column | Meaning |
+|---|---|
+| Organization / Plan / Sale Date | Who and when |
+| New this Q? | Whether this is the org's first billed quarter |
+| Setup Fee | Only charged when "New this Q" is Yes |
+| Add-ons/mo | Monthly total of the org's active add-ons |
+| Months | Billable months this quarter |
+| MRR this Q | Plan price × months |
+| Total | Setup + (add-ons × months) + MRR |
+| Vendor | Vendor name, or "Direct" |
+
+**Months billable** follows a day-15 rule: an org created after the 15th of the quarter's last month rolls over to the next quarter and is billed for 3 full months there. Examples (Q1 = Jul–Sep): created in July → 3 months; created 10 Aug → 2 months; created 20 Sep → moves to Q2 with 3 months.
+
+The footer shows **Gross Revenue − Infrastructure Costs = Net Revenue**, then the split:
+- Each org's revenue is split individually. With a vendor, the vendor takes its own commission percentage and the remaining share is divided 50/50 between the two partners. Direct sales split 50/50.
+- Quarter infrastructure costs are subtracted **once**, half from each partner. **Vendors never absorb infrastructure costs.**
+- Only vendors with sales in that quarter appear.
+
+**By Vendor** — the same table filtered to one vendor, with their total sales and commission for the quarter. This view never mentions infrastructure costs; it's meant to be sent to the vendor.
+
+**Export PDF** on both views opens a print dialog — choose "Save as PDF".
 
 ### Vendors
 
-Add and manage reseller/vendor records with name, email, and commission percentage.
+Add and manage reseller/vendor records with name, email, and commission percentage. The commission percentage entered here is what drives the split in Reports.
 
 ### Impersonation Mode
 
@@ -295,7 +345,8 @@ As an SDR, you see only prospects in your assigned area.
 - **Prospects** — Table view with search and filters. Click any row to edit.
 - **Closed Deals** — Your won deals. Upload chat logs here.
 - **Import** — Import your CSV leads (auto-assigned to you and your area).
-- **Scraper** — If enabled, launch scraping runs and import the results.
+
+> **SDRs do not have access to the Scraper or Bridge.** Only your organization's admin runs them. When your admin launches a run and picks you as the recipient, the generated leads land directly in your Kanban with messages written for your sender profile.
 
 ### Importing leads
 
@@ -332,9 +383,11 @@ When you close a deal:
 - **Org Name** — display name across the platform
 - **Default Language** — sets the default locale for new users
 - **Logo** — click **Upload Logo** to upload an image (stored in Supabase Storage). Formats: PNG, JPG, GIF, SVG, WebP.
+- **Company Context** — free text describing what your company does, who you sell to, and any product or focus you want mentioned in outreach. This is sent to the scraper so generated messages reference your real offering.
+  > Example: *"We sell AI-powered CRM software to B2B sales teams in Asia. Right now we're pushing our new automation feature — mention it when relevant."*
 - **Domain Blacklist** — one domain or company name per line; blocks these from CSV imports and manual prospect creation
 
-Click **Save Changes** to apply.
+Click **Save Changes** to apply — one button saves all of the above.
 
 ### Pipeline Tab
 
@@ -343,11 +396,20 @@ Customize the Kanban stage names and colors:
 - Edit the name inline
 - Click the color chip to change the color
 - Click **+ Add Stage** to create a new column
-- Click the trash icon to delete a stage (prospects in that stage are not deleted)
+- Click the trash icon (🗑️, shown on **every** stage) to delete it
+
+Deleting a stage is blocked while prospects are still in it — you'll see an error telling you how many need moving first. This is checked both in the browser and on the server.
 
 ### Plan & Usage Tab
 
-Shows your current plan, billing day, seat usage (active SDRs / max), lead usage this month (imported / max), and active add-ons.
+Shows your current plan, billing day, seat usage (active SDRs / max), lead usage for the current billing period (imported / max), and active add-ons.
+
+### Scraper Tab
+
+Admin-only configuration for the scraper:
+- **Apify token** and **Anthropic key / base URL / model** for this organization
+- **Search strategies** — enable the combos your team will use in New Run
+- **Sender profiles** — the persona used to personalise each SDR's outreach messages (display name, title, company, style, language, plus experience/seniority/expertise). **The admin configures these on behalf of each SDR; SDRs cannot edit their own profile.**
 
 ### Support Tab
 
@@ -368,49 +430,102 @@ Contact details placeholder — AITokenKing support contact information.
 
 ## LinkedIn Scraper
 
-The scraper module is accessible via the **Scraper** section in the sidebar (admins and SDRs).
+**Admin only.** The Scraper section in the sidebar is not visible to SDRs.
 
 ### Dashboard
 
-Live overview:
-- Total runs executed
-- Total leads scraped
-- Active run progress (auto-refreshes every 10 seconds)
-- Recent runs list with quick **→** links to leads
+Live overview: total runs, total leads, active run banner, and a recent runs list.
 
 ### New Run
 
-1. Select one or more **combos** (A–G, each targets a different LinkedIn audience segment)
-2. Select the **market** (Taiwan, LATAM, Vietnam)
-3. Set **leads per combo** (how many profiles to scrape per combo)
-4. Click **Launch Run**
+New Run is a three-phase flow on a single page. The sidebar stays visible throughout, and if you navigate away mid-run and come back, the live progress is restored automatically (the state lives in the database, so it also survives closing the tab).
 
-The run goes through phases: Starting → Scraping → Scoring → Generating messages → Completed.
+#### Phase 1 — Configuration
 
-You can watch live logs stream in real time during the run.
+The header shows how many leads you have left in the current billing period.
+
+1. **Market** — Taiwan / LATAM / Vietnam / Global. Picking one filters the SDR list below.
+2. **Search Strategy** — choose one or more strategies (only the ones enabled for your org in Settings → Scraper appear).
+3. **Total Leads** — presets 100–500, or use the input with the +/− buttons (steps of 10, minimum 10, maximum 500). If you ask for more than your remaining allowance, the Run button is disabled and shows the limit.
+4. **Assign to SDR** — pick **exactly one** SDR. Every lead this run generates goes to them, with messages personalised from their sender profile. Only SDRs covering the selected market are listed.
+5. Click **Run Scraping**.
+
+#### Phase 2 — Progress
+
+An animated ring shows the current stage, with a four-step bar underneath: Scraping · Scoring · Messages · Done.
+
+| Backend status | Shown as |
+|---|---|
+| pending / running | Initializing… |
+| scraping | 🔍 Scraping LinkedIn |
+| scoring | 📊 Scoring leads |
+| drafting | ✍️ Generating messages |
+
+A run usually takes 2–5 minutes. You can close the tab — it keeps going. **Cancel run** stops it.
+
+#### Phase 3 — Result
+
+On success you get the total generated, a HOT / WARM / COLD breakdown, and **Assigned to: [SDR name]**, plus three actions:
+- **View Detailed** — opens History with this run expanded
+- **Download CSV** — exports the run's leads
+- **New Run** — resets back to Phase 1
+
+The leads are assigned to the chosen SDR automatically — no manual import step. If the run fails or is cancelled, you'll see that state instead with a **New Run** button.
 
 ### Run History
 
-All past runs listed with date, market, lead count, and status.
+All past runs, newest first: date and time, market and strategy badges, lead count, and a status badge (Completed / Failed / Running).
 
-- Click any row to expand and preview up to 15 leads
-- **Import to CRM** — for completed runs, import leads into the CRM:
-  1. Select the target **Area**
-  2. Optionally assign to a specific **SDR**
-  3. Click **Import N leads**
-  4. Results show: Imported / Duplicates / No name
-- **Delete** a run (removes from scraper only; does not affect CRM leads already imported)
-- **Clear History** — deletes all runs (requires typing DELETE to confirm)
+Click a row to expand it:
+- **Assigned to: [SDR name]** and the full grid of that run's leads (name, company, title, ICP score, temperature, and which SDR holds each lead)
+- **Download CSV**
+- **Send to another SDR** — pick a different SDR to **move** the run's leads to them. This reassigns the leads rather than copying, so the same lead never ends up on two people's boards.
 
-### Scraper Leads
+Active runs show a **Cancel** button. A failed run shows only "This run failed. Contact support."
 
-Browse all scraped leads across all runs.
+> There is no separate Scraper Leads page. Leads are reviewed per run in History, or in the normal Kanban / Prospects views once assigned.
 
-- Filter by **run** or **temperature** (All Temps / HOT / WARM / COLD)
-- Click any row to open the detail panel with:
-  - Company, title, industry, location, LinkedIn link
-  - **Connection request** message (Custom 1) with Copy button
-  - **Value message** (Custom 2) with Copy button
+---
+
+## Bridge — Partnerships
+
+**Admin only, and only if your organization has the Bridge add-on enabled.** If you don't see **Partnerships** in the sidebar, ask AITokenKing to enable the add-on.
+
+Bridge is separate from the lead scraper. It finds **B2B partnership contacts** inside companies you're interested in, so you can explore partnership opportunities. It does **not** write outreach messages — it discovers candidates for you to review by hand.
+
+### Seed Lists
+
+A seed list defines who you're looking for. Click **+ New Seed List**:
+
+1. **Name** — e.g. "Taiwan SaaS resellers"
+2. **Channel Family** — Reseller / Referral / Technology Integration / Affiliate / Channel Distribution
+3. **Sources** — you can use either or **both**:
+   - **Specific companies** — paste company names, one per line or comma-separated
+   - **Search criteria** — industry, company headcount (1-10, 11-50, 51-200, …) and market
+4. **Save Seed List**
+
+### Running a search
+
+1. Pick a seed list from the dropdown
+2. Click **Search Partnerships**
+3. A progress ring and live log appear. You can leave the page — the search keeps running.
+4. When it finishes you'll see "X candidates found" and the review list opens automatically
+
+### Candidate Review
+
+Each candidate card shows name, company, title, location, a LinkedIn link and a short bio.
+
+| Action | Effect |
+|---|---|
+| **Confirm** (green) | Marks the candidate as a real partnership prospect |
+| **Reject** (red) | Discards the candidate |
+| **Restore** | Appears on rejected candidates — sends them back to Pending |
+
+Use the filter chips at the top (**All / Pending / Confirmed / Rejected**) to work through the list; each chip shows its count.
+
+### Past Searches
+
+The **Past Searches** tab lists previous runs with date, seed list and candidate count. Click any one to reopen its candidates in the review list.
 
 ---
 
