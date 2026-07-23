@@ -55,6 +55,7 @@ function OrgTab() {
   const [language, setLanguage] = useState('en')
   const [logoUrl, setLogoUrl] = useState('')
   const [blacklist, setBlacklist] = useState('')
+  const [companyContext, setCompanyContext] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -71,6 +72,7 @@ function OrgTab() {
         setLanguage(d.default_language ?? 'en')
         setLogoUrl(d.logo_url ?? '')
         setBlacklist(d.domain_blacklist ?? '')
+        setCompanyContext(d.company_context ?? '')
       })
   }, [])
 
@@ -79,7 +81,7 @@ function OrgTab() {
     const res = await fetch('/api/settings/organization', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, default_language: language, logo_url: logoUrl || null, domain_blacklist: blacklist || null }),
+      body: JSON.stringify({ name, default_language: language, logo_url: logoUrl || null, domain_blacklist: blacklist || null, company_context: companyContext }),
     })
     const data = await res.json()
     if (!res.ok) { setError(data.error); setSaving(false); return }
@@ -159,6 +161,20 @@ function OrgTab() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div style={S.card}>
+        <p style={S.sectionTitle}>Company Context</p>
+        <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginBottom: 12 }}>
+          Used to personalise the outreach messages the scraper generates.
+        </p>
+        <textarea
+          value={companyContext}
+          onChange={e => setCompanyContext(e.target.value)}
+          rows={8}
+          placeholder={"Describe what your company does, who you sell to, and any specific products or focus you want your outreach messages to mention. Example: We sell AI-powered CRM software to B2B sales teams in Asia. Right now we're pushing our new automation feature — mention it when relevant."}
+          style={{ ...S.input, resize: 'vertical', minHeight: 140, lineHeight: 1.6 }}
+        />
       </div>
 
       <div style={S.card}>

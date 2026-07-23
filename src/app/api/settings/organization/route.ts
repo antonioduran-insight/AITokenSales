@@ -31,7 +31,7 @@ export async function GET() {
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('organizations')
-    .select('id, name, slug, plan, logo_url, default_language, domain_blacklist, max_seats, max_leads_per_month, billing_day, apify_token, anthropic_key, anthropic_base_url, anthropic_model')
+    .select('id, name, slug, plan, logo_url, default_language, domain_blacklist, company_context, max_seats, max_leads_per_month, billing_day, apify_token, anthropic_key, anthropic_base_url, anthropic_model')
     .eq('id', ctx.orgId)
     .single()
 
@@ -44,7 +44,7 @@ export async function PATCH(req: Request) {
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const allowed = ['name', 'default_language', 'logo_url', 'domain_blacklist', 'apify_token', 'anthropic_key', 'anthropic_base_url', 'anthropic_model']
+  const allowed = ['name', 'default_language', 'logo_url', 'domain_blacklist', 'company_context', 'apify_token', 'anthropic_key', 'anthropic_base_url', 'anthropic_model']
   const update: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) update[key] = body[key]
@@ -62,7 +62,7 @@ export async function PATCH(req: Request) {
     .from('organizations')
     .update(update)
     .eq('id', ctx.orgId)
-    .select('id, name, slug, plan, logo_url, default_language, domain_blacklist, apify_token, anthropic_key, anthropic_base_url, anthropic_model')
+    .select('id, name, slug, plan, logo_url, default_language, domain_blacklist, company_context, apify_token, anthropic_key, anthropic_base_url, anthropic_model')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })

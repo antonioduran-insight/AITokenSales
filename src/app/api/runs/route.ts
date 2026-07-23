@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
     const { data: org } = await supabase
       .from('organizations')
-      .select('plan, max_leads_per_month, billing_day, apify_token, anthropic_key, anthropic_base_url, anthropic_model')
+      .select('plan, max_leads_per_month, billing_day, company_context, apify_token, anthropic_key, anthropic_base_url, anthropic_model')
       .eq('id', userData?.organization_id)
       .single()
 
@@ -167,6 +167,8 @@ export async function POST(req: NextRequest) {
         markets: allMarkets,
         combos: combos as string[],
         total_leads: Number(total_leads),
+        // What the org sells / to whom — lets the backend personalise messages.
+        company_context: org.company_context ?? '',
         sdr_assignments: sdrAssignments.map(a => ({
           sdr_id: a.sdr_id,
           sender_profile_id: a.sender_profile_id ?? null,
