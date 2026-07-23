@@ -172,7 +172,7 @@ function HistoryContent() {
     }
   }
 
-  async function handleSend(runId: string, market: string) {
+  async function handleSend(runId: string, runMarkets: string[]) {
     if (!sendSelected || sending) return;
     setSending(true);
     setSendMsg(null);
@@ -180,7 +180,9 @@ function HistoryContent() {
       const res = await fetch(`/api/runs/${runId}/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ manual: true, sdr_id: sendSelected, market }),
+        // Send every country the run covered, not just the first — the assign
+        // route already accepts `markets` as an array.
+        body: JSON.stringify({ manual: true, sdr_id: sendSelected, markets: runMarkets }),
       });
       const data = await res.json();
       if (!res.ok) { setSendMsg(data.error ?? 'Send failed'); return; }
@@ -214,14 +216,23 @@ function HistoryContent() {
         const markets = run.markets?.length ? run.markets : [run.market];
         const generated = (run.run_sdr_assignments ?? []).reduce((s, a) => s + (a.leads_assigned || 0), 0);
         const statusLabel = isActive ? 'Running' : run.status.charAt(0).toUpperCase() + run.status.slice(1);
-        const runArea: AreaName | null = inferAreaFromCountry(run.market, marketAreaMap);
+        // Union of areas across every country in the run — not just the first.
+        // In practice all of a run's markets share one region (New Run's
+        // Phase 1 is region-first), but this stays correct for older runs too.
+        const runAreas = new Set(
+          markets
+            .map(m => inferAreaFromCountry(m, marketAreaMap))
+            .filter((a): a is AreaName => a !== null)
+        );
         // A run belongs to exactly ONE SDR.
         const assignment = (run.run_sdr_assignments ?? [])[0];
         const assignedSdrName = assignment?.user?.full_name
           ?? sdrs.find(s => s.id === assignment?.sdr_id)?.full_name
           ?? null;
-        // Any SDR covering the run's market can receive the leads.
-        const pickableSdrs = runArea ? sdrs.filter(s => s.areaNames.includes(runArea)) : sdrs;
+        // Any SDR covering one of the run's markets can receive the leads.
+        const pickableSdrs = runAreas.size > 0
+          ? sdrs.filter(s => s.areaNames.some(a => runAreas.has(a as AreaName)))
+          : sdrs;
 
         return (
           <div key={run.id} style={S.row} ref={el => { rowRefs.current[run.id] = el; }}>
@@ -292,7 +303,7 @@ function HistoryContent() {
                           <button onClick={() => setSendOpenFor(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)' }}><X size={15} /></button>
                         </div>
                         {pickableSdrs.length === 0 ? (
-                          <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: 0 }}>No SDRs assigned to {run.market}.</p>
+                          <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: 0 }}>No SDRs assigned to {markets.join(', ')}.</p>
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
                             {pickableSdrs.map(sdr => {
@@ -308,7 +319,7 @@ function HistoryContent() {
                           </div>
                         )}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <button onClick={() => handleSend(run.id, run.market)} disabled={!sendSelected || sending}
+                          <button onClick={() => handleSend(run.id, markets)} disabled={!sendSelected || sending}
                             style={{ fontSize: 12, fontWeight: 700, color: '#FFF', backgroundColor: !sendSelected || sending ? 'var(--crm-border)' : 'var(--crm-accent)', padding: '8px 18px', borderRadius: 8, border: 'none', cursor: !sendSelected || sending ? 'default' : 'pointer' }}>
                             {sending ? 'Moving…' : 'Move leads'}
                           </button>

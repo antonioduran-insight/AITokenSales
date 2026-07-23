@@ -301,6 +301,8 @@ For each feature, verify behavior for all applicable roles:
 - [ ] Expanded run shows **Assigned to: [name]** and the lead grid with per-lead assignee
 - [ ] Download CSV works
 - [ ] **Send to another SDR** moves the leads: the new SDR gets them AND the previous holder no longer has them
+- [ ] For a run spanning several countries in one region, the eligible-SDR list considers **all** of the run's countries, not just the first — test with a run whose first market doesn't map to any area but a later one does (old behaviour showed every SDR here; it should now narrow correctly)
+- [ ] The payload to `/api/runs/{id}/assign` carries `markets` as the full array (check the network tab), not just the run's primary market
 - [ ] After a move, no lead exists on two SDRs' boards
 - [ ] Active runs show a Cancel button; failed runs show only the support message
 - [ ] There is no Scraper "Leads" page or sidebar entry
