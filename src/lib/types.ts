@@ -229,6 +229,43 @@ export interface RunRecord {
   run_sdr_assignments?: RunSdrAssignment[]
 }
 
+/** Lifecycle of a scraper run, as reported by the Python backend. */
+export type RunStatus = 'pending' | 'running' | 'scoring' | 'drafting' | 'completed' | 'failed' | 'cancelled'
+
+/** A raw scraped lead, before it is imported into `prospects`. */
+export interface Lead {
+  id: string
+  run_id: string
+  sdr_id?: string
+  linkedin_url?: string
+  first_name?: string
+  last_name?: string
+  full_name?: string
+  company?: string
+  title?: string
+  industry?: string
+  company_size?: string
+  location?: string
+  email?: string
+  icp_score?: number
+  temperature?: 'HOT' | 'WARM' | 'COLD'
+  market?: string
+  search_combo?: string
+  custom1?: string
+  custom2?: string
+  exported_to_crm: boolean
+  created_at: string
+}
+
+/** A log line written by the backend while a run executes. */
+export interface RunLog {
+  id: string
+  run_id: string
+  level: 'info' | 'warning' | 'error' | 'success'
+  message: string
+  created_at: string
+}
+
 export interface RunSdrAssignment {
   id: string
   run_id: string

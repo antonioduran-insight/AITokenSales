@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { Link } from '@/i18n/navigation';
-import { type RunStatus } from '@/lib/scraper-api';
 import { StatusBadge } from '@/components/scraper/StatusBadge';
 import { Play, Activity } from 'lucide-react';
-import type { RunRecord } from '@/lib/types';
+import type { RunRecord, RunStatus } from '@/lib/types';
 
 const ACTIVE_STATUSES = new Set<RunStatus>(['pending', 'running', 'scoring', 'drafting']);
 

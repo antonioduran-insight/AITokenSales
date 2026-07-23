@@ -72,14 +72,15 @@ Global Admin views any org's CRM as read-only by appending `?impersonate_org_id=
 
 All cross-RLS operations are Next.js API routes using the admin client. Every route validates the caller with an internal session/role check before proceeding.
 
-Two proxies to the external Python backend:
+One proxy to the external Python backend:
 
 | Proxy | Auth | Behaviour |
 |---|---|---|
-| `/api/scraper/[...path]` | session + `admin` | Verifies any `/runs/{id}` in the path belongs to the caller's org, then injects `organization_id`. `scraperApi` in `src/lib/scraper-api.ts` wraps it. |
-| `/api/bridge/[...path]` | session + `admin` + `bridge` add-on | Injects `organization_id` (and `apify_token` on `POST /bridge/runs`) server-side. `bridgeApi` in `src/lib/bridge-api.ts` wraps it. |
+| `/api/bridge/[...path]` | session + `admin` + `bridge` add-on | **Overwrites** `organization_id` in the query and body with the session-derived value, and injects `apify_token` on `POST /bridge/runs`. `bridgeApi` in `src/lib/bridge-api.ts` wraps it. |
 
-Both proxies **overwrite** `organization_id` in the query and body with the session-derived value — never trust a client-supplied one. Any new backend-facing route must follow the same shape.
+The scraper backend has **no** catch-all proxy — a `/api/scraper/[...path]` passthrough existed but was deleted (no consumers, and it was unauthenticated). Scraper traffic goes through purpose-built routes (`/api/runs*`, `/api/scraper/to-crm`) that each do their own auth and org scoping.
+
+**Never add a generic passthrough proxy.** If a new backend endpoint is needed, either add a purpose-built route or follow the Bridge shape: verify session → verify role from the DB → gate on whatever the feature requires → overwrite `organization_id` server-side. Never trust a client-supplied `organization_id`.
 
 **When adding an add-on-gated feature, gate it in the UI *and* re-check server-side in the API route.** UI gating is never the security boundary.
 
@@ -137,14 +138,13 @@ ultra:      { max_seats: MAX_INT, max_leads_per_month: MAX_INT }
 
 | Thing | Location |
 |---|---|
-| All TypeScript types + constants | `src/lib/types.ts` |
+| All TypeScript types + constants (incl. `Lead`, `RunStatus`, `RunLog`) | `src/lib/types.ts` |
 | Supabase browser client | `src/lib/supabase/client.ts` |
 | Supabase server client | `src/lib/supabase/server.ts` |
 | Supabase admin client | `src/lib/supabase/admin.ts` |
 | User context | `src/contexts/UserContext.tsx` |
 | Global Admin theme/i18n | `src/contexts/GlobalAdminThemeContext.tsx` |
 | Audit log helper | `src/lib/utils/audit.ts` → `logAuditEvent()` |
-| Scraper HTTP client | `src/lib/scraper-api.ts` → `scraperApi` |
 | Bridge HTTP client | `src/lib/bridge-api.ts` → `bridgeApi` |
 | Org ID + impersonation hook | `src/lib/hooks/useOrgId.ts` |
 | Billing period from `billing_day` | `src/lib/utils/billing-period.ts` |

@@ -3,11 +3,10 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { type Lead } from '@/lib/scraper-api';
 import { TemperatureBadge } from '@/components/scraper/TemperatureBadge';
 import { ICPScore } from '@/components/scraper/ICPScore';
 import { Download } from 'lucide-react';
-import type { RunRecord } from '@/lib/types';
+import type { RunRecord, Lead } from '@/lib/types';
 
 const CSV_COLUMNS = ['full_name', 'linkedin_url', 'email', 'company', 'title', 'industry', 'company_size', 'icp_score', 'temperature', 'search_combo', 'created_at', 'market', 'custom1', 'custom2'] as const;
 

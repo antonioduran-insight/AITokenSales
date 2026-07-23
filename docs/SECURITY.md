@@ -39,8 +39,8 @@ Browser
   │      └─ storage: logos bucket      (public org logos)
   │
   └─── Python Scraper + Bridge Backend (external service, Railway)
-         ├─ /api/scraper/**  authenticated proxy: session + admin role +
-         │                   per-run ownership check, injects organization_id
+         ├─ /api/runs**      purpose-built scraper routes (session + admin,
+         │                   org-scoped per query)
          └─ /api/bridge/**   authenticated proxy: session + admin role +
                              add-on check, injects organization_id server-side
 ```
@@ -184,23 +184,28 @@ Verify: run `grep -r "SERVICE_ROLE" src/` — results should only be in `src/app
 
 ### Backend proxies
 
-The Python backend (`SCRAPER_API_URL`) is never called directly from the browser. Both proxies enforce the same baseline:
+The Python backend (`SCRAPER_API_URL`) is never called directly from the browser.
 
-| Proxy | Auth | Extra checks |
+**There is no generic passthrough proxy.** A catch-all `/api/scraper/[...path]` route used to forward any method, path, query and body to the backend with no session, role or org check. It has been **deleted** — it had no consumers in the application, so removing it eliminated the exposure outright rather than patching it.
+
+Backend access is now limited to:
+
+| Route | Auth | Notes |
 |---|---|---|
-| `/api/scraper/[...path]` | Session + `admin` role | Any `/runs/{id}…` path is verified to belong to the caller's org before forwarding |
-| `/api/bridge/[...path]` | Session + `admin` role | Active `bridge` add-on required; injects `apify_token` on `POST /bridge/runs` |
+| `/api/runs`, `/api/runs/[id]*` | Session + `admin` role | Purpose-built; each query is explicitly scoped to the caller's `organization_id` |
+| `/api/scraper/to-crm` | Session + role check | Imports scraped leads into `prospects` |
+| `/api/bridge/[...path]` | Session + `admin` role + active `bridge` add-on | The only remaining proxy; injects `apify_token` on `POST /bridge/runs` |
 
-Both follow the same pattern, which is the reference for any new backend-facing route:
+The Bridge proxy is the reference pattern for any new backend-facing route:
 
 1. Resolves the session via `supabase.auth.getUser()`
 2. Reads the caller's role and `organization_id` **from the database**
-3. Rejects non-`admin` callers (403) — SDRs cannot reach either backend
-4. Route-specific gate: Bridge checks the add-on is active; the scraper proxy checks that any `/runs/{id}` in the path belongs to the caller's org (404 otherwise, using the same response for "missing" and "another org" so run ids are not enumerable)
+3. Rejects non-`admin` callers (403) — SDRs cannot reach the backend at all
+4. Route-specific gate (Bridge: the add-on must be active for that org)
 5. **Overwrites** `organization_id` in both the query string and the JSON body with the value from the session — a client-supplied value is always discarded
 6. Injects org credentials from the DB where the backend needs them (`apify_token` on `POST /bridge/runs`), so they never reach the browser
 
-Because step 5 overwrites rather than validates, an authenticated admin of Org A cannot read or mutate Org B's runs, seed lists or candidates through either route.
+Because step 5 overwrites rather than validates, an authenticated admin of Org A cannot read or mutate Org B's seed lists, runs or candidates through this route. The purpose-built `/api/runs/[id]*` routes achieve the same by verifying the run's `organization_id` matches the caller's before returning anything.
 
 Per-org third-party credentials (Apify token, Anthropic key) live on the `organizations` row and are only ever read server-side in API routes.
 
@@ -337,8 +342,7 @@ A compromised `admin_global` account has full read access to all organizations' 
 
 | Item | Risk level | Notes |
 |---|---|---|
-| Backend trusts the injected `organization_id` | Medium | Both proxies guarantee the value is server-derived, but the Python backend must scope its queries by it. If the backend ignores `organization_id`, cross-org exposure is possible despite a correct proxy. **Verify on the backend side.** |
-| Non-`/runs` scraper paths are not ownership-checked | Low | The scraper proxy validates ownership for `/runs/{id}` paths. Any future backend path that embeds a different org-scoped identifier would need its own check — the `organization_id` injection is the only guard there. |
+| Backend trusts the injected `organization_id` | Medium | The Bridge proxy guarantees the value is server-derived, but the Python backend must scope its queries by it. If the backend ignores `organization_id`, cross-org exposure is possible despite a correct proxy. **Verify on the backend side.** |
 | No MFA enforcement at app layer | Medium | Must be enforced in Supabase Auth project settings |
 | No rate limiting on import API | Low | Supabase's auth rate limits apply; large imports are bounded by file size limit (5 MB) |
 | Client-side audit for some events | Low | Status changes and notes are audit-logged from the browser. A motivated user could skip the call. |
@@ -395,11 +399,12 @@ Priority areas for security testing:
    - Call any `/api/bridge/*` endpoint (expect 403)
    - Pass another org's `organization_id` in the query or body and confirm it is ignored
 
-2c. **Backend proxies** — for both `/api/scraper/*` and `/api/bridge/*`:
+2c. **Backend access** — for `/api/bridge/*` and `/api/runs/*`:
    - Call with no session (expect 401)
    - Call as `sdr` (expect 403)
-   - As an admin of Org A, request `/api/scraper/runs/<org-B-run-id>` and `/api/scraper/runs/<org-B-run-id>/logs` (expect 404, identical to a non-existent id)
-   - Pass `?organization_id=<org-B>` and a body `organization_id` and confirm both are overwritten with the caller's org
+   - As an admin of Org A, request `/api/runs/<org-B-run-id>` and `/api/runs/<org-B-run-id>/logs` (expect 404, identical to a non-existent id)
+   - On Bridge, pass `?organization_id=<org-B>` and a body `organization_id` and confirm both are overwritten with the caller's org
+   - Confirm no catch-all proxy has been reintroduced: `/api/scraper/<anything>` should 404 except the explicit `to-crm` route
 
 3. **RLS bypass** — using the anon key directly (bypassing the Next.js layer), verify no data is accessible beyond the user's scope
 

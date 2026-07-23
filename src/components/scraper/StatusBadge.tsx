@@ -1,6 +1,6 @@
 'use client';
 
-import type { RunStatus } from "@/lib/scraper-api";
+import type { RunStatus } from "@/lib/types";
 
 const STATUS_LABELS: Record<RunStatus, string> = {
   pending:   "Pending",

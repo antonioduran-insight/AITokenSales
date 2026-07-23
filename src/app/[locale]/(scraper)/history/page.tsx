@@ -3,11 +3,10 @@
 import { useEffect, useRef, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { type Lead } from '@/lib/scraper-api';
 import { TemperatureBadge } from '@/components/scraper/TemperatureBadge';
 import { ICPScore } from '@/components/scraper/ICPScore';
 import { ChevronDown, ChevronUp, Download, Send, X, XCircle } from 'lucide-react';
-import type { RunRecord, User, AreaName } from '@/lib/types';
+import type { RunRecord, User, AreaName, Lead } from '@/lib/types';
 import { inferAreaFromCountry } from '@/lib/utils/area-inference';
 
 const ACTIVE = new Set(['pending', 'running', 'scraping', 'scoring', 'drafting']);

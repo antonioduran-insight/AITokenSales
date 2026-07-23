@@ -199,10 +199,9 @@ Every org has isolated data via `organization_id` columns and RLS. Admins are sc
 
 | Proxy | Auth | Notes |
 |---|---|---|
-| `/api/scraper/[...path]` | session + `admin` | Verifies `/runs/{id}` ownership, injects `organization_id` |
-| `/api/bridge/[...path]` | session + `admin` + `bridge` add-on | Injects `organization_id` and `apify_token` server-side |
+| `/api/bridge/[...path]` | session + `admin` + `bridge` add-on | Injects `organization_id` and `apify_token` server-side, overwriting anything the client sent |
 
-Both overwrite any client-supplied `organization_id` with the session-derived value.
+The scraper backend is **not** proxied generically. The CRM talks to it only through purpose-built routes (`/api/runs*`, `/api/scraper/to-crm`), each with its own auth and org scoping. A catch-all `/api/scraper/[...path]` proxy previously existed but was removed — it had no consumers.
 
 ---
 
@@ -357,8 +356,8 @@ src/
 │   └── GlobalAdminThemeContext.tsx  # Dark/light + zh/en for Global Admin only
 ├── lib/
 │   ├── supabase/               # client.ts · server.ts · admin.ts
-│   ├── types.ts                # All types + constants (MAX_INT, PLAN_DEFAULTS, ADDON_LIST, ADDON_MONTHLY_PRICE)
-│   ├── scraper-api.ts          # Scraper HTTP client
+│   ├── types.ts                # All types (incl. Lead, RunStatus, RunLog) + constants
+│   │                           #   (MAX_INT, PLAN_DEFAULTS, ADDON_LIST, ADDON_MONTHLY_PRICE)
 │   ├── bridge-api.ts           # Bridge HTTP client
 │   └── utils/
 │       ├── audit.ts            # logAuditEvent helper
@@ -419,7 +418,7 @@ npm run lint         # ESLint
 | POST | `/api/runs/[id]/assign` | admin | Assign the run's leads to its SDR (`manual: true` moves them) |
 | GET | `/api/runs/quota` | any | Lead quota for the current billing period |
 | GET/POST | `/api/scraper-combos` | admin | Search strategies enabled per org |
-| ALL | `/api/scraper/[...path]` | admin | Proxy to the Python backend; checks run ownership, injects `organization_id` |
+| POST | `/api/scraper/to-crm` | admin | Import scraped leads into `prospects` |
 
 ### Bridge
 
