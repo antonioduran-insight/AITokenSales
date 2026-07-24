@@ -215,6 +215,10 @@ Every outbound call to the Python backend carries `X-Internal-Api-Key`, a shared
 
 When the variable is unset the header is **omitted** rather than sent as the string `"undefined"` — a misconfigured deploy is then rejected by the backend instead of appearing to authenticate. This is defence in depth: the CRM already authenticates and org-scopes the caller before forwarding, and the key stops anything that is not the CRM from reaching the backend directly.
 
+### Cron authentication
+
+`GET /api/cron/reconcile-runs` is the one route in this app authenticated by a **shared secret instead of a session** — it has no human caller, Vercel Cron invokes it directly. It requires `Authorization: Bearer $CRON_SECRET` (Vercel adds this header automatically when the `CRON_SECRET` env var is configured on the project) and rejects the request outright if the env var is unset, so a missing secret fails closed rather than open. It uses the service-role client and operates **across every organization** by design (it has no single caller to scope to) — anyone who obtains `CRON_SECRET` could trigger it manually, but the route only ever assigns already-scraped leads to the SDR already recorded on that run's own `run_sdr_assignments` row; it cannot be used to exfiltrate data, change ownership arbitrarily, or write anything not already implied by existing DB state.
+
 ### CORS
 
 Next.js API routes do not set permissive CORS headers by default. Cross-origin requests from unauthorized domains cannot call these endpoints with cookies.
@@ -237,6 +241,7 @@ No application-level rate limiting is currently implemented. Rate limiting shoul
 | `NEXT_PUBLIC_APP_URL` | Public | Redirects |
 | `SCRAPER_API_URL` | Private (server) | Scraper / Bridge backend base URL |
 | `INTERNAL_API_KEY` | **Private** (server only) | Sent as `X-Internal-Api-Key` on every backend call |
+| `CRON_SECRET` | **Private** (server only) | Authorizes `GET /api/cron/reconcile-runs`; Vercel sends it automatically as `Authorization: Bearer $CRON_SECRET` |
 
 `NEXT_PUBLIC_*` variables are bundled into the client JS. All others are server-only. Never add sensitive values to `NEXT_PUBLIC_*` variables.
 

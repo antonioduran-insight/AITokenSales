@@ -118,9 +118,13 @@ Global Admin has its own theme system (`GlobalAdminThemeContext`) with dark/ligh
 
 **Never treat `run_sdr_assignments` as proof of assignment** — the Railway backend writes those rows itself when a run completes. Gating the auto-assign on `leads_assigned > 0` caused leads to never reach `prospects`. The assign endpoint is idempotent, so always call it.
 
-**Auto-assign is entirely client-driven — there is no server-side cron or webhook.** New Run's `poll()` (`src/app/[locale]/(scraper)/run/page.tsx`) is the only thing that calls `/api/runs/[id]/assign` on completion. Two consequences to keep in mind when touching this file:
-- A transient status-read failure (backend redeploy, 5xx, network blip) must **never** be treated the same as `status === 'failed'`. Only an authoritative 404/403 (run gone / access lost) should stop polling and route to the failure screen; everything else should keep polling indefinitely and show a soft "reconnecting" state. Conflating the two used to make a mid-run Railway redeploy look like a failure, and clicking "Try Again" would wipe the `localStorage` run pointer while the run went on to complete in the background with nothing left to catch it.
+**Auto-assign has a client-driven path AND a server-side safety net.** New Run's `poll()` (`src/app/[locale]/(scraper)/run/page.tsx`) calls `/api/runs/[id]/assign` the moment it observes `status === 'completed'` — this is still the primary, fastest path. Two consequences to keep in mind when touching that file:
+- A transient status-read failure (backend redeploy, 5xx, network blip) must **never** be treated the same as `status === 'failed'`. Only an authoritative 404/403 (run gone / access lost) should stop polling and route to the failure screen; everything else should keep polling indefinitely and show a soft "reconnecting" state.
 - `runAssign()` must not depend solely on `localStorage`/in-memory state for the `sdr_id` — that state is lost if the tab is closed and reopened later, or if a second run overwrites the single `scraper_active_run` localStorage key. Always fall back to `run_sdr_assignments[0].sdr_id` from the freshly-polled run (already returned by `GET /api/runs/[id]`), since that row is written server-side when the run is created.
+
+Because the client path can still be missed entirely (tab closed before completion, admin navigates to History instead of staying on New Run — which is the *normal* flow, not an edge case), **`GET /api/cron/reconcile-runs` is a server-side safety net** run by Vercel Cron (`vercel.json`, every 10 min). It scans for `completed` runs with `scraper_leads.exported_to_crm = false` and exactly one `run_sdr_assignments` row (unambiguous recipient — every run created via New Run starts with exactly one), and assigns them. Runs with zero or multiple assignment rows are **skipped and reported, never guessed at** — a manual "Send to another SDR" can leave a run with several rows, and picking the wrong one has real business cost (quota, commission, lead ownership).
+
+Both paths call the same `assignRunLeads()` in `src/lib/utils/run-assign.ts` — **never reimplement the assign logic inline in a route handler.** It's idempotent, so the client and cron paths racing each other is safe.
 
 **Prospect uniqueness** — `prospects` is unique on `(organization_id, linkedin_url, assigned_to)`, so the same lead can live on more than one SDR's board. Insert paths must tolerate `23505` row-by-row rather than aborting a whole batch.
 
@@ -163,6 +167,8 @@ ultra:      { max_seats: MAX_INT, max_leads_per_month: MAX_INT }
 | Org ID + impersonation hook | `src/lib/hooks/useOrgId.ts` |
 | Billing period from `billing_day` | `src/lib/utils/billing-period.ts` |
 | Lead quota for current period | `src/lib/utils/lead-quota.ts` |
+| Shared run-assign core logic | `src/lib/utils/run-assign.ts` → `assignRunLeads()` |
+| Cron: reconcile stuck completed runs | `src/app/api/cron/reconcile-runs/route.ts` (see `vercel.json`) |
 | Fiscal quarters + billable months | `src/lib/utils/quarter.ts` |
 | Anthropic base URL normaliser | `src/lib/utils/anthropic.ts` |
 | Area normalisation + market→area lookup | `src/lib/utils/area-inference.ts` |

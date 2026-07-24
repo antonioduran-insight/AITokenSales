@@ -79,6 +79,14 @@ The lead allowance now renews on each org's **`billing_day`**, not on the 1st of
 
 Settings → Organization has a **Company Context** textarea describing what the org sells and to whom. It is forwarded in the `POST /runs` payload to the scraper backend so generated messages can reference real products and focus.
 
+### Server-side safety net for auto-assign
+
+New Run's auto-assign used to be **entirely client-driven**: it only fired if the browser tab that started the run was still open and polling at the exact moment the backend reported `completed`. Since completing a run normally sends the admin to History (not back to New Run), and a tab can be closed at any point, leads could sit in `scraper_leads` with `exported_to_crm = false` indefinitely with nothing to catch it.
+
+`GET /api/cron/reconcile-runs`, run every 10 minutes by Vercel Cron (`vercel.json`), now sweeps for completed runs with unexported leads and an unambiguous single-SDR recipient, and assigns them — no open tab required. Runs with zero or multiple `run_sdr_assignments` rows (e.g. after a manual "Send to another SDR") are skipped and reported rather than guessed at. Both the client path and the cron call the same `assignRunLeads()` (`src/lib/utils/run-assign.ts`), so they're safe to race — the unique-key guard makes double-assignment a no-op.
+
+Requires the `CRON_SECRET` env var (see [Environment Variables](#environment-variables)).
+
 ### Other changes
 
 - **Dark mode only** — the CRM light/dark toggle and all light-theme CSS were removed. (Global Admin keeps its own independent theme toggle.)
@@ -274,9 +282,16 @@ NEXT_PUBLIC_SCRAPER_WS_URL=wss://pwa-aitokensales-production.up.railway.app
 # Shared secret sent as X-Internal-Api-Key on every backend call.
 # Must match INTERNAL_API_KEY on the Railway backend. Server-only.
 INTERNAL_API_KEY=your-internal-api-key
+
+# Authorizes Vercel Cron to call /api/cron/reconcile-runs. Vercel sends this
+# automatically as `Authorization: Bearer $CRON_SECRET` when the cron fires —
+# just set the variable, no extra wiring needed. Server-only.
+CRON_SECRET=your-cron-secret
 ```
 
-> `SUPABASE_SERVICE_ROLE_KEY` and `INTERNAL_API_KEY` must never reach the browser. They are server-only — never prefix them with `NEXT_PUBLIC_`.
+> `SUPABASE_SERVICE_ROLE_KEY`, `INTERNAL_API_KEY` and `CRON_SECRET` must never reach the browser. They are server-only — never prefix them with `NEXT_PUBLIC_`.
+>
+> `vercel.json` schedules `/api/cron/reconcile-runs` every 10 minutes. **Vercel's Hobby plan only runs cron jobs once a day** — the 10-minute schedule requires a Pro (or higher) plan; confirm the project's plan before relying on this.
 
 Per-org credentials (**Apify token**, **Anthropic key / base URL / model**) are stored on the `organizations` row, not in env vars — set them in Settings → Scraper or in Global Admin.
 
@@ -426,6 +441,7 @@ npm run lint         # ESLint
 | GET | `/api/runs/quota` | any | Lead quota for the current billing period |
 | GET/POST | `/api/scraper-combos` | admin | Search strategies enabled per org |
 | POST | `/api/scraper/to-crm` | admin | Import scraped leads into `prospects` |
+| GET | `/api/cron/reconcile-runs` | `CRON_SECRET` bearer token | Vercel Cron safety net — assigns completed runs the client-side flow missed |
 
 ### Bridge
 
