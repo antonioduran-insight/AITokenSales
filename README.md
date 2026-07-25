@@ -1,5 +1,3 @@
-<!-- deploy-webhook-test: temporary marker, to be removed once Vercel auto-deploy is confirmed working -->
-
 # AITokenKing — B2B LinkedIn Outreach CRM
 
 Multi-tenant CRM platform for managing LinkedIn outreach campaigns across geographic regions. Built for sales teams with SDRs working dedicated markets, full admin oversight, an AI-powered LinkedIn scraper, a Bridge partnership-discovery add-on, conversation logging, and a Global Admin control plane for managing all client organizations.
@@ -85,7 +83,7 @@ Settings → Organization has a **Company Context** textarea describing what the
 
 New Run's auto-assign used to be **entirely client-driven**: it only fired if the browser tab that started the run was still open and polling at the exact moment the backend reported `completed`. Since completing a run normally sends the admin to History (not back to New Run), and a tab can be closed at any point, leads could sit in `scraper_leads` with `exported_to_crm = false` indefinitely with nothing to catch it.
 
-`GET /api/cron/reconcile-runs`, run every 10 minutes by Vercel Cron (`vercel.json`), now sweeps for completed runs with unexported leads and an unambiguous single-SDR recipient, and assigns them — no open tab required. Runs with zero or multiple `run_sdr_assignments` rows (e.g. after a manual "Send to another SDR") are skipped and reported rather than guessed at. Both the client path and the cron call the same `assignRunLeads()` (`src/lib/utils/run-assign.ts`), so they're safe to race — the unique-key guard makes double-assignment a no-op.
+`GET /api/cron/reconcile-runs`, run daily by Vercel Cron (`vercel.json`), now sweeps for completed runs with unexported leads and an unambiguous single-SDR recipient, and assigns them — no open tab required. Runs with zero or multiple `run_sdr_assignments` rows (e.g. after a manual "Send to another SDR") are skipped and reported rather than guessed at. Both the client path and the cron call the same `assignRunLeads()` (`src/lib/utils/run-assign.ts`), so they're safe to race — the unique-key guard makes double-assignment a no-op.
 
 Requires the `CRON_SECRET` env var (see [Environment Variables](#environment-variables)).
 
@@ -293,7 +291,7 @@ CRON_SECRET=your-cron-secret
 
 > `SUPABASE_SERVICE_ROLE_KEY`, `INTERNAL_API_KEY` and `CRON_SECRET` must never reach the browser. They are server-only — never prefix them with `NEXT_PUBLIC_`.
 >
-> `vercel.json` schedules `/api/cron/reconcile-runs` every 10 minutes. **Vercel's Hobby plan only runs cron jobs once a day** — the 10-minute schedule requires a Pro (or higher) plan; confirm the project's plan before relying on this.
+> `vercel.json` schedules `/api/cron/reconcile-runs` once a day (`0 3 * * *`, ~3am UTC — Vercel doesn't guarantee the exact minute). This schedule is deliberately Hobby-plan-compatible: **Vercel rejects the entire deployment** if any cron in `vercel.json` would run more than once a day on Hobby, so an invalid schedule here silently blocks every deploy, not just the cron. If the project is on Pro or higher, this can safely be tightened (e.g. `*/10 * * * *` for a 10-minute sweep) for faster recovery.
 
 Per-org credentials (**Apify token**, **Anthropic key / base URL / model**) are stored on the `organizations` row, not in env vars — set them in Settings → Scraper or in Global Admin.
 
