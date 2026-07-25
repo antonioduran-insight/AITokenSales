@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { randomUUID } from 'crypto'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { backendHeaders, SCRAPER_API_URL } from '@/lib/scraper-backend'
@@ -55,9 +54,10 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
   const url = `${BACKEND}${pathStr}?${search.toString()}`
 
   const init: RequestInit = { method: req.method, headers: backendHeaders() }
-  // Set only for POST /bridge/runs — used below to backfill the response if
-  // the backend doesn't echo it back (the client needs an id to start polling).
-  let generatedRunId: string | null = null
+  // Set only for POST /bridge/runs. The bridge_runs row we create below is
+  // the authoritative id — used to force it into the response regardless of
+  // what shape the backend echoes back.
+  let createdRunId: string | null = null
 
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     let body: Record<string, unknown> = {}
@@ -83,16 +83,27 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
       }
       body.apify_token = org.apify_token
 
-      // Unlike the main scraper (which owns a `runs` table row and passes its
-      // id to the backend), Bridge has no local run table — the backend is
-      // the sole owner of run state. Its POST /bridge/runs schema requires
-      // run_id in the request body rather than generating one itself, so we
-      // generate it here, the same way the main scraper's run_id originates
-      // from the CRM side rather than the backend.
-      if (!body.run_id) {
-        generatedRunId = randomUUID()
-        body.run_id = generatedRunId
+      // Same pattern as the main scraper's `runs` table: the CRM creates the
+      // row FIRST (status='pending') and passes its id as run_id — the
+      // backend looks up and validates that row rather than creating its own,
+      // and updates it (status, total_candidates, started_at/completed_at,
+      // error_message) as the run progresses. GET /bridge/runs/[id] proxies
+      // straight to the backend, which reads this same row.
+      const seedListId = typeof body.seed_list_id === 'string' ? body.seed_list_id : null
+      const { data: bridgeRun, error: bridgeRunError } = await admin
+        .from('bridge_runs')
+        .insert({ organization_id: orgId, seed_list_id: seedListId, status: 'pending' })
+        .select('id')
+        .single()
+
+      if (bridgeRunError || !bridgeRun) {
+        return NextResponse.json(
+          { error: bridgeRunError?.message ?? 'Failed to create Bridge run' },
+          { status: 500 }
+        )
       }
+      createdRunId = bridgeRun.id as string
+      body.run_id = createdRunId
     }
 
     // Batch-confirming candidates generates personalised partnership messages,
@@ -153,15 +164,26 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
     const res = await fetch(url, init)
     let text = await res.text()
 
-    // Guarantee the client gets back an id it can poll with, regardless of
-    // whether the backend echoes the run_id we generated above.
-    if (generatedRunId && res.ok) {
-      try {
-        const parsed = JSON.parse(text)
-        if (parsed && typeof parsed === 'object' && !parsed.id && !parsed.run_id) {
-          text = JSON.stringify({ ...parsed, run_id: generatedRunId })
+    if (createdRunId) {
+      if (res.ok) {
+        // We already know the true id (the row we just created) — force it
+        // into the response unconditionally rather than trusting the backend
+        // echoed it back in a shape we happen to recognise. This is what the
+        // client polls with, so any mismatch here means "run not found".
+        try {
+          const parsed = JSON.parse(text)
+          text = JSON.stringify({ ...(parsed && typeof parsed === 'object' ? parsed : {}), id: createdRunId, run_id: createdRunId })
+        } catch {
+          text = JSON.stringify({ id: createdRunId, run_id: createdRunId })
         }
-      } catch { /* backend didn't return JSON — leave the passthrough as-is */ }
+      } else {
+        // The backend rejected the run (bad seed list, Apify error, etc.) —
+        // don't leave the row stuck at 'pending' forever with no explanation.
+        await admin
+          .from('bridge_runs')
+          .update({ status: 'failed', error_message: text.slice(0, 2000) })
+          .eq('id', createdRunId)
+      }
     }
 
     return new NextResponse(text, {
@@ -169,6 +191,12 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
       headers: { 'Content-Type': res.headers.get('Content-Type') ?? 'application/json' },
     })
   } catch (e) {
+    if (createdRunId) {
+      await admin
+        .from('bridge_runs')
+        .update({ status: 'failed', error_message: String(e).slice(0, 2000) })
+        .eq('id', createdRunId)
+    }
     return NextResponse.json({ error: String(e) }, { status: 502 })
   }
 }
