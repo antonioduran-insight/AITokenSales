@@ -347,7 +347,7 @@ For each feature, verify behavior for all applicable roles:
 - [ ] With no Anthropic key configured, confirm-batch returns a clear 400
 - [ ] Passing an `sdr_id` from another org returns 400 (the proxy validates it)
 - [ ] Filter chips (All / Pending / Confirmed / Rejected) show correct counts
-- [ ] **Past Searches** lists previous runs; opening one loads its candidates
+- [ ] **Past Searches** lists previous runs (reads `bridge_runs` directly — no 405, the backend doesn't support listing); opening one loads its candidates
 
 ### Billing-period lead quota
 

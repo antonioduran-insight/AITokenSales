@@ -48,6 +48,36 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
   const { path } = await params
   const pathStr = '/bridge/' + path.join('/')
 
+  // Listing runs ("Past Searches") is NOT proxied — the backend only
+  // implements POST /bridge/runs (create), not GET (list), and 405s. We
+  // already own bridge_runs (the proxy inserts into it on create), so read
+  // it directly here instead, the same way /api/runs reads `runs` straight
+  // from Supabase rather than asking the scraper backend to list anything.
+  // GET /bridge/runs/{id} and /logs are unaffected — those the backend does
+  // support, and keep proxying through below.
+  if (pathStr === '/bridge/runs' && req.method === 'GET') {
+    const { data, error } = await admin
+      .from('bridge_runs')
+      .select('id, seed_list_id, status, total_candidates, error_message, started_at, completed_at, created_at')
+      .eq('organization_id', orgId)
+      .order('created_at', { ascending: false })
+      .limit(100)
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    const runs = (data ?? []).map(r => ({
+      id: r.id,
+      seed_list_id: r.seed_list_id,
+      status: r.status,
+      candidates_found: r.total_candidates ?? 0,
+      error_message: r.error_message,
+      started_at: r.started_at,
+      completed_at: r.completed_at,
+      created_at: r.created_at,
+    }))
+    return NextResponse.json(runs)
+  }
+
   // Always scope reads to this org.
   const search = new URLSearchParams(req.nextUrl.searchParams)
   search.set('organization_id', orgId)
