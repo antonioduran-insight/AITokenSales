@@ -1,3 +1,5 @@
+<!-- deploy-webhook-test: temporary marker, to be removed once Vercel auto-deploy is confirmed working -->
+
 # AITokenKing — B2B LinkedIn Outreach CRM
 
 Multi-tenant CRM platform for managing LinkedIn outreach campaigns across geographic regions. Built for sales teams with SDRs working dedicated markets, full admin oversight, an AI-powered LinkedIn scraper, a Bridge partnership-discovery add-on, conversation logging, and a Global Admin control plane for managing all client organizations.
