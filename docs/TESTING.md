@@ -329,6 +329,7 @@ For each feature, verify behavior for all applicable roles:
 - [ ] Create one with **criteria only** (industry / headcount / market)
 - [ ] Create one with **both** — both are stored
 - [ ] Save is blocked until a name and at least one populated source exist
+- [ ] Run a search: `POST /bridge/runs` succeeds (no 422 "Field required" for `run_id` — the proxy generates one before forwarding) and the client receives a usable id to start polling
 - [ ] Run a search: progress ring + logs poll every 3s
 - [ ] On completion, candidate count shown and candidates load
 - [ ] **Reject** turns a candidate red and persists after reload

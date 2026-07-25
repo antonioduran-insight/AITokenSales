@@ -78,6 +78,8 @@ One proxy to the external Python backend:
 |---|---|---|
 | `/api/bridge/[...path]` | session + `admin` + `bridge` add-on | **Overwrites** `organization_id` in the query and body with the session-derived value, and injects `apify_token` on `POST /bridge/runs`. `bridgeApi` in `src/lib/bridge-api.ts` wraps it. |
 
+**Bridge has no local run table — the backend owns all Bridge state.** Unlike the main scraper (`runs` is a first-class CRM table with `run_sdr_assignments`, quota tracking, etc.), Bridge's `GET /runs`, `GET /runs/[id]`, `GET /runs/[id]/logs` and `GET /candidates` are pure passthroughs; nothing is mirrored locally. `POST /bridge/runs` requires `run_id` in the request body (422 otherwise) — the proxy generates it with `randomUUID()` before forwarding, the same way the main scraper's `run_id` originates CRM-side rather than from the backend. The response is defensively backfilled with that `run_id` if the backend doesn't echo it back, so `bridgeApi.createRun()`'s `res.id ?? res.run_id` always resolves.
+
 The scraper backend has **no** catch-all proxy — a `/api/scraper/[...path]` passthrough existed but was deleted (no consumers, and it was unauthenticated). Scraper traffic goes through purpose-built routes (`/api/runs*`, `/api/scraper/to-crm`) that each do their own auth and org scoping.
 
 **Never add a generic passthrough proxy.** If a new backend endpoint is needed, either add a purpose-built route or follow the Bridge shape: verify session → verify role from the DB → gate on whatever the feature requires → overwrite `organization_id` server-side. Never trust a client-supplied `organization_id`.

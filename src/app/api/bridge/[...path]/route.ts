@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { backendHeaders, SCRAPER_API_URL } from '@/lib/scraper-backend'
@@ -54,6 +55,9 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
   const url = `${BACKEND}${pathStr}?${search.toString()}`
 
   const init: RequestInit = { method: req.method, headers: backendHeaders() }
+  // Set only for POST /bridge/runs — used below to backfill the response if
+  // the backend doesn't echo it back (the client needs an id to start polling).
+  let generatedRunId: string | null = null
 
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     let body: Record<string, unknown> = {}
@@ -78,6 +82,17 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
         )
       }
       body.apify_token = org.apify_token
+
+      // Unlike the main scraper (which owns a `runs` table row and passes its
+      // id to the backend), Bridge has no local run table — the backend is
+      // the sole owner of run state. Its POST /bridge/runs schema requires
+      // run_id in the request body rather than generating one itself, so we
+      // generate it here, the same way the main scraper's run_id originates
+      // from the CRM side rather than the backend.
+      if (!body.run_id) {
+        generatedRunId = randomUUID()
+        body.run_id = generatedRunId
+      }
     }
 
     // Batch-confirming candidates generates personalised partnership messages,
@@ -136,7 +151,19 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
 
   try {
     const res = await fetch(url, init)
-    const text = await res.text()
+    let text = await res.text()
+
+    // Guarantee the client gets back an id it can poll with, regardless of
+    // whether the backend echoes the run_id we generated above.
+    if (generatedRunId && res.ok) {
+      try {
+        const parsed = JSON.parse(text)
+        if (parsed && typeof parsed === 'object' && !parsed.id && !parsed.run_id) {
+          text = JSON.stringify({ ...parsed, run_id: generatedRunId })
+        }
+      } catch { /* backend didn't return JSON — leave the passthrough as-is */ }
+    }
+
     return new NextResponse(text, {
       status: res.status,
       headers: { 'Content-Type': res.headers.get('Content-Type') ?? 'application/json' },
