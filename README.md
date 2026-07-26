@@ -97,11 +97,14 @@ Moving a lead to **Closed** — by dragging it in Kanban, or via the status drop
 
 `GET /api/conversations/counts` (which both drive) is now session-authenticated and org-scoped through `prospects`, not `conversations.organization_id` directly (that column isn't guaranteed populated on every row) — it previously had no auth check at all.
 
+### Kanban ↔ Leads pipeline stages, fixed mapping (FUNC-F8)
+
+`pipeline_stages` used to map to `outreach_status` purely by array position, and the write path (drag-reorder) and read path (Kanban's column lookup) disagreed on whether that position was 0- or 1-indexed — so every org's Kanban column labels were silently shifted by one from what was actually configured, and nothing stopped an admin renaming two different columns to the same label or leaving one unlabeled. Fixed with an explicit `pipeline_stages.outreach_status` column, unique per org: every org now always has exactly one stage per status, `name`/`color` stay freely editable in Settings → Pipeline, but there's no more add/delete/reorder — those were exactly the operations that let the mapping drift. See `supabase/migrations/20260726_pipeline_stage_status_mapping.sql` (**run by hand, in two steps** — it backfills the new column by rank rather than assuming the old broken position data, since custom labels may already be attached to the wrong status).
+
 ### Other changes
 
 - **Dark mode only** — the CRM light/dark toggle and all light-theme CSS were removed. (Global Admin keeps its own independent theme toggle.)
 - **Anthropic base URL** is normalised on save (a trailing `/v1` is stripped) on org create, org edit and Settings — this fixes the `/v1/v1` model error.
-- **Pipeline** — every stage now has a delete button, gated by a prospect-count check on both client and server; stages are de-duplicated by id *and* name when rendering.
 - **Statistics** — conversion-rate percentages are green in the By SDR and By Area cards.
 - **User Management** — the Edit User modal no longer contains `years_experience` / `seniority` / `expertise_area` (these live on the sender profile) or the Scraper Access toggle.
 
@@ -346,6 +349,7 @@ scraper_leads        -- Raw scraped leads before import into prospects
 | `20260720_dedup_pipeline_stages.sql` | Cleans duplicate `pipeline_stages` rows |
 | `20260721_company_context.sql` | Adds `organizations.company_context` |
 | `20260721_bridge_addon.sql` | Widens the `addon_type` CHECK to include `bridge` |
+| `20260726_pipeline_stage_status_mapping.sql` | Adds `pipeline_stages.outreach_status` (fixed 1:1 mapping, FUNC-F8 fix) — **run in two steps, see the file's own comments** |
 
 ---
 
@@ -436,7 +440,7 @@ npm run lint         # ESLint
 | GET | `/api/organizations/[id]/markets` | own org | Markets this org activated |
 | PUT | `/api/organizations/[id]/markets` | admin (own org) | Sync the org's market selection |
 | GET | `/api/settings/addons` | any | Active add-on types for the caller's org |
-| GET/POST/PATCH/DELETE | `/api/settings/pipeline-stages` | admin | Pipeline stage CRUD |
+| GET/PATCH | `/api/settings/pipeline-stages` | admin | Rename/recolor the org's 7 fixed stages (one per `outreach_status`, no add/delete) |
 | GET/POST | `/api/support/tickets` | admin/sdr | Support tickets |
 
 ### Scraper

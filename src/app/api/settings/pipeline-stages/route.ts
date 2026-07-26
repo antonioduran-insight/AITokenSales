@@ -23,7 +23,7 @@ async function getOrgAdmin() {
   return { userId: user.id, orgId: profile.organization_id as string }
 }
 
-// GET — list stages for org
+// GET — list this org's 7 stages (one per outreach_status), ordered by position
 export async function GET() {
   const ctx = await getOrgAdmin()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -36,109 +36,44 @@ export async function GET() {
     .order('position')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-
-  // If no stages exist yet, return empty array (admin should seed via SQL migration)
   return NextResponse.json(data ?? [])
 }
 
-// POST — add a new stage
-export async function POST(req: Request) {
-  const ctx = await getOrgAdmin()
-  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { name, color } = await req.json()
-  if (!name?.trim()) return NextResponse.json({ error: 'name required' }, { status: 400 })
-
-  const admin = createAdminClient()
-
-  // Get max position
-  const { data: existing } = await admin
-    .from('pipeline_stages')
-    .select('position')
-    .eq('organization_id', ctx.orgId)
-    .order('position', { ascending: false })
-    .limit(1)
-
-  const nextPos = (existing?.[0]?.position ?? -1) + 1
-
-  const { data, error } = await admin
-    .from('pipeline_stages')
-    .insert({ organization_id: ctx.orgId, name: name.trim(), color: color ?? '#6C63FF', position: nextPos })
-    .select()
-    .single()
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  return NextResponse.json(data, { status: 201 })
-}
-
-// PATCH — bulk update (reorder + rename + recolor)
+// PATCH — rename/recolor stages. Each stage's outreach_status is fixed — a
+// 1:1 mapping to the funnel, unique per org (see FUNC-F8 in CLAUDE.md for why
+// this replaced free add/delete/reorder) — so this only ever touches
+// `name`/`color`. There is no POST/DELETE anymore: every org always has
+// exactly one stage per OutreachStatus value, forever.
 export async function PATCH(req: Request) {
   const ctx = await getOrgAdmin()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { stages } = await req.json() as { stages: Array<{ id: string; name: string; color: string; position: number }> }
+  const { stages } = await req.json() as { stages: Array<{ id: string; name: string; color: string }> }
   if (!Array.isArray(stages)) return NextResponse.json({ error: 'stages array required' }, { status: 400 })
 
   const admin = createAdminClient()
 
-  // Upsert each stage, verifying it belongs to this org
-  const updates = stages.map(s => ({
-    id: s.id,
-    organization_id: ctx.orgId,
-    name: s.name,
-    color: s.color,
-    position: s.position,
-  }))
-
-  const { error } = await admin
+  // Verify every id belongs to this org before touching anything.
+  const ids = stages.map(s => s.id)
+  const { data: owned, error: ownedErr } = await admin
     .from('pipeline_stages')
-    .upsert(updates, { onConflict: 'id' })
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  return NextResponse.json({ ok: true })
-}
-
-// DELETE — remove a stage (only if no prospects in it)
-export async function DELETE(req: Request) {
-  const ctx = await getOrgAdmin()
-  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { id } = await req.json()
-  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
-
-  const admin = createAdminClient()
-
-  // Verify the stage belongs to this org
-  const { data: stage } = await admin
-    .from('pipeline_stages')
-    .select('id, name')
-    .eq('id', id)
+    .select('id')
     .eq('organization_id', ctx.orgId)
-    .single()
-
-  if (!stage) return NextResponse.json({ error: 'Stage not found' }, { status: 404 })
-
-  // Block deletion while prospects still sit in this stage.
-  const statusKey = stage.name.toLowerCase().replace(/\s+/g, '_')
-  const { count } = await admin
-    .from('prospects')
-    .select('id', { count: 'exact', head: true })
-    .eq('organization_id', ctx.orgId)
-    .eq('outreach_status', statusKey)
-
-  if (count && count > 0) {
-    return NextResponse.json(
-      { error: `Cannot delete "${stage.name}" — ${count} prospect(s) are in this stage. Move them first.` },
-      { status: 400 }
-    )
+    .in('id', ids)
+  if (ownedErr) return NextResponse.json({ error: ownedErr.message }, { status: 400 })
+  const ownedIds = new Set((owned ?? []).map(s => s.id as string))
+  if (stages.some(s => !ownedIds.has(s.id))) {
+    return NextResponse.json({ error: 'Stage not found' }, { status: 404 })
   }
 
-  const { error } = await admin
-    .from('pipeline_stages')
-    .delete()
-    .eq('id', id)
-    .eq('organization_id', ctx.orgId)
+  for (const s of stages) {
+    const { error } = await admin
+      .from('pipeline_stages')
+      .update({ name: s.name, color: s.color })
+      .eq('id', s.id)
+      .eq('organization_id', ctx.orgId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   return NextResponse.json({ ok: true })
 }

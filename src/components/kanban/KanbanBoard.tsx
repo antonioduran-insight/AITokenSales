@@ -23,7 +23,7 @@ const PROSPECT_SELECT = '*, area:areas(*), assigned_user:users!assigned_to(id, f
 interface PipelineStage {
   name: string
   color: string
-  position: number
+  outreach_status: OutreachStatus
 }
 
 export function KanbanBoard() {
@@ -40,7 +40,7 @@ export function KanbanBoard() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [stageMap, setStageMap] = useState<Map<number, PipelineStage>>(new Map())
+  const [stageMap, setStageMap] = useState<Map<OutreachStatus, PipelineStage>>(new Map())
   const [chatCounts, setChatCounts] = useState<Record<string, number>>({})
   const [pendingClose, setPendingClose] = useState<{ prospect: Prospect; prevStatus: OutreachStatus } | null>(null)
   const [closingSaving, setClosingSaving] = useState(false)
@@ -67,7 +67,7 @@ export function KanbanBoard() {
           ? supabase.from('user_areas').select('area:areas(*)').eq('user_id', user.id)
           : Promise.resolve({ data: null }),
         !isImpersonating
-          ? supabase.from('pipeline_stages').select('name, color, position').order('position')
+          ? supabase.from('pipeline_stages').select('name, color, outreach_status')
           : Promise.resolve({ data: null }),
       ])
 
@@ -86,8 +86,8 @@ export function KanbanBoard() {
       }
 
       if (stagesRes.data && stagesRes.data.length > 0) {
-        const map = new Map<number, PipelineStage>()
-        stagesRes.data.forEach(s => map.set(s.position, s as PipelineStage))
+        const map = new Map<OutreachStatus, PipelineStage>()
+        stagesRes.data.forEach(s => map.set((s as PipelineStage).outreach_status, s as PipelineStage))
         setStageMap(map)
       }
 
@@ -377,8 +377,8 @@ export function KanbanBoard() {
       <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden', padding: '16px 16px 0' }}>
         <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={{ display: 'flex', gap: 12, height: '100%', minWidth: 'max-content' }}>
-            {OUTREACH_STATUSES.map((status, i) => {
-              const stage = stageMap.get(i + 1)
+            {OUTREACH_STATUSES.map(status => {
+              const stage = stageMap.get(status)
               return (
                 <KanbanColumn
                   key={status}

@@ -5,9 +5,10 @@ import { createClient } from '@/lib/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { useUser } from '@/contexts/UserContext'
-import { GripVertical, Plus, Trash2, X } from 'lucide-react'
+import { Plus, Trash2, X } from 'lucide-react'
 import { OrgMarketsSettings } from '@/components/markets/OrgMarketsSettings'
 import type { Organization, PipelineStage, OrganizationAddon, ScraperComboMaster, User, SenderProfile } from '@/lib/types'
+import { OUTREACH_STATUSES } from '@/lib/types'
 
 const PLAN_COLORS: Record<string, string> = {
   basic: '#3B82F6',
@@ -225,117 +226,47 @@ function OrgTab() {
 function PipelineTab() {
   const [stages, setStages] = useState<PipelineStage[]>([])
   const [loading, setLoading] = useState(true)
-  const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [pendingChanges, setPendingChanges] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [newColor, setNewColor] = useState('#6C63FF')
-  const [adding, setAdding] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/settings/pipeline-stages')
       .then(r => r.json())
       .then((d: PipelineStage[]) => {
-        // Guard against both id-level dupes and real duplicate rows that share a
-        // name (different id) — keep the first occurrence (lowest position).
-        const byId = d.filter((s, i, arr) => arr.findIndex(x => x.id === s.id) === i)
-        const seenName = new Set<string>()
-        const deduped = byId.filter(s => {
-          const key = (s.name ?? '').trim().toLowerCase()
-          if (seenName.has(key)) return false
-          seenName.add(key)
-          return true
-        })
-        setStages(deduped)
+        // Always render in canonical funnel order — the stage's own
+        // `position` is a legacy column with no effect on the Kanban anymore
+        // (see FUNC-F8 in CLAUDE.md), so it's not used for display order.
+        const sorted = [...d].sort(
+          (a, b) => OUTREACH_STATUSES.indexOf(a.outreach_status) - OUTREACH_STATUSES.indexOf(b.outreach_status)
+        )
+        setStages(sorted)
         setLoading(false)
       })
   }, [])
 
-  function onDragStart(idx: number) { setDragIdx(idx) }
-
-  function onDragOver(e: React.DragEvent, idx: number) {
-    e.preventDefault()
-    if (dragIdx === null || dragIdx === idx) return
-    const next = [...stages]
-    const [moved] = next.splice(dragIdx, 1)
-    next.splice(idx, 0, moved)
-    setStages(next)
-    setDragIdx(idx)
-  }
-
-  function onDragEnd() {
-    setDragIdx(null)
-    setPendingChanges(true)
-  }
-
-  async function saveOrder() {
+  async function saveChanges() {
     setSaving(true); setPendingChanges(false)
-    const payload = stages.map((s, i) => ({ id: s.id, name: s.name, color: s.color, position: i }))
-    await fetch('/api/settings/pipeline-stages', {
+    const payload = stages.map(s => ({ id: s.id, name: s.name, color: s.color }))
+    const res = await fetch('/api/settings/pipeline-stages', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ stages: payload }),
     })
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
-    setSaving(false)
-  }
-
-  function updateStage(idx: number, field: 'name' | 'color', value: string) {
-    setStages(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s))
-    setPendingChanges(true)
-  }
-
-  async function addStage() {
-    if (!newName.trim()) return
-    setAdding(true)
-    const res = await fetch('/api/settings/pipeline-stages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName.trim(), color: newColor }),
-    })
-    const data = await res.json()
     if (res.ok) {
-      setStages(prev => [...prev, data as PipelineStage])
-      setNewName('')
-      setNewColor('#6C63FF')
-      setPendingChanges(true)
-    } else {
-      setError(data.error)
-    }
-    setAdding(false)
-  }
-
-  async function deleteStage(stage: PipelineStage, idx: number) {
-    if (stages.length <= 1) { setError('Cannot delete the only stage'); return }
-
-    const statusKey = stage.name.toLowerCase().replace(/\s+/g, '_')
-    const { count } = await createClient()
-      .from('prospects')
-      .select('*', { count: 'exact', head: true })
-      .eq('outreach_status', statusKey)
-
-    if (count && count > 0) {
-      setError(`Cannot delete "${stage.name}" — ${count} prospect(s) are in this stage. Move them first.`)
-      return
-    }
-
-    if (!confirm(`Delete stage "${stage.name}"? This cannot be undone.`)) return
-
-    const res = await fetch('/api/settings/pipeline-stages', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: stage.id }),
-    })
-    if (res.ok) {
-      setStages(prev => prev.filter((_, i) => i !== idx))
-      setPendingChanges(false)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
     } else {
       const d = await res.json()
       setError(d.error)
     }
+    setSaving(false)
+  }
+
+  function updateStage(id: string, field: 'name' | 'color', value: string) {
+    setStages(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s))
+    setPendingChanges(true)
   }
 
   if (loading) return <div style={{ color: 'var(--crm-text-muted)', padding: 40, textAlign: 'center' }}>Loading…</div>
@@ -349,7 +280,7 @@ function PipelineTab() {
             {saving && <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>Saving…</span>}
             {saved && !saving && <span style={{ fontSize: 11, color: '#22C55E' }}>✓ Saved</span>}
             <button
-              onClick={saveOrder}
+              onClick={saveChanges}
               disabled={saving || !pendingChanges}
               style={{ ...S.btn, padding: '6px 16px', fontSize: 12, opacity: pendingChanges ? 1 : 0.4, cursor: pendingChanges ? 'pointer' : 'default' }}
             >
@@ -358,72 +289,35 @@ function PipelineTab() {
           </div>
         </div>
         <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginBottom: 16 }}>
-          Drag to reorder. Changes apply to the Kanban immediately.
+          Rename and recolor each stage. Order follows the sales funnel and isn&apos;t editable — every org always has exactly one stage per status, so a lead never ends up ambiguous about which Kanban column it belongs to.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {stages.map((stage, idx) => (
+          {stages.map(stage => (
             <div
               key={stage.id}
-              draggable
-              onDragStart={() => onDragStart(idx)}
-              onDragOver={e => onDragOver(e, idx)}
-              onDragEnd={onDragEnd}
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '10px 12px',
-                backgroundColor: dragIdx === idx ? 'var(--crm-border)' : 'var(--crm-surface-raised)',
+                backgroundColor: 'var(--crm-surface-raised)',
                 border: '1px solid var(--crm-border)', borderRadius: 8,
-                cursor: 'grab',
-                transition: 'background .1s',
               }}
             >
-              <GripVertical size={14} color="var(--crm-text-muted)" style={{ flexShrink: 0 }} />
               <input
                 type="color"
                 value={stage.color}
-                onChange={e => updateStage(idx, 'color', e.target.value)}
+                onChange={e => updateStage(stage.id, 'color', e.target.value)}
                 style={{ width: 28, height: 28, border: 'none', borderRadius: 4, cursor: 'pointer', padding: 0, backgroundColor: 'transparent' }}
                 title="Stage color"
               />
               <input
                 value={stage.name}
-                onChange={e => updateStage(idx, 'name', e.target.value)}
+                onChange={e => updateStage(stage.id, 'name', e.target.value)}
                 style={{ flex: 1, backgroundColor: 'transparent', border: 'none', color: 'var(--crm-text-primary)', fontSize: 13, outline: 'none' }}
               />
-              <span style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontFamily: 'monospace' }}>#{idx}</span>
-              {stage.is_default && (
-                <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', border: '1px solid var(--crm-border)', borderRadius: 3, padding: '1px 5px' }}>default</span>
-              )}
-              <button
-                onClick={() => deleteStage(stage, idx)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', padding: 2, display: 'flex', alignItems: 'center' }}
-                title="Delete stage"
-              >
-                <Trash2 size={14} />
-              </button>
+              <span style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontFamily: 'monospace' }}>{stage.outreach_status}</span>
             </div>
           ))}
-        </div>
-
-        {/* Add stage */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
-          <input
-            type="color"
-            value={newColor}
-            onChange={e => setNewColor(e.target.value)}
-            style={{ width: 32, height: 32, border: 'none', borderRadius: 4, cursor: 'pointer', padding: 0, backgroundColor: 'transparent', flexShrink: 0 }}
-          />
-          <input
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && addStage()}
-            placeholder="New stage name…"
-            style={{ ...S.input, flex: 1 }}
-          />
-          <button onClick={addStage} disabled={adding || !newName.trim()} style={{ ...S.btn, display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-            <Plus size={14} /> Add Stage
-          </button>
         </div>
       </div>
 

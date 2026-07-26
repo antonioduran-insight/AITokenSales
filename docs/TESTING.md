@@ -251,12 +251,14 @@ For each feature, verify behavior for all applicable roles:
 - [ ] Logo upload: select image file → uploads → preview shows new logo → URL auto-filled
 - [ ] Domain blacklist: domains blocked from CSV import and manual creation
 
-**Pipeline tab**:
-- [ ] Stage reorder (drag) persists and reflects in Kanban column order
-- [ ] Stage name edit persists
-- [ ] Color change persists
-- [ ] New stage appears in Kanban
-- [ ] Deleted stage disappears from Kanban (existing prospects not deleted)
+**Pipeline tab — CRITICAL (FUNC-F8 fix)**:
+- [ ] Exactly 7 stages shown, one per `outreach_status`, in fixed funnel order (New → Connection Sent → Connected → Replied → Demo Scheduled → Closed → Nurture) — no add button, no delete button, no drag handle
+- [ ] Each row shows its `outreach_status` key (read-only) next to the editable name/color
+- [ ] Rename a stage → Kanban column shows the new label for the **correct** status (not a neighboring one)
+- [ ] Recolor a stage → Kanban column border/accent updates to match
+- [ ] Renaming two different stages to the same label is allowed (it's just a display string) but each still drives its own distinct Kanban column — dragging a lead only ever changes `outreach_status`, never depends on the label
+- [ ] `PATCH /api/settings/pipeline-stages` with a stage id from another org → 404, no rows touched
+- [ ] Kanban never shows two columns for the same status, and never shows zero columns for a status — there are always exactly 7, because there's no operation left that can create or delete a stage row
 
 **Plan & Usage tab**:
 - [ ] Shows correct plan name
