@@ -2,7 +2,8 @@
 
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { Star } from 'lucide-react'
+import { useTranslations } from 'next-intl'
+import { Star, MessageSquareWarning } from 'lucide-react'
 import { AreaBadge } from '@/components/ui/AreaBadge'
 import { TemperatureBadge } from '@/components/ui/TemperatureBadge'
 import { ICPScore } from '@/components/ui/ICPScore'
@@ -12,9 +13,12 @@ interface Props {
   prospect: Prospect
   onClick: (prospect: Prospect) => void
   isDragOverlay?: boolean
+  /** Closed deal with zero conversations uploaded — surfaced so it never gets lost silently. */
+  missingConversation?: boolean
 }
 
-export function ProspectCard({ prospect, onClick, isDragOverlay = false }: Props) {
+export function ProspectCard({ prospect, onClick, isDragOverlay = false, missingConversation = false }: Props) {
+  const t = useTranslations('convertidos')
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: prospect.id,
   })
@@ -57,6 +61,11 @@ export function ProspectCard({ prospect, onClick, isDragOverlay = false }: Props
           <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--crm-text-primary)', lineHeight: 1.3, flex: 1 }}>
             {prospect.name}
           </span>
+          {missingConversation && (
+            <span title={t('missingConversation')} style={{ display: 'flex', flexShrink: 0, marginTop: 1 }}>
+              <MessageSquareWarning size={13} color="#EF4444" />
+            </span>
+          )}
         </div>
 
         {/* Company + title */}

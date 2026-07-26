@@ -225,6 +225,10 @@ The same secret is also checked in the **reverse** direction on `POST /api/runs/
 
 `GET /api/cron/reconcile-runs` is a **backstop** for whatever the webhook above and the client-side path both miss — same shared-secret pattern, but via `Authorization: Bearer $CRON_SECRET` (Vercel adds this header automatically when the `CRON_SECRET` env var is configured on the project), and it has no human caller — Vercel Cron invokes it directly. It rejects the request outright if the env var is unset, so a missing secret fails closed rather than open. It uses the service-role client and operates **across every organization** by design (it has no single caller to scope to) — anyone who obtains `CRON_SECRET` could trigger it manually, but the route only ever assigns already-scraped leads to the SDR already recorded on that run's own `run_sdr_assignments` row; it cannot be used to exfiltrate data, change ownership arbitrarily, or write anything not already implied by existing DB state.
 
+### Conversation-count scoping
+
+`GET /api/conversations/counts` (used by the "Missing conversation" badge on Kanban/Leads and by Closed Deals) previously had **no auth check at all** — it took a raw `ids` list and returned counts straight from the service-role client. Anyone who could guess or observe a prospect UUID from any org could probe its conversation count (not the content, just an integer). Fixed to require a session, resolve the caller's `organization_id` (or, for `admin_global`, an explicitly passed `impersonate_org_id`), and scope the count query through `prospects` — not through `conversations.organization_id` directly, since that column isn't guaranteed populated on every historical row (same caveat as `/api/crm/[table]`'s handling of `conversations`/`notes`).
+
 ### CORS
 
 Next.js API routes do not set permissive CORS headers by default. Cross-origin requests from unauthorized domains cannot call these endpoints with cookies.

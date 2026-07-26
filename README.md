@@ -91,6 +91,12 @@ All three call the same `assignRunLeads()` (`src/lib/utils/run-assign.ts`) and s
 
 Requires the `CRON_SECRET` env var for the cron and `INTERNAL_API_KEY` for the webhook (see [Environment Variables](#environment-variables)).
 
+### Mandatory chat upload on closing a deal
+
+Moving a lead to **Closed** — by dragging it in Kanban, or via the status dropdown in the lead drawer (shared by Kanban and Leads) — now opens `CloseDealModal` before the status actually changes. The admin/SDR must either paste the conversation that led to the close (saved to `conversations`) or explicitly click "Skip for now"; dismissing the modal (backdrop or ✕) aborts the move entirely, so a deal never ends up silently "closed with no record." A closed deal with zero conversations uploaded gets a red "Missing conversation" badge on its Kanban card and its row in Leads, so the gap stays visible instead of only showing up on the separately-visited Closed Deals page.
+
+`GET /api/conversations/counts` (which both drive) is now session-authenticated and org-scoped through `prospects`, not `conversations.organization_id` directly (that column isn't guaranteed populated on every row) — it previously had no auth check at all.
+
 ### Other changes
 
 - **Dark mode only** — the CRM light/dark toggle and all light-theme CSS were removed. (Global Admin keeps its own independent theme toggle.)

@@ -240,7 +240,12 @@
     "anotherChatTitle": "Add another chat",
     "anotherChatHint": "Why are you uploading another chat for this deal?",
     "searchPlaceholder": "Search by name...",
-    "allSdrs": "All SDRs"
+    "allSdrs": "All SDRs",
+    "modalTitle": "Upload conversation before closing",
+    "modalHint": "Paste the full conversation that led to this close. This is required to move the deal to Closed.",
+    "skipForNow": "Skip for now",
+    "confirmClose": "Save & close deal",
+    "missingConversation": "Missing conversation"
   },
   "users": {
     "title": "User Management",

@@ -11,6 +11,7 @@ import { KanbanColumn } from './KanbanColumn'
 import { ProspectCard } from './ProspectCard'
 import { ProspectDrawer } from '@/components/prospects/ProspectDrawer'
 import { ProspectForm } from '@/components/prospects/ProspectForm'
+import { CloseDealModal } from '@/components/conversations/CloseDealModal'
 import { AreaBadge } from '@/components/ui/AreaBadge'
 import { Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -40,6 +41,9 @@ export function KanbanBoard() {
   const [formOpen, setFormOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [stageMap, setStageMap] = useState<Map<number, PipelineStage>>(new Map())
+  const [chatCounts, setChatCounts] = useState<Record<string, number>>({})
+  const [pendingClose, setPendingClose] = useState<{ prospect: Prospect; prevStatus: OutreachStatus } | null>(null)
+  const [closingSaving, setClosingSaving] = useState(false)
   const isInitialMount = useRef(true)
 
   const isSdr = user?.role === 'sdr'
@@ -161,8 +165,41 @@ export function KanbanBoard() {
     fetchProspects().catch(console.error)
   }, [selectedAreaId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Chat counts for closed prospects — drives the "Missing conversation" badge.
+  const closedIds = prospects.filter(p => p.outreach_status === 'closed').map(p => p.id).sort().join(',')
+  useEffect(() => {
+    if (!closedIds) { setChatCounts({}); return }
+    const url = isImpersonating && impersonateOrgId
+      ? `/api/conversations/counts?ids=${closedIds}&impersonate_org_id=${impersonateOrgId}`
+      : `/api/conversations/counts?ids=${closedIds}`
+    fetch(url).then(r => r.json()).then(setChatCounts).catch(() => {})
+  }, [closedIds, isImpersonating, impersonateOrgId])
+
   function handleDragStart({ active }: DragStartEvent) {
     setDraggingId(active.id as string)
+  }
+
+  async function commitStatusChange(prospect: Prospect, newStatus: OutreachStatus, prevStatus: OutreachStatus) {
+    setProspects(prev => prev.map(p => p.id === prospect.id ? { ...p, outreach_status: newStatus } : p))
+
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('prospects')
+      .update({ outreach_status: newStatus })
+      .eq('id', prospect.id)
+
+    if (error) {
+      setProspects(prev => prev.map(p => p.id === prospect.id ? { ...p, outreach_status: prevStatus } : p))
+      return false
+    }
+
+    await logAuditEvent({
+      event_type: 'status_changed',
+      prospect_id: prospect.id,
+      prospect_name: prospect.name,
+      metadata: { from_status: prevStatus, to_status: newStatus },
+    })
+    return true
   }
 
   async function handleDragEnd({ active, over }: DragEndEvent) {
@@ -174,25 +211,59 @@ export function KanbanBoard() {
     if (!prospect || prospect.outreach_status === newStatus) return
 
     const prevStatus = prospect.outreach_status
-    setProspects(prev => prev.map(p => p.id === prospect.id ? { ...p, outreach_status: newStatus } : p))
 
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('prospects')
-      .update({ outreach_status: newStatus })
-      .eq('id', prospect.id)
-
-    if (error) {
-      setProspects(prev => prev.map(p => p.id === prospect.id ? { ...p, outreach_status: prevStatus } : p))
+    // Moving to Closed is gated behind the mandatory chat-upload modal — the
+    // status isn't committed until the modal resolves (Save or Skip).
+    if (newStatus === 'closed') {
+      setPendingClose({ prospect, prevStatus })
       return
     }
 
-    await logAuditEvent({
-      event_type: 'status_changed',
-      prospect_id: prospect.id,
-      prospect_name: prospect.name,
-      metadata: { from_status: prevStatus, to_status: newStatus },
-    })
+    await commitStatusChange(prospect, newStatus, prevStatus)
+  }
+
+  async function handleCloseSave(chatContent: string) {
+    if (!pendingClose) return
+    setClosingSaving(true)
+    const { prospect, prevStatus } = pendingClose
+    try {
+      const res = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prospect_id: prospect.id, chat_content: chatContent, reason: 'Uploaded at close' }),
+      })
+      if (!res.ok) return
+
+      await logAuditEvent({
+        event_type: 'conversation_added',
+        prospect_id: prospect.id,
+        prospect_name: prospect.name,
+        metadata: { source: 'kanban_close' },
+      })
+      const ok = await commitStatusChange(prospect, 'closed', prevStatus)
+      if (ok) {
+        setChatCounts(prev => ({ ...prev, [prospect.id]: (prev[prospect.id] ?? 0) + 1 }))
+        setPendingClose(null)
+      }
+    } finally {
+      setClosingSaving(false)
+    }
+  }
+
+  async function handleCloseSkip() {
+    if (!pendingClose) return
+    setClosingSaving(true)
+    const { prospect, prevStatus } = pendingClose
+    try {
+      const ok = await commitStatusChange(prospect, 'closed', prevStatus)
+      if (ok) setPendingClose(null)
+    } finally {
+      setClosingSaving(false)
+    }
+  }
+
+  function handleCloseCancel() {
+    setPendingClose(null)
   }
 
   function handleCardClick(prospect: Prospect) {
@@ -316,6 +387,7 @@ export function KanbanBoard() {
                   color={stage?.color}
                   prospects={visibleProspects.filter(p => p.outreach_status === status)}
                   onCardClick={handleCardClick}
+                  chatCounts={status === 'closed' ? chatCounts : undefined}
                 />
               )
             })}
@@ -347,6 +419,15 @@ export function KanbanBoard() {
         onClose={() => setFormOpen(false)}
         onCreated={handleProspectCreated}
         defaultAreaId={defaultAreaForForm}
+      />
+
+      <CloseDealModal
+        open={!!pendingClose}
+        prospectName={pendingClose?.prospect.name ?? ''}
+        saving={closingSaving}
+        onSave={handleCloseSave}
+        onSkip={handleCloseSkip}
+        onCancel={handleCloseCancel}
       />
     </div>
   )

@@ -9,7 +9,7 @@ import { useOrgId } from '@/lib/hooks/useOrgId'
 import { ProspectDrawer } from './ProspectDrawer'
 import { TemperatureBadge } from '@/components/ui/TemperatureBadge'
 import { AreaBadge } from '@/components/ui/AreaBadge'
-import { Search, ChevronLeft, ChevronRight, Users, RefreshCw, X, Trash2, CheckCircle, ArrowRight } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, Users, RefreshCw, X, Trash2, CheckCircle, ArrowRight, MessageSquareWarning } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, Area, User, LeadTemperature } from '@/lib/types'
@@ -89,6 +89,10 @@ export function ProspectsTable() {
   const [drawerProspect, setDrawerProspect] = useState<Prospect | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
+  // Chat counts for closed prospects on the current page — drives the
+  // "Missing conversation" badge.
+  const [chatCounts, setChatCounts] = useState<Record<string, number>>({})
+
   useEffect(() => {
     const supabase = createClient()
     Promise.all([
@@ -164,6 +168,15 @@ export function ProspectsTable() {
 
   // Reset page when filters or page size change
   useEffect(() => { setPage(0) }, [search, filterArea, filterStatus, filterTemp, pageSize])
+
+  const closedIds = prospects.filter(p => p.outreach_status === 'closed').map(p => p.id).sort().join(',')
+  useEffect(() => {
+    if (!closedIds) { setChatCounts({}); return }
+    const url = isImpersonating && impersonateOrgId
+      ? `/api/conversations/counts?ids=${closedIds}&impersonate_org_id=${impersonateOrgId}`
+      : `/api/conversations/counts?ids=${closedIds}`
+    fetch(url).then(r => r.json()).then(setChatCounts).catch(() => {})
+  }, [closedIds, isImpersonating, impersonateOrgId])
 
   function toggleSelect(id: string) {
     setSelected(prev => {
@@ -423,12 +436,17 @@ export function ProspectsTable() {
                 <td style={{ ...S.td, color: 'var(--crm-text-secondary)' }}>{p.company ?? '—'}</td>
                 <td style={S.td}>
                   <span style={{
-                    display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+                    display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
                     backgroundColor: STATUS_COLORS[p.outreach_status] + '20',
                     color: STATUS_COLORS[p.outreach_status],
                   }}>
                     {t(`outreachStatus.${p.outreach_status}`)}
                   </span>
+                  {p.outreach_status === 'closed' && (chatCounts[p.id] ?? 0) === 0 && (
+                    <span title={t('convertidos.missingConversation')} style={{ display: 'inline-flex', verticalAlign: 'middle', marginLeft: 5 }}>
+                      <MessageSquareWarning size={12} color="#EF4444" />
+                    </span>
+                  )}
                 </td>
                 <td style={S.td}>
                   {p.lead_temperature ? <TemperatureBadge temperature={p.lead_temperature} /> : <span style={{ color: 'var(--crm-text-muted)' }}>—</span>}

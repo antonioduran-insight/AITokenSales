@@ -137,6 +137,10 @@ Both paths call the same `assignRunLeads()` in `src/lib/utils/run-assign.ts` —
 
 **Prospect uniqueness** — `prospects` is unique on `(organization_id, linkedin_url, assigned_to)`, so the same lead can live on more than one SDR's board. Insert paths must tolerate `23505` row-by-row rather than aborting a whole batch.
 
+**Kanban's `pipeline_stages` ↔ `outreach_status` mapping is purely positional, and the write/read paths disagree on the index base.** `KanbanBoard.tsx` renders one column per `OUTREACH_STATUSES[i]` (the fixed 7-value enum) and looks up its custom label/color via `stageMap.get(i + 1)` — i.e. it assumes `pipeline_stages.position` is 1-indexed. But Settings' `saveOrder()` (`src/app/[locale]/settings/page.tsx`) writes `position: i` when persisting a drag-reorder — 0-indexed. Any manual reorder therefore shifts every stage's displayed label by one column relative to what the admin set. Separately, `DELETE /api/settings/pipeline-stages` (and its client-side twin) infer a stage's underlying status by slugifying `stage.name` (`name.toLowerCase().replace(/\s+/g, '_')`) — a completely different mechanism from the Kanban's positional lookup, with no uniqueness constraint anywhere, so nothing stops an admin renaming two different positions to the same label (or leaving one of the 7 slots unlabeled). **This is being redesigned — see the FUNC-F8 investigation** before touching either `KanbanBoard.tsx`'s stage lookup or the `pipeline-stages` settings UI/API.
+
+**Closing a deal is gated behind a mandatory chat upload.** Moving a lead to `outreach_status = 'closed'` — from Kanban drag-and-drop (`KanbanBoard.handleDragEnd`) or the status dropdown in `ProspectDrawer` (shared by Kanban and Leads) — does not commit immediately. It opens `CloseDealModal` (`src/components/conversations/CloseDealModal.tsx`) first; the status write only happens once the modal resolves via "Save & close" (which also inserts a `conversations` row) or "Skip for now" (status only). Dismissing the modal (backdrop/X) aborts the move entirely — nothing is written. A closed prospect with zero `conversations` rows is flagged with a "Missing conversation" badge (red `MessageSquareWarning` icon) on both the Kanban card and the Leads table row, driven by `GET /api/conversations/counts` — the same derived-state approach the Convertidos page already used, now surfaced where reps actually work day-to-day instead of only on a separately-visited page.
+
 **Anthropic base URL** — Always run values through `normalizeAnthropicBaseUrl()` (`src/lib/utils/anthropic.ts`) before persisting. The backend appends `/v1` itself; storing a URL that already ends in `/v1` produces the `/v1/v1` error.
 
 **INT limits** — Postgres `int4` max is `2147483647`. Ultra plan seats/leads use this value for "unlimited". Always `MAX_INT = 2147483647`. Display as `∞` when `value >= MAX_INT`.
@@ -172,6 +176,7 @@ ultra:      { max_seats: MAX_INT, max_leads_per_month: MAX_INT }
 | User context | `src/contexts/UserContext.tsx` |
 | Global Admin theme/i18n | `src/contexts/GlobalAdminThemeContext.tsx` |
 | Audit log helper | `src/lib/utils/audit.ts` → `logAuditEvent()` |
+| Mandatory chat-upload gate on closing a deal | `src/components/conversations/CloseDealModal.tsx` |
 | Bridge HTTP client | `src/lib/bridge-api.ts` → `bridgeApi` |
 | Org ID + impersonation hook | `src/lib/hooks/useOrgId.ts` |
 | Billing period from `billing_day` | `src/lib/utils/billing-period.ts` |

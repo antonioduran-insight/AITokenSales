@@ -240,7 +240,12 @@
     "anotherChatTitle": "添加另一條對話",
     "anotherChatHint": "為什麼要再次上傳此成交的對話？",
     "searchPlaceholder": "按姓名搜索...",
-    "allSdrs": "所有銷售"
+    "allSdrs": "所有銷售",
+    "modalTitle": "成交前請上傳對話記錄",
+    "modalHint": "請貼上促成此次成交的完整對話。移至「已成交」前必須上傳。",
+    "skipForNow": "暫時跳過",
+    "confirmClose": "保存並成交",
+    "missingConversation": "缺少對話記錄"
   },
   "users": {
     "title": "用戶管理",

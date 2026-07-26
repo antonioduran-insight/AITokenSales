@@ -99,7 +99,10 @@ export function ConvertidosPage() {
       const ids = rawData.map(p => p.id)
       let countMap: Record<string, number> = {}
       if (ids.length > 0) {
-        const res = await fetch(`/api/conversations/counts?ids=${ids.join(',')}`)
+        const countsUrl = isImpersonating && impersonateOrgId
+          ? `/api/conversations/counts?ids=${ids.join(',')}&impersonate_org_id=${impersonateOrgId}`
+          : `/api/conversations/counts?ids=${ids.join(',')}`
+        const res = await fetch(countsUrl)
         if (res.ok) countMap = await res.json()
       }
 

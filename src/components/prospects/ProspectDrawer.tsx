@@ -8,6 +8,7 @@ import { AreaBadge } from '@/components/ui/AreaBadge'
 import { TemperatureBadge } from '@/components/ui/TemperatureBadge'
 import { ICPScore } from '@/components/ui/ICPScore'
 import { NotesLog } from './NotesLog'
+import { CloseDealModal } from '@/components/conversations/CloseDealModal'
 
 import { useUser } from '@/contexts/UserContext'
 import { useOrgId } from '@/lib/hooks/useOrgId'
@@ -77,6 +78,8 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
   const [sdrsForArea, setSdrsForArea] = useState<User[]>([])
   const [reassigning, setReassigning] = useState(false)
   const [reassignToast, setReassignToast] = useState<string | null>(null)
+  const [pendingClose, setPendingClose] = useState(false)
+  const [closingSaving, setClosingSaving] = useState(false)
 
   if (initial.id !== prospect.id) setProspect(initial)
 
@@ -140,7 +143,7 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
     setSaving(false)
   }
 
-  async function handleStatusChange(newStatus: OutreachStatus) {
+  async function commitStatusChange(newStatus: OutreachStatus) {
     const prev = prospect.outreach_status
     await updateField('outreach_status', newStatus)
     await logAuditEvent({
@@ -149,6 +152,48 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
       prospect_name: prospect.name,
       metadata: { from_status: prev, to_status: newStatus },
     })
+  }
+
+  async function handleStatusChange(newStatus: OutreachStatus) {
+    // Moving to Closed is gated behind the mandatory chat-upload modal — the
+    // status isn't committed until the modal resolves (Save or Skip).
+    if (newStatus === 'closed' && prospect.outreach_status !== 'closed') {
+      setPendingClose(true)
+      return
+    }
+    await commitStatusChange(newStatus)
+  }
+
+  async function handleCloseSave(chatContent: string) {
+    setClosingSaving(true)
+    try {
+      const res = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prospect_id: prospect.id, chat_content: chatContent, reason: 'Uploaded at close' }),
+      })
+      if (!res.ok) return
+      await logAuditEvent({
+        event_type: 'conversation_added',
+        prospect_id: prospect.id,
+        prospect_name: prospect.name,
+        metadata: { source: 'drawer_close' },
+      })
+      await commitStatusChange('closed')
+      setPendingClose(false)
+    } finally {
+      setClosingSaving(false)
+    }
+  }
+
+  async function handleCloseSkip() {
+    setClosingSaving(true)
+    try {
+      await commitStatusChange('closed')
+      setPendingClose(false)
+    } finally {
+      setClosingSaving(false)
+    }
   }
 
   async function toggleFlag() { await updateField('flag_tomorrow', !prospect.flag_tomorrow) }
@@ -367,6 +412,15 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
           </div>
         )}
       </div>
+
+      <CloseDealModal
+        open={pendingClose}
+        prospectName={prospect.name}
+        saving={closingSaving}
+        onSave={handleCloseSave}
+        onSkip={handleCloseSkip}
+        onCancel={() => setPendingClose(false)}
+      />
     </div>
   )
 }

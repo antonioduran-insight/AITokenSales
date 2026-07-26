@@ -189,6 +189,19 @@ For each feature, verify behavior for all applicable roles:
 - [ ] Global unique constraint violation (LinkedIn URL exists in another org's area) handled gracefully
 - [ ] Imported prospects appear in Prospects table immediately
 
+### Mandatory close-deal chat gate — CRITICAL
+
+- [ ] Drag a Kanban card to the Closed column → `CloseDealModal` opens, card does **not** move columns yet, no DB write happens
+- [ ] Paste chat text → "Save & close deal" → conversation is inserted, card moves to Closed, `outreach_status` is `closed` in DB, audit log has both `conversation_added` and `status_changed` entries
+- [ ] Leave the textarea empty → "Save & close deal" is disabled
+- [ ] Click "Skip for now" (no text needed) → card moves to Closed, no `conversations` row inserted, audit log has `status_changed` only
+- [ ] Dismiss the modal (✕ or backdrop click) → nothing changes: card stays in its original column, no DB write at all
+- [ ] Same three behaviors (save / skip / cancel) via the status dropdown in the Prospect Drawer, opened from **both** Kanban and the Leads table
+- [ ] Selecting Closed from the dropdown when the lead is *already* closed does **not** re-open the modal (no-op)
+- [ ] "Missing conversation" red icon appears on the Kanban card and the Leads table row for any closed prospect with zero conversations, and disappears immediately after an upload (no page reload needed)
+- [ ] `GET /api/conversations/counts` — no session → 401; ids belonging to another org → excluded from the response, not just zero-filled
+- [ ] Global Admin impersonation: Closed Deals' "no chat" stats still populate correctly (counts endpoint now requires `impersonate_org_id` explicitly for `admin_global`)
+
 ### Closed Deals
 
 - [ ] Page shows only `closed` status prospects

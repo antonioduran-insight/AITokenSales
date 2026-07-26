@@ -240,7 +240,12 @@
     "anotherChatTitle": "Agregar otro chat",
     "anotherChatHint": "¿Por qué subís otro chat de esta venta?",
     "searchPlaceholder": "Buscar por nombre...",
-    "allSdrs": "Todos los SDR"
+    "allSdrs": "Todos los SDR",
+    "modalTitle": "Subí la conversación antes de cerrar",
+    "modalHint": "Pegá la conversación completa que llevó a este cierre. Es obligatorio para mover el deal a Cerrado.",
+    "skipForNow": "Omitir por ahora",
+    "confirmClose": "Guardar y cerrar deal",
+    "missingConversation": "Falta la conversación"
   },
   "users": {
     "title": "Gestión de Usuarios",

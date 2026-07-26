@@ -240,7 +240,12 @@
     "anotherChatTitle": "Thêm chat khác",
     "anotherChatHint": "Tại sao bạn tải lên thêm chat cho deal này?",
     "searchPlaceholder": "Tìm theo tên...",
-    "allSdrs": "Tất cả SDR"
+    "allSdrs": "Tất cả SDR",
+    "modalTitle": "Tải lên cuộc trò chuyện trước khi chốt deal",
+    "modalHint": "Dán toàn bộ cuộc trò chuyện đã dẫn đến việc chốt deal này. Bắt buộc để chuyển deal sang trạng thái Đã Chốt.",
+    "skipForNow": "Bỏ qua lúc này",
+    "confirmClose": "Lưu & chốt deal",
+    "missingConversation": "Thiếu cuộc trò chuyện"
   },
   "users": {
     "title": "Quản Lý Người Dùng",
