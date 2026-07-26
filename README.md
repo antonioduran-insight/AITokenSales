@@ -79,13 +79,17 @@ The lead allowance now renews on each org's **`billing_day`**, not on the 1st of
 
 Settings → Organization has a **Company Context** textarea describing what the org sells and to whom. It is forwarded in the `POST /runs` payload to the scraper backend so generated messages can reference real products and focus.
 
-### Server-side safety net for auto-assign
+### Server-side auto-assign (webhook + cron backstop)
 
-New Run's auto-assign used to be **entirely client-driven**: it only fired if the browser tab that started the run was still open and polling at the exact moment the backend reported `completed`. Since completing a run normally sends the admin to History (not back to New Run), and a tab can be closed at any point, leads could sit in `scraper_leads` with `exported_to_crm = false` indefinitely with nothing to catch it.
+New Run's auto-assign used to be **entirely client-driven**: it only fired if the browser tab that started the run was still open and polling at the exact moment the backend reported `completed`. Since completing a run normally sends the admin to History (not back to New Run), and a tab can be closed at any point, leads could sit in `scraper_leads` with `exported_to_crm = false` indefinitely with nothing to catch it. It's now three layers, in order of expected latency:
 
-`GET /api/cron/reconcile-runs`, run daily by Vercel Cron (`vercel.json`), now sweeps for completed runs with unexported leads and an unambiguous single-SDR recipient, and assigns them — no open tab required. Runs with zero or multiple `run_sdr_assignments` rows (e.g. after a manual "Send to another SDR") are skipped and reported rather than guessed at. Both the client path and the cron call the same `assignRunLeads()` (`src/lib/utils/run-assign.ts`), so they're safe to race — the unique-key guard makes double-assignment a no-op.
+1. **`POST /api/runs/[id]/complete`** — a server-to-server webhook the scraper backend (or a Supabase Database Webhook on `runs`, firing when `status` transitions to `completed`) calls the instant a run finishes. Authenticated by `X-Internal-Api-Key`, the same shared secret already used for every CRM→backend call — no new secret to provision on either side. This is the primary path: no browser involved at all.
+2. **Client-side optimistic assign** — New Run still calls `/api/runs/[id]/assign` on completion if the tab is open, for instant UI feedback. No longer load-bearing for correctness.
+3. **`GET /api/cron/reconcile-runs`**, run daily by Vercel Cron (`vercel.json`), sweeps for completed runs with unexported leads and an unambiguous single-SDR recipient — a backstop for whatever the webhook and the client both miss.
 
-Requires the `CRON_SECRET` env var (see [Environment Variables](#environment-variables)).
+All three call the same `assignRunLeads()` (`src/lib/utils/run-assign.ts`) and share its idempotent insert, so they're safe to race regardless of which one gets there first — the unique-key guard makes a duplicate assignment a no-op. Runs with zero or multiple `run_sdr_assignments` rows (e.g. after a manual "Send to another SDR") are skipped and reported by both the webhook and the cron, never guessed at.
+
+Requires the `CRON_SECRET` env var for the cron and `INTERNAL_API_KEY` for the webhook (see [Environment Variables](#environment-variables)).
 
 ### Other changes
 
@@ -279,8 +283,10 @@ SCRAPER_API_URL=https://pwa-aitokensales-production.up.railway.app
 NEXT_PUBLIC_SCRAPER_API_URL=https://pwa-aitokensales-production.up.railway.app
 NEXT_PUBLIC_SCRAPER_WS_URL=wss://pwa-aitokensales-production.up.railway.app
 
-# Shared secret sent as X-Internal-Api-Key on every backend call.
-# Must match INTERNAL_API_KEY on the Railway backend. Server-only.
+# Shared secret sent as X-Internal-Api-Key on every backend call, and
+# checked in the other direction on POST /api/runs/[id]/complete (the
+# backend's run-completion webhook back into the CRM). Must match
+# INTERNAL_API_KEY on the Railway backend. Server-only.
 INTERNAL_API_KEY=your-internal-api-key
 
 # Authorizes Vercel Cron to call /api/cron/reconcile-runs. Vercel sends this
@@ -291,7 +297,7 @@ CRON_SECRET=your-cron-secret
 
 > `SUPABASE_SERVICE_ROLE_KEY`, `INTERNAL_API_KEY` and `CRON_SECRET` must never reach the browser. They are server-only — never prefix them with `NEXT_PUBLIC_`.
 >
-> `vercel.json` schedules `/api/cron/reconcile-runs` once a day (`0 3 * * *`, ~3am UTC — Vercel doesn't guarantee the exact minute). This schedule is deliberately Hobby-plan-compatible: **Vercel rejects the entire deployment** if any cron in `vercel.json` would run more than once a day on Hobby, so an invalid schedule here silently blocks every deploy, not just the cron. If the project is on Pro or higher, this can safely be tightened (e.g. `*/10 * * * *` for a 10-minute sweep) for faster recovery.
+> `vercel.json` schedules `/api/cron/reconcile-runs` once a day (`0 3 * * *`, ~3am UTC — Vercel doesn't guarantee the exact minute). This schedule is deliberately Hobby-plan-compatible: **Vercel rejects the entire deployment** if any cron in `vercel.json` would run more than once a day on Hobby, so an invalid schedule here silently blocks every deploy, not just the cron. Since `POST /api/runs/[id]/complete` is now the primary assign path, once-a-day is an acceptable backstop even on Hobby (worst case: a webhook failure sits unassigned up to ~24h). If/when the project moves to Pro or higher, this can be tightened (e.g. `*/10 * * * *`) for a faster backstop, or replaced with a GitHub Actions cron hitting the same `CRON_SECRET`-protected route on a tighter schedule without needing a Vercel plan change at all.
 
 Per-org credentials (**Apify token**, **Anthropic key / base URL / model**) are stored on the `organizations` row, not in env vars — set them in Settings → Scraper or in Global Admin.
 
@@ -438,10 +444,11 @@ npm run lint         # ESLint
 | DELETE | `/api/runs/[id]` | admin | Cancel a run |
 | GET | `/api/runs/[id]/logs` | admin | Run logs |
 | POST | `/api/runs/[id]/assign` | admin | Assign the run's leads to its SDR (`manual: true` moves them) |
+| POST | `/api/runs/[id]/complete` | `X-Internal-Api-Key` shared secret | Run-completion webhook — primary auto-assign trigger, called by the backend/a DB webhook, not a browser |
 | GET | `/api/runs/quota` | any | Lead quota for the current billing period |
 | GET/POST | `/api/scraper-combos` | admin | Search strategies enabled per org |
 | POST | `/api/scraper/to-crm` | admin | Import scraped leads into `prospects` |
-| GET | `/api/cron/reconcile-runs` | `CRON_SECRET` bearer token | Vercel Cron safety net — assigns completed runs the client-side flow missed |
+| GET | `/api/cron/reconcile-runs` | `CRON_SECRET` bearer token | Vercel Cron backstop — assigns completed runs the webhook and client-side flow both missed |
 
 ### Bridge
 

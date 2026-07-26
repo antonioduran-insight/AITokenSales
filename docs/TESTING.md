@@ -291,13 +291,23 @@ For each feature, verify behavior for all applicable roles:
 - [ ] A genuine 404 (bad run id) or 403 (wrong org) **does** stop polling and route to the failure screen — these are the only cases that should
 - [ ] **Recovery from a lost local pointer**: manually clear `localStorage.scraper_active_run`, then visit `/run?run=<a completed run's id>` — the leads should still get assigned (confirms the `run_sdr_assignments[0].sdr_id` server-side fallback in `runAssign()`)
 
-**Cron: `/api/cron/reconcile-runs` (server-side safety net) — CRITICAL**
+**Webhook: `POST /api/runs/[id]/complete` (primary auto-assign trigger) — CRITICAL**
+- [ ] No `X-Internal-Api-Key` header → 401
+- [ ] Wrong key → 401
+- [ ] Correct key, run doesn't exist → 404
+- [ ] Correct key, run has exactly one `run_sdr_assignments` row (the normal case) → 200, `{ ok: true, sdr_id, assigned, queued, skipped }`, leads land in `prospects` on the right SDR's board, `scraper_leads.exported_to_crm` flips to `true`, monthly count bumps
+- [ ] Correct key, run has **zero or 2+** `run_sdr_assignments` rows → 200, `{ ok: false, skipped: 'ambiguous', sdr_count }`, no leads touched — never guesses
+- [ ] Calling it twice in a row (or racing it with the client-side assign / the cron) never double-inserts — second call's `skipped` count absorbs the leads already assigned
+- [ ] Body is ignored entirely — POST with an empty body `{}` and confirm it still resolves `sdr_id` correctly from `run_sdr_assignments`, not from anything in the request
+- [ ] cURL smoke test: `curl -X POST -H "X-Internal-Api-Key: $INTERNAL_API_KEY" .../api/runs/<id>/complete`
+
+**Cron: `/api/cron/reconcile-runs` (backstop, not primary) — CRITICAL**
 - [ ] No `Authorization` header → 401
 - [ ] Wrong bearer token → 401
 - [ ] Correct `Authorization: Bearer $CRON_SECRET` → 200 with `{ ok: true, checked, processed, skipped_ambiguous, errors }`
-- [ ] End-to-end: start a run, let it complete, but simulate "nobody was watching" — close the New Run tab (or just never load it) so the client-side auto-assign never fires. Confirm the leads sit in `scraper_leads` with `exported_to_crm = false`. Manually trigger the cron route (`curl -H "Authorization: Bearer $CRON_SECRET" .../api/cron/reconcile-runs`) and confirm the run now shows up in `processed`, the leads are in `prospects`, and the SDR's Kanban has them
+- [ ] End-to-end: start a run, let it complete, but simulate "nobody was watching AND the webhook didn't fire" — close the New Run tab (or just never load it), and don't call `/complete`. Confirm the leads sit in `scraper_leads` with `exported_to_crm = false`. Manually trigger the cron route (`curl -H "Authorization: Bearer $CRON_SECRET" .../api/cron/reconcile-runs`) and confirm the run now shows up in `processed`, the leads are in `prospects`, and the SDR's Kanban has them
 - [ ] A run with **2+ rows** in `run_sdr_assignments` (e.g. after "Send to another SDR") is **not** touched — appears in `skipped_ambiguous` with the correct `sdr_count`, and no leads move
-- [ ] Calling it twice in a row (or racing it with a live client-side assign) never double-inserts — the second call's `processed` entry for that run shows those leads as `skipped`, not duplicated in `prospects`
+- [ ] Calling it twice in a row (or racing it with a live client-side assign or the webhook) never double-inserts — the second call's `processed` entry for that run shows those leads as `skipped`, not duplicated in `prospects`
 - [ ] Running it with zero stuck leads anywhere returns `{ ok: true, checked: 0, processed: [], ... }` quickly, without erroring
 
 **New Run — Phase 3 (result) — CRITICAL**

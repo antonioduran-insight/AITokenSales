@@ -215,9 +215,15 @@ Every outbound call to the Python backend carries `X-Internal-Api-Key`, a shared
 
 When the variable is unset the header is **omitted** rather than sent as the string `"undefined"` — a misconfigured deploy is then rejected by the backend instead of appearing to authenticate. This is defence in depth: the CRM already authenticates and org-scopes the caller before forwarding, and the key stops anything that is not the CRM from reaching the backend directly.
 
+The same secret is also checked in the **reverse** direction on `POST /api/runs/[id]/complete` (see below) — the backend, or a Supabase Database Webhook, presents `X-Internal-Api-Key` to prove it's an authorized caller of the CRM, not the other way around. Reusing one shared secret both ways means no second value has to be provisioned or rotated separately; either side leaking it has the same blast radius either way (backend↔CRM trust), so this isn't a meaningfully weaker posture than two secrets would be.
+
+### Run-completion webhook authentication
+
+`POST /api/runs/[id]/complete` is the primary trigger for auto-assign — the scraper backend (or a Supabase Database Webhook on `runs` for `status` → `completed`) calls it the instant a run finishes, instead of relying on a browser tab to notice via polling. Like the cron below, it's authenticated by a **shared secret instead of a session** (`X-Internal-Api-Key` must equal `INTERNAL_API_KEY`) and fails closed if the env var is unset. It never trusts anything from the request body — the SDR, org and markets are all re-resolved server-side from that run's own `run_sdr_assignments` row, and it only acts when that row is unambiguous (exactly one), so a caller in possession of the secret can't use this route to redirect leads to an arbitrary SDR — the recipient was already fixed at run-creation time.
+
 ### Cron authentication
 
-`GET /api/cron/reconcile-runs` is the one route in this app authenticated by a **shared secret instead of a session** — it has no human caller, Vercel Cron invokes it directly. It requires `Authorization: Bearer $CRON_SECRET` (Vercel adds this header automatically when the `CRON_SECRET` env var is configured on the project) and rejects the request outright if the env var is unset, so a missing secret fails closed rather than open. It uses the service-role client and operates **across every organization** by design (it has no single caller to scope to) — anyone who obtains `CRON_SECRET` could trigger it manually, but the route only ever assigns already-scraped leads to the SDR already recorded on that run's own `run_sdr_assignments` row; it cannot be used to exfiltrate data, change ownership arbitrarily, or write anything not already implied by existing DB state.
+`GET /api/cron/reconcile-runs` is a **backstop** for whatever the webhook above and the client-side path both miss — same shared-secret pattern, but via `Authorization: Bearer $CRON_SECRET` (Vercel adds this header automatically when the `CRON_SECRET` env var is configured on the project), and it has no human caller — Vercel Cron invokes it directly. It rejects the request outright if the env var is unset, so a missing secret fails closed rather than open. It uses the service-role client and operates **across every organization** by design (it has no single caller to scope to) — anyone who obtains `CRON_SECRET` could trigger it manually, but the route only ever assigns already-scraped leads to the SDR already recorded on that run's own `run_sdr_assignments` row; it cannot be used to exfiltrate data, change ownership arbitrarily, or write anything not already implied by existing DB state.
 
 ### CORS
 
@@ -240,7 +246,7 @@ No application-level rate limiting is currently implemented. Rate limiting shoul
 | `SUPABASE_SERVICE_ROLE_KEY` | **Private** (server only) | API routes only |
 | `NEXT_PUBLIC_APP_URL` | Public | Redirects |
 | `SCRAPER_API_URL` | Private (server) | Scraper / Bridge backend base URL |
-| `INTERNAL_API_KEY` | **Private** (server only) | Sent as `X-Internal-Api-Key` on every backend call |
+| `INTERNAL_API_KEY` | **Private** (server only) | Sent as `X-Internal-Api-Key` on every backend call; also checked in reverse on `POST /api/runs/[id]/complete` |
 | `CRON_SECRET` | **Private** (server only) | Authorizes `GET /api/cron/reconcile-runs`; Vercel sends it automatically as `Authorization: Bearer $CRON_SECRET` |
 
 `NEXT_PUBLIC_*` variables are bundled into the client JS. All others are server-only. Never add sensitive values to `NEXT_PUBLIC_*` variables.
