@@ -32,6 +32,8 @@ Two parallel UI systems share the same URL space:
 
 `AppShell` (server component) reads the session and org plan SSR, passes them to `UserProvider`. `GlobalAdminLayout` does its own SSR auth check and redirects non-`admin_global` users to `/kanban`.
 
+**Admin-only pages within `AppShell` must gate themselves — `AppShell` does not do it for them.** Unlike `GlobalAdminLayout`, `AppShell` renders `children` for `admin` and `sdr` alike; RLS is what actually stops an SDR from seeing another area's/org's data, but a page that still mounts and renders an empty shell for a role that shouldn't be there is fragile (FUNC-F12) — any future component on that page doing a service-role fetch or showing an aggregate count could leak data without anyone noticing. `blockSdrAccess(locale)` (`src/lib/utils/route-guard.ts`) is the shared SSR check — call it at the top of an **async server component** page (not a client component) before rendering anything, mirroring `GlobalAdminLayout`'s own pattern. Currently applied to `/admin/users`, `/audit`, and `/history` (`(scraper)/history/page.tsx` delegates to a `HistoryClient.tsx` client component so the gate itself stays server-side). **Not yet applied** to the rest of the Scraper's admin-only surface (`(scraper)/dashboard`, `(scraper)/run`, `(scraper)/export`) or `/bridge` — those are all still client components with no route-level gate, same latent gap FUNC-F12 found, just not yet flagged by name.
+
 ### Three Supabase Client Types
 
 Never mix these — they have different auth and RLS behavior:
@@ -176,6 +178,7 @@ ultra:      { max_seats: MAX_INT, max_leads_per_month: MAX_INT }
 | User context | `src/contexts/UserContext.tsx` |
 | Global Admin theme/i18n | `src/contexts/GlobalAdminThemeContext.tsx` |
 | Audit log helper | `src/lib/utils/audit.ts` → `logAuditEvent()` |
+| Route-level SDR gate for admin-only pages | `src/lib/utils/route-guard.ts` → `blockSdrAccess()` |
 | Mandatory chat-upload gate on closing a deal | `src/components/conversations/CloseDealModal.tsx` |
 | Bridge HTTP client | `src/lib/bridge-api.ts` → `bridgeApi` |
 | Org ID + impersonation hook | `src/lib/hooks/useOrgId.ts` |

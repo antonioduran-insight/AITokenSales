@@ -80,8 +80,9 @@ For each feature, verify behavior for all applicable roles:
 | Prospects table | ✗ | ✓ (all areas + SDR filter) | ✓ (own area, no SDR filter) |
 | Bulk delete | ✗ | ✓ | ✗ (no checkboxes) |
 | Bulk SDR reassign | ✗ | ✓ | ✗ |
-| Audit Log | ✗ | ✓ | ✗ |
-| User Management | ✗ | ✓ | ✗ |
+| Audit Log | ✗ | ✓ | ✗ (redirect to /kanban) |
+| User Management | ✗ | ✓ | ✗ (redirect to /kanban) |
+| Run History | ✗ | ✓ | ✗ (redirect to /kanban) |
 | CSV Import | ✗ | ✓ (chooses area) | ✓ (own area auto-set) |
 | Stats Dashboard | ✗ | ✓ (premium+) | ✗ |
 | Conversations | ✗ | ✓ | ✗ |
@@ -188,6 +189,16 @@ For each feature, verify behavior for all applicable roles:
 - [ ] Results step shows correct breakdown: imported / duplicates / no name / forced
 - [ ] Global unique constraint violation (LinkedIn URL exists in another org's area) handled gracefully
 - [ ] Imported prospects appear in Prospects table immediately
+
+### Route-level SDR gate on admin-only pages (FUNC-F12) — CRITICAL
+
+- [ ] As `sdr`, navigate directly to `/history` (type the URL, don't click a link) → redirected to `/kanban`, page content never renders (check Network tab — no `scraper_leads`/`run_sdr_assignments` request should even fire)
+- [ ] As `sdr`, navigate directly to `/audit` → redirected to `/kanban`
+- [ ] As `sdr`, navigate directly to `/admin/users` → redirected to `/kanban`
+- [ ] As `admin`, all three routes load normally
+- [ ] As `admin_global` (impersonating or not), all three still behave per their own rules — this fix must not affect the `admin`/`admin_global` path, only add a block for `sdr`
+- [ ] Logged-out user hitting any of the three → redirected to `/login`, not `/kanban`
+- [ ] **Known gap, not covered by this fix**: `(scraper)/dashboard`, `(scraper)/run`, `(scraper)/export`, and `/bridge` are admin-only pages with no route-level gate yet — confirm they're on the list for a follow-up before assuming full FUNC-F12 coverage
 
 ### Mandatory close-deal chat gate — CRITICAL
 

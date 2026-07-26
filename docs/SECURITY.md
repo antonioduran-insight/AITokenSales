@@ -127,14 +127,19 @@ async function verifyGlobalAdmin() {
 
 The role is **always read from the database** in API routes — never trusted from cookies or request headers.
 
+#### Layer 3 — route-level SSR gate for admin-only pages (FUNC-F12)
+
+Layers 1 and 2 stop data from leaking, but they don't stop an admin-only *page* from mounting for an SDR — RLS just makes its queries come back empty, so the page renders an empty shell instead of returning a clean 404/redirect. That's a fragile third state: a future component on that page doing a service-role fetch or an aggregate count wouldn't be caught by RLS at all, and would leak silently. `blockSdrAccess(locale)` (`src/lib/utils/route-guard.ts`) closes this: an SSR check at the top of the page's server component, before anything renders, that redirects the `sdr` role to `/kanban` — the same pattern `GlobalAdminLayout` already used for `admin_global`-only pages. Applied to `/admin/users`, `/audit`, and `/history`. **Not yet applied** to `(scraper)/dashboard`, `(scraper)/run`, `(scraper)/export`, or `/bridge` — same admin-only pages, same gap, not yet closed.
+
 #### Layered defense summary
 
-| Attack vector | Layer 1 (RLS) | Layer 2 (API check) |
-|---|---|---|
-| Direct Supabase anon key abuse | ✓ blocks | N/A |
-| Forged `user_role` cookie | N/A | ✓ ignores cookie, checks DB |
-| IDOR on API route | N/A | ✓ verifies session + role |
-| SDR querying another area | ✓ blocks | ✓ area scoped queries |
+| Attack vector | Layer 1 (RLS) | Layer 2 (API check) | Layer 3 (route gate) |
+|---|---|---|---|
+| Direct Supabase anon key abuse | ✓ blocks | N/A | N/A |
+| Forged `user_role` cookie | N/A | ✓ ignores cookie, checks DB | N/A |
+| IDOR on API route | N/A | ✓ verifies session + role | N/A |
+| SDR querying another area | ✓ blocks | ✓ area scoped queries | N/A |
+| SDR directly navigating to an admin-only page | ✓ blocks (empty result set) | N/A | ✓ blocks (page never renders) |
 
 ---
 

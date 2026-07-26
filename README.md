@@ -101,6 +101,14 @@ Moving a lead to **Closed** — by dragging it in Kanban, or via the status drop
 
 `pipeline_stages` used to map to `outreach_status` purely by array position, and the write path (drag-reorder) and read path (Kanban's column lookup) disagreed on whether that position was 0- or 1-indexed — so every org's Kanban column labels were silently shifted by one from what was actually configured, and nothing stopped an admin renaming two different columns to the same label or leaving one unlabeled. Fixed with an explicit `pipeline_stages.outreach_status` column, unique per org: every org now always has exactly one stage per status, `name`/`color` stay freely editable in Settings → Pipeline, but there's no more add/delete/reorder — those were exactly the operations that let the mapping drift. See `supabase/migrations/20260726_pipeline_stage_status_mapping.sql` (**run by hand, in two steps** — it backfills the new column by rank rather than assuming the old broken position data, since custom labels may already be attached to the wrong status).
 
+### Route-level SDR gating for admin-only pages (FUNC-F12)
+
+`/history`, `/audit`, and `/admin/users` used to rely entirely on RLS to keep an SDR from seeing their contents: the page still mounted and rendered (an empty shell, since RLS blocked every query), instead of being blocked at the route level like `/global-admin` already was. No data actually leaked — RLS held — but an empty-but-mounted page is a fragile second layer: any future component doing a service-role fetch or showing an aggregate count on one of these pages could leak data without anyone noticing. Fixed with `blockSdrAccess()` (`src/lib/utils/route-guard.ts`), an SSR check mirroring `GlobalAdminLayout`'s own pattern, called at the top of each page before anything renders. `(scraper)/history` needed a small split (`page.tsx` now just does the check and renders `HistoryClient.tsx`) since the whole page used to be one client component.
+
+**Also found while fixing this**: `/admin/users` had *no* route-level gate at all before this fix, despite FUNC-F12 citing it as an already-correctly-blocked reference case — it was exposed to the exact same gap as `/history`/`/audit`, just not yet caught by testing. Fixed alongside the other two.
+
+**Not yet fixed, same gap**: `(scraper)/dashboard`, `(scraper)/run`, `(scraper)/export`, and `/bridge` are all admin-only pages that are still plain client components with no route-level check — same latent exposure, just outside this ticket's named scope.
+
 ### Other changes
 
 - **Dark mode only** — the CRM light/dark toggle and all light-theme CSS were removed. (Global Admin keeps its own independent theme toggle.)
