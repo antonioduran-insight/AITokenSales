@@ -35,6 +35,9 @@ export function KanbanBoard() {
   const [areas, setAreas] = useState<Area[]>([])
   const [sdrAreas, setSdrAreas] = useState<Area[]>([])
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
+  // Admin-only: view one SDR's individual board instead of the consolidated one (FUNC-S2).
+  const [orgSdrs, setOrgSdrs] = useState<{ id: string; full_name: string }[]>([])
+  const [selectedSdrId, setSelectedSdrId] = useState<string | null>(null)
   const [activeProspect, setActiveProspect] = useState<Prospect | null>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -44,6 +47,8 @@ export function KanbanBoard() {
   const [chatCounts, setChatCounts] = useState<Record<string, number>>({})
   const [pendingClose, setPendingClose] = useState<{ prospect: Prospect; prevStatus: OutreachStatus } | null>(null)
   const [closingSaving, setClosingSaving] = useState(false)
+  const [recentlyMovedId, setRecentlyMovedId] = useState<string | null>(null)
+  const recentlyMovedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isInitialMount = useRef(true)
 
   const isSdr = user?.role === 'sdr'
@@ -59,7 +64,7 @@ export function KanbanBoard() {
 
     async function init() {
       // Phase 1 — all meta queries in parallel
-      const [areasRes, sdrAreasRes, stagesRes] = await Promise.all([
+      const [areasRes, sdrAreasRes, stagesRes, orgSdrsRes] = await Promise.all([
         isAdmin
           ? supabase.from('areas').select('*').order('name')
           : Promise.resolve({ data: null }),
@@ -69,9 +74,13 @@ export function KanbanBoard() {
         !isImpersonating
           ? supabase.from('pipeline_stages').select('name, color, outreach_status')
           : Promise.resolve({ data: null }),
+        isAdmin
+          ? supabase.from('users').select('id, full_name').eq('role', 'sdr').eq('is_active', true).order('full_name')
+          : Promise.resolve({ data: null }),
       ])
 
       if (areasRes.data) setAreas(areasRes.data as Area[])
+      if (orgSdrsRes.data) setOrgSdrs(orgSdrsRes.data as { id: string; full_name: string }[])
 
       // Resolve SDR areas locally so prospects query doesn't need a re-render
       let resolvedSdrAreas: Area[] = []
@@ -193,6 +202,12 @@ export function KanbanBoard() {
       return false
     }
 
+    // Transient highlight on the card's new column so it's clear where it
+    // landed instead of just disappearing and reappearing (F13).
+    setRecentlyMovedId(prospect.id)
+    if (recentlyMovedTimeoutRef.current) clearTimeout(recentlyMovedTimeoutRef.current)
+    recentlyMovedTimeoutRef.current = setTimeout(() => setRecentlyMovedId(null), 1800)
+
     await logAuditEvent({
       event_type: 'status_changed',
       prospect_id: prospect.id,
@@ -289,9 +304,10 @@ export function KanbanBoard() {
   const draggingProspect = draggingId ? prospects.find(p => p.id === draggingId) : null
   const currentArea = areas.find(a => a.id === selectedAreaId) ?? sdrAreas[0] ?? user?.area
 
-  const visibleProspects = isImpersonating && selectedAreaId
+  const visibleProspects = (isImpersonating && selectedAreaId
     ? prospects.filter(p => p.area_id === selectedAreaId)
     : prospects
+  ).filter(p => !selectedSdrId || p.assigned_to === selectedSdrId)
 
   const filterAreas = isAdmin ? areas : (isSdr ? sdrAreas : [])
   const showAreaFilter = filterAreas.length > 0
@@ -348,6 +364,22 @@ export function KanbanBoard() {
           currentArea && <AreaBadge area={currentArea as Area} size="md" />
         )}
 
+        {isAdmin && orgSdrs.length > 0 && (
+          <select
+            value={selectedSdrId ?? ''}
+            onChange={e => setSelectedSdrId(e.target.value || null)}
+            style={{
+              padding: '4px 10px', borderRadius: 6, border: '1px solid var(--crm-border)',
+              backgroundColor: selectedSdrId ? '#6C63FF20' : 'transparent',
+              color: selectedSdrId ? 'var(--crm-accent)' : 'var(--crm-text-secondary)',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            <option value="">{t('convertidos.allSdrs')}</option>
+            {orgSdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+          </select>
+        )}
+
         <div style={{ flex: 1 }} />
 
         <button
@@ -388,6 +420,7 @@ export function KanbanBoard() {
                   prospects={visibleProspects.filter(p => p.outreach_status === status)}
                   onCardClick={handleCardClick}
                   chatCounts={status === 'closed' ? chatCounts : undefined}
+                  recentlyMovedId={recentlyMovedId}
                 />
               )
             })}

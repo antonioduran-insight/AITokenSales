@@ -13,6 +13,8 @@ interface Props {
   onCardClick: (prospect: Prospect) => void
   /** Prospect id -> conversation count. Only passed for the Closed column. */
   chatCounts?: Record<string, number>
+  /** Prospect id that just landed in a new column — briefly highlighted. */
+  recentlyMovedId?: string | null
 }
 
 const COLUMN_ACCENT: Record<OutreachStatus, string> = {
@@ -27,7 +29,7 @@ const COLUMN_ACCENT: Record<OutreachStatus, string> = {
 
 const TERMINAL: OutreachStatus[] = ['closed', 'nurture']
 
-export function KanbanColumn({ status, label, color, prospects, onCardClick, chatCounts }: Props) {
+export function KanbanColumn({ status, label, color, prospects, onCardClick, chatCounts, recentlyMovedId }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: status })
   const isTerminal = TERMINAL.includes(status)
   const accent = color ?? COLUMN_ACCENT[status]
@@ -94,6 +96,7 @@ export function KanbanColumn({ status, label, color, prospects, onCardClick, cha
             prospect={p}
             onClick={onCardClick}
             missingConversation={!!chatCounts && (chatCounts[p.id] ?? 0) === 0}
+            justMoved={p.id === recentlyMovedId}
           />
         ))}
         {prospects.length === 0 && (

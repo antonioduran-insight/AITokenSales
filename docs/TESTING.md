@@ -190,6 +190,25 @@ For each feature, verify behavior for all applicable roles:
 - [ ] Global unique constraint violation (LinkedIn URL exists in another org's area) handled gracefully
 - [ ] Imported prospects appear in Prospects table immediately
 
+### UX/performance batch (F1/F5/F6/F7/F17, FUNC-F1/F2/F4/F6/F7/F13, S1/S2)
+
+- [ ] New Run: click "Run" → button shows a spinning icon + "Starting…" and is disabled, immediately, before `POST /api/runs` resolves
+- [ ] Progress screen (Phase 2) shows a single "Running…" label with the spinner ring — no 4-dot Scraping/Scoring/Messages bar
+- [ ] Sidebar `<Link>`s do not prefetch — open DevTools Network, reload the app shell, confirm no burst of RSC requests for every sidebar route on initial mount
+- [ ] Both New Run's and Bridge's status polling stop (no more `GET .../[id]` requests) the instant a run reaches `completed`/`failed`/`cancelled`
+- [ ] `PATCH /api/prospects` (reassign) completes noticeably faster than before — no functional change, just less serialized round-trip time
+- [ ] Leads table: select 2-3 specific leads (not sequential) → "Reassign selected (N)" appears in the bulk bar → pick an SDR → confirm → exactly those leads move, audit log shows one `prospect_reassigned` entry **per lead, named** (not "—")
+- [ ] The existing by-quantity "Reassign SDR" modal (Users icon button) still works unchanged and still logs a single count-only entry (that's expected — it's a different, intentionally coarser mode)
+- [ ] Kanban card click → opens the same drawer as clicking a row in Leads (Info/Messages/Notes tabs, same data)
+- [ ] Lead drawer → Messages tab → Custom 1/2 each have an Edit button → edit → Save → persists and reflects immediately; Cancel discards the change
+- [ ] "Custom 3" does not appear anywhere: lead drawer Messages tab, manual "+ New Prospect" form, or CSV import column-mapping list
+- [ ] History and Leads (Search Combo column) and Kanban cards show the combo's human name ("CTO / VP Engineering"), never a raw code like `combo_D`
+- [ ] Audit Log: trigger a status change → "Detail" column shows translated labels ("New → Connection Sent"), not raw enum values; CSV export of the audit log matches
+- [ ] Run a scrape where a lead's name contains a stuck-on title (can't force this from the CRM side — check existing data or wait for a natural occurrence) → confirm `prospects.name` has just the name, not `"Name - Title"`
+- [ ] Manually create a prospect with a dash in the name (e.g. testing edge case) → confirm it is **not** trimmed (cleanup only applies to scraper-sourced leads)
+- [ ] Kanban header (admin only): SDR dropdown next to the area filter → selecting an SDR shows only their leads across all columns; "All SDRs" resets to the consolidated view
+- [ ] Drag a card to a new column → briefly highlighted (accent border + glow) in its new position, fading out over ~1.5-2s
+
 ### Route-level SDR gate on admin-only pages (FUNC-F12) — CRITICAL
 
 - [ ] As `sdr`, navigate directly to each of `/history`, `/audit`, `/admin/users`, `/bridge`, `/run`, `/dashboard`, `/export` (type the URL, don't click a link — none of these should even be visible in the sidebar for an SDR, so this must be a direct-navigation test) → redirected to `/kanban`, page content never renders (check Network tab — no data request for that page should fire at all, not even one that comes back empty)

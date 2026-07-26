@@ -9,6 +9,7 @@ import { ChevronDown, ChevronUp, Download, Send, X, XCircle } from 'lucide-react
 import type { RunRecord, User, AreaName, Lead } from '@/lib/types';
 import { inferAreaFromCountry } from '@/lib/utils/area-inference';
 import { useMarketAreaMap } from '@/lib/hooks/useMarketAreaMap';
+import { useComboLabels } from '@/lib/hooks/useComboLabels';
 
 const ACTIVE = new Set(['pending', 'running', 'scraping', 'scoring', 'drafting']);
 
@@ -71,6 +72,7 @@ function HistoryContent() {
 
   const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
   const marketAreaMap = useMarketAreaMap();
+  const comboLabels = useComboLabels();
 
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const autoExpanded = useRef(false);
@@ -249,7 +251,7 @@ function HistoryContent() {
               </div>
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 {markets.map(m => <span key={m} style={{ ...S.badge, color: 'var(--crm-accent)', borderColor: '#6C63FF40' }}>{m}</span>)}
-                {(run.combos ?? []).map(c => <span key={c} style={S.badge}>{c}</span>)}
+                {(run.combos ?? []).map(c => <span key={c} style={S.badge}>{comboLabels[c] ?? c}</span>)}
               </div>
               <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)', fontWeight: 600, minWidth: 70, textAlign: 'right' }}>
                 {generated > 0 ? generated : run.total_leads_requested} leads

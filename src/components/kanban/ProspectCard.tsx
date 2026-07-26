@@ -7,6 +7,7 @@ import { Star, MessageSquareWarning } from 'lucide-react'
 import { AreaBadge } from '@/components/ui/AreaBadge'
 import { TemperatureBadge } from '@/components/ui/TemperatureBadge'
 import { ICPScore } from '@/components/ui/ICPScore'
+import { useComboLabels } from '@/lib/hooks/useComboLabels'
 import type { Prospect } from '@/lib/types'
 
 interface Props {
@@ -15,10 +16,13 @@ interface Props {
   isDragOverlay?: boolean
   /** Closed deal with zero conversations uploaded — surfaced so it never gets lost silently. */
   missingConversation?: boolean
+  /** Just landed in this column — briefly highlighted so the move is visible (F13). */
+  justMoved?: boolean
 }
 
-export function ProspectCard({ prospect, onClick, isDragOverlay = false, missingConversation = false }: Props) {
+export function ProspectCard({ prospect, onClick, isDragOverlay = false, missingConversation = false, justMoved = false }: Props) {
   const t = useTranslations('convertidos')
+  const comboLabels = useComboLabels()
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: prospect.id,
   })
@@ -43,12 +47,12 @@ export function ProspectCard({ prospect, onClick, isDragOverlay = false, missing
       <div
         style={{
           backgroundColor: 'var(--crm-surface)',
-          border: '1px solid var(--crm-border)',
+          border: `1px solid ${justMoved ? 'var(--crm-accent)' : 'var(--crm-border)'}`,
           borderRadius: 8,
           padding: '14px',
           marginBottom: 8,
-          transition: 'border-color 0.15s',
-          boxShadow: isDragOverlay ? '0 8px 24px rgba(0,0,0,0.5)' : undefined,
+          transition: 'border-color 0.15s, box-shadow 1.6s ease-out',
+          boxShadow: isDragOverlay ? '0 8px 24px rgba(0,0,0,0.5)' : justMoved ? '0 0 0 3px #6C63FF30' : '0 0 0 0px transparent',
         }}
         onMouseEnter={e => !isDragOverlay && ((e.currentTarget as HTMLElement).style.borderColor = 'var(--crm-accent)')}
         onMouseLeave={e => !isDragOverlay && ((e.currentTarget as HTMLElement).style.borderColor = 'var(--crm-border)')}
@@ -99,7 +103,7 @@ export function ProspectCard({ prospect, onClick, isDragOverlay = false, missing
           )}
           {prospect.search_combo && (
             <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', backgroundColor: 'var(--crm-surface-raised)', padding: '2px 5px', borderRadius: 4 }}>
-              {prospect.search_combo}
+              {comboLabels[prospect.search_combo] ?? prospect.search_combo}
             </span>
           )}
         </div>

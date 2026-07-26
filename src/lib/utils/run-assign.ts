@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { cleanScrapedName } from './clean-name'
 
 /**
  * Core "push a run's scraper leads onto an SDR's kanban board" logic, shared
@@ -134,7 +135,7 @@ export async function assignRunLeads({
     assigned++
 
     prospectRows.push({
-      name: lead.full_name,
+      name: cleanScrapedName(lead.full_name),
       linkedin_url: lead.linkedin_url ?? null,
       email: lead.email ?? null,
       company: lead.company ?? null,

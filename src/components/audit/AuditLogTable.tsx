@@ -46,10 +46,10 @@ function getFromDate(filter: TimeFilter): string | null {
   }
 }
 
-function formatDetail(log: AuditLog): string {
+function formatDetail(log: AuditLog, statusLabel: (status: unknown) => string): string {
   const m = log.metadata ?? {}
   switch (log.event_type) {
-    case 'status_changed': return `${m.from_status} → ${m.to_status}`
+    case 'status_changed': return `${statusLabel(m.from_status)} → ${statusLabel(m.to_status)}`
     case 'prospect_reassigned': {
       const from = (m.from_sdr ?? m.from) as string | undefined
       const to = (m.to_sdr ?? m.to) as string | undefined
@@ -65,8 +65,17 @@ function formatDetail(log: AuditLog): string {
 
 export function AuditLogTable() {
   const t = useTranslations('audit')
+  const tRoot = useTranslations()
   const { isImpersonating, impersonateOrgId } = useOrgId()
   const { orgPlan, user } = useUser()
+
+  // Renders a raw outreach_status enum value ("connection_sent") as its
+  // translated label ("Connection Sent") — falls back to the raw value for
+  // anything that isn't a known status (FUNC-F13).
+  function statusLabel(status: unknown): string {
+    if (typeof status !== 'string' || !status) return String(status ?? '?')
+    try { return tRoot(`outreachStatus.${status}`) } catch { return status }
+  }
 
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [total, setTotal] = useState(0)
@@ -134,7 +143,7 @@ export function AuditLogTable() {
     const header = ['Timestamp', 'Actor', 'Event', 'Prospect', 'Detail']
     const csvRows = logs.map(l => [
       format(new Date(l.created_at), 'yyyy-MM-dd HH:mm'),
-      l.actor_name, l.event_type, l.prospect_name ?? '', formatDetail(l),
+      l.actor_name, l.event_type, l.prospect_name ?? '', formatDetail(l, statusLabel),
     ])
     const csv = [header, ...csvRows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
@@ -258,7 +267,7 @@ export function AuditLogTable() {
                     </span>
                   </td>
                   <td style={{ ...S.td, color: 'var(--crm-text-secondary)' }}>{log.prospect_name ?? '—'}</td>
-                  <td style={{ ...S.td, color: 'var(--crm-text-secondary)', fontSize: 12 }}>{formatDetail(log)}</td>
+                  <td style={{ ...S.td, color: 'var(--crm-text-secondary)', fontSize: 12 }}>{formatDetail(log, statusLabel)}</td>
                 </tr>
               )
             })}

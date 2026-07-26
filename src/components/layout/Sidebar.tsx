@@ -140,6 +140,7 @@ export function Sidebar({ user }: Props) {
             <Link
               key={item.href}
               href={linkHref}
+              prefetch={false}
               title={collapsed ? item.label : undefined}
               style={{
                 display: 'flex',
@@ -184,6 +185,7 @@ export function Sidebar({ user }: Props) {
                 <Link
                   key={item.href}
                   href={`/${locale}${item.href}`}
+                  prefetch={false}
                   title={collapsed ? item.label : undefined}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: 10,
@@ -217,6 +219,7 @@ export function Sidebar({ user }: Props) {
               </div>
               <Link
                 href={fullHref}
+                prefetch={false}
                 title={collapsed ? 'Partnerships' : undefined}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: 10,

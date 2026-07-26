@@ -12,7 +12,7 @@ import { CloseDealModal } from '@/components/conversations/CloseDealModal'
 
 import { useUser } from '@/contexts/UserContext'
 import { useOrgId } from '@/lib/hooks/useOrgId'
-import { ExternalLink, Copy, Check, Star, ChevronDown, CheckCircle, X } from 'lucide-react'
+import { ExternalLink, Copy, Check, Star, ChevronDown, CheckCircle, X, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, LeadTemperature, User } from '@/lib/types'
 import { OUTREACH_STATUSES, LEAD_TEMPERATURES } from '@/lib/types'
@@ -80,6 +80,8 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
   const [reassignToast, setReassignToast] = useState<string | null>(null)
   const [pendingClose, setPendingClose] = useState(false)
   const [closingSaving, setClosingSaving] = useState(false)
+  const [editingField, setEditingField] = useState<'custom1' | 'custom2' | null>(null)
+  const [editValue, setEditValue] = useState('')
 
   if (initial.id !== prospect.id) setProspect(initial)
 
@@ -141,6 +143,23 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
       onUpdated(updated)
     }
     setSaving(false)
+  }
+
+  function startEditMessage(field: 'custom1' | 'custom2') {
+    setEditingField(field)
+    setEditValue(prospect[field] ?? '')
+  }
+
+  function cancelEditMessage() {
+    setEditingField(null)
+    setEditValue('')
+  }
+
+  async function saveEditMessage() {
+    if (!editingField) return
+    await updateField(editingField, editValue.trim() || null)
+    setEditingField(null)
+    setEditValue('')
   }
 
   async function commitStatusChange(newStatus: OutreachStatus) {
@@ -377,23 +396,62 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
           {/* MESSAGES TAB */}
           {tab === 'messages' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {(['custom1', 'custom2', 'custom3'] as const).map(field => (
-                <div key={field}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--crm-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                      {t(`prospect.${field}`)}
-                    </span>
-                    {prospect[field] && <CopyButton text={prospect[field]!} />}
-                  </div>
-                  {prospect[field] ? (
-                    <div style={{ backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '12px 14px', fontSize: 13, color: 'var(--crm-text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                      {prospect[field]}
+              {(['custom1', 'custom2'] as const).map(field => {
+                const isEditing = editingField === field
+                return (
+                  <div key={field}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--crm-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        {t(`prospect.${field}`)}
+                      </span>
+                      {!isEditing && !isImpersonating && (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          {prospect[field] && <CopyButton text={prospect[field]!} />}
+                          <button
+                            onClick={() => startEditMessage(field)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)', color: 'var(--crm-text-secondary)', fontSize: 12, cursor: 'pointer' }}
+                          >
+                            <Pencil size={12} /> {t('common.edit')}
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <p style={{ color: 'var(--crm-text-muted)', fontSize: 13 }}>{t('prospect.noMessage')}</p>
-                  )}
-                </div>
-              ))}
+                    {isEditing ? (
+                      <div>
+                        <textarea
+                          value={editValue}
+                          onChange={e => setEditValue(e.target.value)}
+                          rows={6}
+                          autoFocus
+                          style={{ width: '100%', backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-accent)', borderRadius: 8, padding: '12px 14px', fontSize: 13, color: 'var(--crm-text-primary)', lineHeight: 1.6, outline: 'none', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }}
+                        />
+                        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                          <button
+                            onClick={saveEditMessage}
+                            disabled={saving}
+                            style={{ padding: '6px 14px', borderRadius: 6, border: 'none', backgroundColor: 'var(--crm-accent)', color: '#FFF', fontSize: 12, fontWeight: 600, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1 }}
+                          >
+                            {saving ? t('common.loading') : t('common.save')}
+                          </button>
+                          <button
+                            onClick={cancelEditMessage}
+                            disabled={saving}
+                            style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', fontSize: 12, cursor: 'pointer' }}
+                          >
+                            {t('common.cancel')}
+                          </button>
+                        </div>
+                      </div>
+                    ) : prospect[field] ? (
+                      <div style={{ backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '12px 14px', fontSize: 13, color: 'var(--crm-text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                        {prospect[field]}
+                      </div>
+                    ) : (
+                      <p style={{ color: 'var(--crm-text-muted)', fontSize: 13 }}>{t('prospect.noMessage')}</p>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
 

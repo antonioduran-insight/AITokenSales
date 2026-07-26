@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
-import { Minus, Plus, AlertCircle, XCircle } from 'lucide-react'
+import { Minus, Plus, AlertCircle, XCircle, Loader2 } from 'lucide-react'
 import type { User, ScraperComboMaster, AreaName } from '@/lib/types'
 import { areaLabel } from '@/lib/utils/area-inference'
 import { useOrgMarkets } from '@/lib/hooks/useOrgMarkets'
@@ -21,22 +21,17 @@ const MAX_LEADS = 500
 const PRESETS = [100, 200, 300, 400, 500]
 const STORAGE_KEY = 'scraper_active_run'
 
-const ACTIVE = new Set(['pending', 'running', 'scraping', 'scoring', 'drafting'])
+// The backend only ever reports 'pending' -> 'running' -> 'completed'/'failed'
+// (it never emits intermediate scraping/scoring/drafting states, despite the
+// enum allowing for them) — so the UI only shows what's actually real: a
+// single "in progress" state, not fabricated sub-steps.
+const ACTIVE = new Set(['pending', 'running'])
 
 // Backend status → simple centered label for Phase 2
 const STATUS_LABEL: Record<string, string> = {
   pending: 'Initializing…',
-  running: 'Initializing…',
-  scraping: '🔍 Scraping LinkedIn',
-  scoring: '📊 Scoring leads',
-  drafting: '✍️ Generating messages',
+  running: 'Running…',
 }
-
-// Which of the 4 progress dots is "active" for a given status
-const STATUS_STEP: Record<string, number> = {
-  pending: 0, running: 0, scraping: 0, scoring: 1, drafting: 2, completed: 3,
-}
-const STEPS = ['Scraping', 'Scoring', 'Messages', 'Done']
 
 const CSV_COLUMNS = ['full_name', 'company', 'title', 'linkedin_url', 'location', 'icp_score', 'temperature', 'search_combo', 'market', 'custom1', 'custom2'] as const
 
@@ -578,6 +573,7 @@ function RunPageInner() {
 
           <button onClick={handleRun} disabled={!canRun || submitting}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px', borderRadius: 10, border: 'none', fontSize: 15, fontWeight: 700, backgroundColor: canRun && !submitting ? 'var(--crm-accent)' : 'var(--crm-border)', color: '#FFF', cursor: canRun && !submitting ? 'pointer' : 'not-allowed', transition: 'all .15s' }}>
+            {submitting && <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />}
             {submitting ? 'Starting…' : overLimit ? 'Monthly limit reached' : 'Run Scraping'}
           </button>
         </div>
@@ -606,27 +602,7 @@ function RunPageInner() {
             </div>
           )}
 
-          {/* 4-dot progress */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 24 }}>
-            {STEPS.map((label, i) => {
-              const cur = STATUS_STEP[status] ?? 0
-              const color = i < cur ? '#22C55E' : i === cur ? 'var(--accent)' : 'var(--crm-border)'
-              const textColor = i <= cur ? 'var(--crm-text-primary)' : 'var(--crm-text-muted)'
-              return (
-                <div key={label} style={{ display: 'flex', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: 76 }}>
-                    <span style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: color, transition: 'all .3s' }} />
-                    <span style={{ fontSize: 11, fontWeight: 600, color: textColor }}>{label}</span>
-                  </div>
-                  {i < STEPS.length - 1 && (
-                    <span style={{ width: 24, height: 2, backgroundColor: i < cur ? '#22C55E' : 'var(--crm-border)', marginBottom: 18 }} />
-                  )}
-                </div>
-              )
-            })}
-          </div>
-
-          <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', textAlign: 'center', maxWidth: 420, lineHeight: 1.6 }}>
+          <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', textAlign: 'center', maxWidth: 420, lineHeight: 1.6, marginBottom: 0 }}>
             This usually takes 2–5 minutes. Do not close this tab — but if you do, we&apos;ll keep working in the background.
           </p>
           {summary && summary.leads_generated > 0 && (

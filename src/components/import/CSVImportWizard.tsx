@@ -28,7 +28,6 @@ const PROSPECT_FIELDS = [
   { key: 'market', label: 'Market / Country', required: false },
   { key: 'custom1', label: 'Custom 1 (msg1)', required: false },
   { key: 'custom2', label: 'Custom 2 (msg2)', required: false },
-  { key: 'custom3', label: 'Custom 3 (msg3)', required: false },
 ] as const
 
 type ProspectFieldKey = typeof PROSPECT_FIELDS[number]['key']
@@ -48,7 +47,6 @@ function autoDetect(col: string): ProspectFieldKey | '' {
   if (['scrapedate', 'date', 'scrapeddate', 'scrapedat'].includes(c)) return 'scrape_date'
   if (['custom1', 'mensaje1', 'message1', 'msg1'].includes(c)) return 'custom1'
   if (['custom2', 'mensaje2', 'message2', 'msg2'].includes(c)) return 'custom2'
-  if (['custom3', 'mensaje3', 'message3', 'msg3'].includes(c)) return 'custom3'
   if (['market', 'country', 'region', 'location', 'geography', 'geo'].includes(c)) return 'market'
   return ''
 }
@@ -282,7 +280,6 @@ export function CSVImportWizard() {
         scrape_date: m.scrape_date?.trim() || null,
         custom1: m.custom1?.trim() || null,
         custom2: m.custom2?.trim() || null,
-        custom3: m.custom3?.trim() || null,
         market: m.market?.trim() || null,
         outreach_status: 'new' as const,
         area_id: selectedAreaId,

@@ -167,6 +167,12 @@ ultra:      { max_seats: MAX_INT, max_leads_per_month: MAX_INT }
 
 **`scraper_access` is dead** — the column still exists on `users` but nothing reads it. Do not reintroduce it as a filter or toggle.
 
+**`prospects.custom3` is a dead UI field, not a dead data field.** The scraper only ever generates two message variants (`Lead.custom1`/`Lead.custom2` — `scraper_leads` has no third column), so `custom3` was removed from the drawer, `ProspectForm`, and CSV import mapping. The DB column itself, and `Prospect.custom3` in `types.ts`, are untouched — do not resurrect a `custom3` input anywhere without first confirming the org actually wants a 3rd manual field (it is not, and never was, an auto-generation target).
+
+**Combo codes vs. combo labels** — `runs.combos`, `prospects.search_combo`, and a run's `combos` array are all stored as the opaque `scraper_combos_master.code` (e.g. `combo_D`), never the human-readable `name` ("CTO / VP Engineering"). Any UI showing a combo to a user must resolve it through `useComboLabels()` (`src/lib/hooks/useComboLabels.ts`, wraps `GET /api/scraper-combos`) — never render the raw code directly. Falls back to the raw code if the combo was deactivated org-wide since.
+
+**Scraped names get a name-only cleanup pass, manual/CSV names don't.** `cleanScrapedName()` (`src/lib/utils/clean-name.ts`) strips a job title the scraper sometimes leaves stuck onto the name field (`"Jassen Castillo - Software Engineer"` → `"Jassen Castillo"`), applied only where `assignRunLeads()` copies a scraped lead's `full_name` into `prospects.name`. Never apply it to `ProspectForm`/CSV-import names — a human typing a name that happens to contain a dash should never get silently truncated.
+
 ## Key Files
 
 | Thing | Location |
@@ -180,6 +186,8 @@ ultra:      { max_seats: MAX_INT, max_leads_per_month: MAX_INT }
 | Audit log helper | `src/lib/utils/audit.ts` → `logAuditEvent()` |
 | Route-level SDR gate for admin-only pages | `src/lib/utils/route-guard.ts` → `blockSdrAccess()` |
 | Mandatory chat-upload gate on closing a deal | `src/components/conversations/CloseDealModal.tsx` |
+| Combo code → human label lookup | `src/lib/hooks/useComboLabels.ts` |
+| Scraped-name cleanup (strips a stuck-on job title) | `src/lib/utils/clean-name.ts` → `cleanScrapedName()` |
 | Bridge HTTP client | `src/lib/bridge-api.ts` → `bridgeApi` |
 | Org ID + impersonation hook | `src/lib/hooks/useOrgId.ts` |
 | Billing period from `billing_day` | `src/lib/utils/billing-period.ts` |

@@ -69,7 +69,6 @@ export function ProspectForm({ open, onClose, onCreated, defaultAreaId }: Props)
     scrape_date: '',
     custom1: '',
     custom2: '',
-    custom3: '',
     outreach_status: 'new' as OutreachStatus,
     market: '',
     area_id: defaultAreaId ?? '',
@@ -143,7 +142,6 @@ export function ProspectForm({ open, onClose, onCreated, defaultAreaId }: Props)
       scrape_date: form.scrape_date || null,
       custom1: form.custom1 || null,
       custom2: form.custom2 || null,
-      custom3: form.custom3 || null,
       outreach_status: form.outreach_status,
       market: form.market || null,
       area_id: form.area_id,
@@ -168,7 +166,7 @@ export function ProspectForm({ open, onClose, onCreated, defaultAreaId }: Props)
       setForm({
         name: '', linkedin_url: '', email: '', company: '', title: '',
         industry: '', company_size: '', icp_score: '', lead_temperature: '',
-        search_combo: '', scrape_date: '', custom1: '', custom2: '', custom3: '',
+        search_combo: '', scrape_date: '', custom1: '', custom2: '',
         outreach_status: 'new', market: '', area_id: defaultAreaId ?? '', assigned_to: '', flag_tomorrow: false,
       })
       setDupWarn({})
@@ -312,8 +310,8 @@ export function ProspectForm({ open, onClose, onCreated, defaultAreaId }: Props)
             </FormField>
           </div>
 
-          {/* Custom 1 / 2 / 3 */}
-          {(['custom1', 'custom2', 'custom3'] as const).map(field => (
+          {/* Custom 1 / 2 */}
+          {(['custom1', 'custom2'] as const).map(field => (
             <FormField key={field} label={t(`prospect.${field}`)}>
               <textarea
                 value={form[field]}

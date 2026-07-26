@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, Area, User, LeadTemperature } from '@/lib/types'
 import { OUTREACH_STATUSES, LEAD_TEMPERATURES } from '@/lib/types'
+import { useComboLabels } from '@/lib/hooks/useComboLabels'
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250]
 
@@ -54,6 +55,7 @@ export function ProspectsTable() {
   const { user } = useUser()
   const { isImpersonating, impersonateOrgId, isAdmin } = useOrgId()
   const t = useTranslations()
+  const comboLabels = useComboLabels()
 
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [total, setTotal] = useState(0)
@@ -76,7 +78,7 @@ export function ProspectsTable() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
-  // SDR reassign modal
+  // SDR reassign modal (by quantity, arbitrary oldest-first leads)
   const [sdrReassignOpen, setSdrReassignOpen] = useState(false)
   const [sdrReassignFrom, setSdrReassignFrom] = useState('')
   const [sdrReassignTo, setSdrReassignTo] = useState('')
@@ -84,6 +86,11 @@ export function ProspectsTable() {
   const [sdrReassignLimit, setSdrReassignLimit] = useState('')
   const [sdrReassigning, setSdrReassigning] = useState(false)
   const [reassignToast, setReassignToast] = useState<string | null>(null)
+
+  // Reassign selected — takes exactly the checked leads, not an arbitrary count
+  const [selectedReassignOpen, setSelectedReassignOpen] = useState(false)
+  const [selectedReassignTo, setSelectedReassignTo] = useState('')
+  const [selectedReassigning, setSelectedReassigning] = useState(false)
 
   // Drawer
   const [drawerProspect, setDrawerProspect] = useState<Prospect | null>(null)
@@ -237,6 +244,45 @@ export function ProspectsTable() {
       fetchProspects()
     } finally {
       setSdrReassigning(false)
+    }
+  }
+
+  // Reassign exactly the checked leads (not an arbitrary "oldest N") to one
+  // SDR, logging each lead by name — same pattern the individual reassign in
+  // ProspectDrawer already uses, unlike the by-quantity mode above which
+  // only logs a count.
+  async function handleReassignSelected() {
+    if (selected.size === 0 || !selectedReassignTo) return
+    setSelectedReassigning(true)
+    try {
+      const ids = Array.from(selected)
+      const selectedProspects = prospects.filter(p => ids.includes(p.id))
+      const res = await fetch('/api/prospects', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, assigned_to: selectedReassignTo }),
+      })
+      const data = await res.json()
+      if (!res.ok) return
+
+      // One audit entry per lead, named — every lead in `selected` should be
+      // on the current page (it's how it got checked), so this covers them
+      // all without an extra fetch.
+      await Promise.all(selectedProspects.map(p => logAuditEvent({
+        event_type: 'prospect_reassigned',
+        prospect_id: p.id,
+        prospect_name: p.name,
+        metadata: { to_sdr: data.sdr_name ?? selectedReassignTo, bulk: true, selected: true },
+      })))
+
+      setSelectedReassignOpen(false)
+      setSelectedReassignTo('')
+      setSelected(new Set())
+      setReassignToast(`${data.reassigned} lead${data.reassigned !== 1 ? 's' : ''} reassigned to ${data.sdr_name}`)
+      setTimeout(() => setReassignToast(null), 3500)
+      fetchProspects()
+    } finally {
+      setSelectedReassigning(false)
     }
   }
 
@@ -466,7 +512,7 @@ export function ProspectsTable() {
                   {format(new Date(p.created_at), 'MMM d, yy')}
                 </td>
                 <td style={{ ...S.td, color: 'var(--crm-text-secondary)', fontSize: 12 }}>
-                  {p.search_combo ?? <span style={{ color: 'var(--crm-text-muted)' }}>—</span>}
+                  {p.search_combo ? (comboLabels[p.search_combo] ?? p.search_combo) : <span style={{ color: 'var(--crm-text-muted)' }}>—</span>}
                 </td>
                 <td style={{ ...S.td, color: 'var(--crm-text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}>
                   {p.scrape_date ?? '—'}
@@ -569,6 +615,13 @@ export function ProspectsTable() {
           </span>
 
           <div style={{ width: 1, height: 20, backgroundColor: 'var(--crm-border)' }} />
+
+          <button
+            onClick={() => setSelectedReassignOpen(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 14px', borderRadius: 5, border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)', color: 'var(--crm-text-secondary)', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+          >
+            <ArrowRight size={12} /> Reassign selected ({selected.size})
+          </button>
 
           <button
             onClick={() => setConfirmDelete(true)}
@@ -696,6 +749,53 @@ export function ProspectsTable() {
                 style={{ flex: 1, backgroundColor: 'var(--crm-accent)', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
               >
                 {sdrReassigning ? 'Reassigning...' : 'Confirm reassignment'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reassign selected — exact checked leads, not an arbitrary count */}
+      {selectedReassignOpen && (
+        <div
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
+          onClick={e => { if (e.target === e.currentTarget) { setSelectedReassignOpen(false); setSelectedReassignTo('') } }}
+        >
+          <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 28, width: 420, maxWidth: '90vw' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', backgroundColor: '#6C63FF20', border: '1px solid #6C63FF40', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Users size={16} color="var(--crm-accent)" />
+              </div>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--crm-text-primary)' }}>
+                Reassign {selected.size} selected lead{selected.size !== 1 ? 's' : ''}
+              </h2>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>To</label>
+              <select
+                value={selectedReassignTo}
+                onChange={e => setSelectedReassignTo(e.target.value)}
+                style={{ ...S.select, width: '100%' }}
+              >
+                <option value="">Select SDR...</option>
+                {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Button
+                onClick={() => { setSelectedReassignOpen(false); setSelectedReassignTo('') }}
+                style={{ flex: 1, backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button
+                onClick={handleReassignSelected}
+                disabled={!selectedReassignTo || selectedReassigning}
+                style={{ flex: 1, backgroundColor: 'var(--crm-accent)', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+              >
+                {selectedReassigning ? 'Reassigning...' : 'Confirm reassignment'}
               </Button>
             </div>
           </div>
