@@ -192,13 +192,12 @@ For each feature, verify behavior for all applicable roles:
 
 ### Route-level SDR gate on admin-only pages (FUNC-F12) — CRITICAL
 
-- [ ] As `sdr`, navigate directly to `/history` (type the URL, don't click a link) → redirected to `/kanban`, page content never renders (check Network tab — no `scraper_leads`/`run_sdr_assignments` request should even fire)
-- [ ] As `sdr`, navigate directly to `/audit` → redirected to `/kanban`
-- [ ] As `sdr`, navigate directly to `/admin/users` → redirected to `/kanban`
-- [ ] As `admin`, all three routes load normally
-- [ ] As `admin_global` (impersonating or not), all three still behave per their own rules — this fix must not affect the `admin`/`admin_global` path, only add a block for `sdr`
-- [ ] Logged-out user hitting any of the three → redirected to `/login`, not `/kanban`
-- [ ] **Known gap, not covered by this fix**: `(scraper)/dashboard`, `(scraper)/run`, `(scraper)/export`, and `/bridge` are admin-only pages with no route-level gate yet — confirm they're on the list for a follow-up before assuming full FUNC-F12 coverage
+- [ ] As `sdr`, navigate directly to each of `/history`, `/audit`, `/admin/users`, `/bridge`, `/run`, `/dashboard`, `/export` (type the URL, don't click a link — none of these should even be visible in the sidebar for an SDR, so this must be a direct-navigation test) → redirected to `/kanban`, page content never renders (check Network tab — no data request for that page should fire at all, not even one that comes back empty)
+- [ ] As `admin`, all seven routes load normally
+- [ ] As `admin_global` (impersonating or not), all seven still behave per their own rules — this fix must not affect the `admin`/`admin_global` path, only add a block for `sdr`
+- [ ] Logged-out user hitting any of the seven → redirected to `/login`, not `/kanban`
+- [ ] `/bridge` specifically: confirm the `sdr` redirect fires **before** any check of the `bridge` add-on's active state — an SDR should never see "add-on not active" or any other Bridge-specific message, only the generic redirect
+- [ ] Full FUNC-F12 coverage is now closed — no known admin-only page left ungated
 
 ### Mandatory close-deal chat gate — CRITICAL
 
