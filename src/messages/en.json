@@ -55,6 +55,7 @@
   "prospect": {
     "new": "New Lead",
     "edit": "Edit Lead",
+    "created": "Lead created",
     "name": "Full Name",
     "linkedinUrl": "LinkedIn URL",
     "email": "Email",
@@ -288,6 +289,7 @@
     "error": "An error occurred",
     "retry": "Retry",
     "noData": "No data available",
+    "missingRequiredFields": "Missing required fields",
     "search": "Search...",
     "filter": "Filter",
     "clearFilters": "Clear Filters",

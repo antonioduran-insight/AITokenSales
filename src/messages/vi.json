@@ -55,6 +55,7 @@
   "prospect": {
     "new": "Khách Hàng Tiềm Năng Mới",
     "edit": "Chỉnh Sửa Khách Hàng",
+    "created": "Đã tạo khách hàng",
     "name": "Họ Tên",
     "linkedinUrl": "LinkedIn URL",
     "email": "Email",
@@ -288,6 +289,7 @@
     "error": "Đã xảy ra lỗi",
     "retry": "Thử Lại",
     "noData": "Không có dữ liệu",
+    "missingRequiredFields": "Thiếu các trường bắt buộc",
     "search": "Tìm kiếm...",
     "filter": "Lọc",
     "clearFilters": "Xóa Bộ Lọc",

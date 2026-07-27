@@ -55,6 +55,7 @@
   "prospect": {
     "new": "新潛在客戶",
     "edit": "編輯潛在客戶",
+    "created": "已建立潛在客戶",
     "name": "姓名",
     "linkedinUrl": "LinkedIn 網址",
     "email": "電子郵件",
@@ -288,6 +289,7 @@
     "error": "發生錯誤",
     "retry": "重試",
     "noData": "無可用數據",
+    "missingRequiredFields": "缺少必填欄位",
     "search": "搜索...",
     "filter": "篩選",
     "clearFilters": "清除篩選",

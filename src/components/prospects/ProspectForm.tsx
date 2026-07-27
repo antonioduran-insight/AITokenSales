@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { useUser } from '@/contexts/UserContext'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, CheckCircle } from 'lucide-react'
 import type { Area, User, OutreachStatus, LeadTemperature, SearchCombo } from '@/lib/types'
 import { OUTREACH_STATUSES, LEAD_TEMPERATURES, SEARCH_COMBOS } from '@/lib/types'
 
@@ -77,6 +77,11 @@ export function ProspectForm({ open, onClose, onCreated, defaultAreaId }: Props)
   })
 
   const [dupWarn, setDupWarn] = useState<{ email?: string; linkedin?: string }>({})
+  // QA-F6: handleSubmit used to just `return` on a missing required field —
+  // no message, no visible change at all (the submit button was disabled,
+  // but nothing explained why). Now surfaces exactly which field is missing.
+  const [formError, setFormError] = useState<string | null>(null)
+  const [justCreated, setJustCreated] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -121,7 +126,14 @@ export function ProspectForm({ open, onClose, onCreated, defaultAreaId }: Props)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.name || !form.area_id) return
+    setFormError(null)
+    const missing: string[] = []
+    if (!form.name.trim()) missing.push(t('prospect.name'))
+    if (!form.area_id) missing.push(t('prospect.area'))
+    if (missing.length > 0) {
+      setFormError(`${t('common.missingRequiredFields')}: ${missing.join(', ')}`)
+      return
+    }
     setSaving(true)
 
     const supabase = createClient()
@@ -161,17 +173,26 @@ export function ProspectForm({ open, onClose, onCreated, defaultAreaId }: Props)
         prospect_name: form.name,
         metadata: { source: 'manual', area_id: form.area_id },
       })
-      onCreated()
-      // Reset form
-      setForm({
-        name: '', linkedin_url: '', email: '', company: '', title: '',
-        industry: '', company_size: '', icp_score: '', lead_temperature: '',
-        search_combo: '', scrape_date: '', custom1: '', custom2: '',
-        outreach_status: 'new', market: '', area_id: defaultAreaId ?? '', assigned_to: '', flag_tomorrow: false,
-      })
-      setDupWarn({})
+      // QA-F6: previously closed instantly with zero confirmation — no way
+      // to tell whether the save actually worked. Brief inline confirmation
+      // before closing, instead of a toast that would outlive the dialog.
+      setJustCreated(true)
+      setSaving(false)
+      setTimeout(() => {
+        onCreated()
+        setJustCreated(false)
+        setForm({
+          name: '', linkedin_url: '', email: '', company: '', title: '',
+          industry: '', company_size: '', icp_score: '', lead_temperature: '',
+          search_combo: '', scrape_date: '', custom1: '', custom2: '',
+          outreach_status: 'new', market: '', area_id: defaultAreaId ?? '', assigned_to: '', flag_tomorrow: false,
+        })
+        setDupWarn({})
+      }, 900)
+      return
     }
 
+    setFormError(error?.message ?? 'Could not save this lead.')
     setSaving(false)
   }
 
@@ -190,6 +211,18 @@ export function ProspectForm({ open, onClose, onCreated, defaultAreaId }: Props)
         <DialogHeader>
           <DialogTitle style={{ color: 'var(--crm-text-primary)' }}>{t('prospect.new')}</DialogTitle>
         </DialogHeader>
+
+        {justCreated && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', backgroundColor: '#1A3A2A', border: '1px solid #22C55E40', borderRadius: 8, fontSize: 13, color: '#22C55E' }}>
+            <CheckCircle size={14} /> {t('prospect.created')}
+          </div>
+        )}
+
+        {formError && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', backgroundColor: '#EF444415', border: '1px solid #EF444440', borderRadius: 8, fontSize: 13, color: '#EF4444' }}>
+            <AlertTriangle size={14} /> {formError}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 8 }}>
           {/* Row 1: name */}
