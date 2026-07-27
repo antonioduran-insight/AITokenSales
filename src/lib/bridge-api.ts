@@ -107,6 +107,11 @@ export const bridgeApi = {
   createSeedList: (payload: Record<string, unknown>) =>
     request<SeedList>('/seed-lists', { method: 'POST', body: JSON.stringify(payload) }),
 
+  // No local ownership check needed here beyond what the proxy already does
+  // (org-scoped) — the backend owns seed lists entirely, same as create/list.
+  deleteSeedList: (id: string) =>
+    request<{ ok?: boolean }>(`/seed-lists/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
   createRun: (seedListId: string) =>
     request<{ id?: string; run_id?: string }>('/runs', {
       method: 'POST',

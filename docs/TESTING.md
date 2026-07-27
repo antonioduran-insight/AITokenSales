@@ -382,6 +382,9 @@ For each feature, verify behavior for all applicable roles:
 - [ ] Create one with **criteria only** including industry — confirm `industry_codes` is sent as `[]` (known gap, no industry-to-code mapping exists yet — documented in CLAUDE.md, not silently guessed at)
 - [ ] Create one with **both** — both are stored, correctly renamed
 - [ ] Save is blocked until a name and at least one populated source exist
+- [ ] Each seed list row has a delete (trash) icon → click → confirm modal ("Delete seed list "[name]"? This cannot be undone.") → Cancel does nothing; Delete removes it and refreshes the list
+- [ ] Deleting a seed list that already has `bridge_runs` against it is allowed (not blocked) — the old run(s) still show in Past Searches with a generic "Seed list" label instead of the deleted name, no error
+- [ ] If the backend doesn't yet implement `DELETE /bridge/seed-lists/[id]`, the delete attempt surfaces a clear error instead of silently doing nothing — this is a backend dependency, unverified from the CRM side
 - [ ] The two seed lists that existed **before** this fix ("Hong Kong Software Companies", "Taiwan Software Reseller") still have empty backend fields — confirm whether they were recreated/edited per the team's decision, don't assume this fix retroactively repairs them
 - [ ] Run a search: `POST /bridge/runs` succeeds (no 422 "Field required" for `run_id`, no 404 "Bridge run not found") — the proxy inserts a `bridge_runs` row first and passes its real id, same pattern as `/api/runs`
 - [ ] The created `bridge_runs` row's `id` is what the client polls with, and `GET /bridge/runs/[id]` finds it immediately (no race)

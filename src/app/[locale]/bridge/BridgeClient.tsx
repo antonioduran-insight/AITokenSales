@@ -5,7 +5,7 @@ import {
   bridgeApi, CHANNEL_FAMILIES, HEADCOUNTS,
   type SeedList, type BridgeRun, type BridgeCandidate, type BridgeLog, type VerificationStatus,
 } from '@/lib/bridge-api'
-import { Plus, X, ExternalLink, Check, Ban, RotateCcw, AlertCircle, Handshake, Building2 } from 'lucide-react'
+import { Plus, X, ExternalLink, Check, Ban, RotateCcw, AlertCircle, Handshake, Building2, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useOrgMarkets } from '@/lib/hooks/useOrgMarkets'
 import { MarketSelect } from '@/components/markets/MarketSelect'
@@ -106,6 +106,24 @@ export function BridgeClient() {
   }, [])
 
   useEffect(() => { loadSeedLists() }, [loadSeedLists])
+
+  // ── Delete seed list ──
+  const [deleteTarget, setDeleteTarget] = useState<SeedList | null>(null)
+  const [deletingSeed, setDeletingSeed] = useState(false)
+
+  async function confirmDeleteSeedList() {
+    if (!deleteTarget) return
+    setDeletingSeed(true)
+    try {
+      await bridgeApi.deleteSeedList(deleteTarget.id)
+      setDeleteTarget(null)
+      await loadSeedLists()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setDeletingSeed(false)
+    }
+  }
 
   // Any active SDR in the org can receive Bridge candidates.
   useEffect(() => {
@@ -394,6 +412,13 @@ export function BridgeClient() {
                         {nCriteria > 0 && `${nCriteria} criteria`}
                         {nCompanies === 0 && nCriteria === 0 && '—'}
                       </span>
+                      <button
+                        onClick={() => setDeleteTarget(sl)}
+                        title="Delete seed list"
+                        style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', padding: 4, flexShrink: 0 }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   )
                 })}
@@ -748,6 +773,34 @@ export function BridgeClient() {
             </div>
           )}
         </>
+      )}
+
+      {deleteTarget && (
+        <div
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
+          onClick={e => { if (e.target === e.currentTarget && !deletingSeed) setDeleteTarget(null) }}
+        >
+          <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 24, width: 420, maxWidth: '90vw' }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>Delete seed list &quot;{deleteTarget.name}&quot;?</h3>
+            <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', marginBottom: 20 }}>This cannot be undone.</p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={deletingSeed}
+                style={{ flex: 1, padding: '9px 0', borderRadius: 8, border: 'none', backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)', fontSize: 13, fontWeight: 600, cursor: deletingSeed ? 'default' : 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteSeedList}
+                disabled={deletingSeed}
+                style={{ flex: 1, padding: '9px 0', borderRadius: 8, border: 'none', backgroundColor: '#EF4444', color: '#FFF', fontSize: 13, fontWeight: 600, cursor: deletingSeed ? 'default' : 'pointer', opacity: deletingSeed ? 0.6 : 1 }}
+              >
+                {deletingSeed ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
