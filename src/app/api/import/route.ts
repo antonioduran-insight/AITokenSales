@@ -39,24 +39,33 @@ async function incrementMonthlyLeads(admin: any, orgId: string, count: number) {
 }
 
 // POST /api/import — dedup check + return domain blacklist
+//
+// Checked org-wide (not scoped to one area) against both `prospects` and
+// `scraper_leads` by linkedin_url — a lead already known anywhere in the org
+// should surface as a duplicate here, regardless of which SDR's board or
+// which scraper run it came from. `area_id` is not needed for this check
+// (only for the insert step later); the org comes from the caller's own
+// session, never a client-supplied value.
 export async function POST(req: NextRequest) {
   const caller = await getCallerProfile()
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!caller.organization_id) return NextResponse.json({ dupEmails: {}, dupLinkedins: {}, blacklistedDomains: [] })
 
-  const { area_id, emails, linkedins } = await req.json()
-  if (!area_id) return NextResponse.json({ error: 'Missing area_id' }, { status: 400 })
+  const { emails, linkedins } = await req.json()
+  const orgId = caller.organization_id
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Fetch existing prospects + org blacklist in parallel
-  const [existingRes, orgRes] = await Promise.all([
-    admin.from('prospects').select('id, name, email, linkedin_url').eq('area_id', area_id),
-    caller.organization_id
-      ? admin.from('organizations').select('domain_blacklist').eq('id', caller.organization_id).single()
-      : Promise.resolve({ data: null }),
+  // Fetch existing prospects + scraper leads + org blacklist in parallel —
+  // both tables are checked so a lead already scraped (but not yet exported)
+  // still shows up as a duplicate.
+  const [existingRes, scraperLeadsRes, orgRes] = await Promise.all([
+    admin.from('prospects').select('id, name, email, linkedin_url').eq('organization_id', orgId),
+    admin.from('scraper_leads').select('full_name, linkedin_url').eq('organization_id', orgId),
+    admin.from('organizations').select('domain_blacklist').eq('id', orgId).single(),
   ])
 
   const emailMap: Record<string, string> = {}
@@ -64,6 +73,11 @@ export async function POST(req: NextRequest) {
   existingRes.data?.forEach(p => {
     if (p.email) emailMap[p.email.toLowerCase()] = p.name
     if (p.linkedin_url) linkedinMap[p.linkedin_url.toLowerCase()] = p.name
+  })
+  scraperLeadsRes.data?.forEach(l => {
+    if (l.linkedin_url && !linkedinMap[l.linkedin_url.toLowerCase()]) {
+      linkedinMap[l.linkedin_url.toLowerCase()] = l.full_name ?? 'Unknown'
+    }
   })
 
   const dupEmails: Record<string, string> = {}

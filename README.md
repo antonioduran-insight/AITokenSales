@@ -146,7 +146,7 @@ Once that fix landed, the Settings → Pipeline editor (rename/recolor stages) w
 - **Stats Dashboard** — global conversion rate, SDR leaderboard, area breakdown, status and temperature distribution (Premium+)
 - **Audit Log** — immutable trail of all actions
 - **User Management** — create/deactivate/reactivate/unassign/delete SDRs (admin only)
-- **CSV Import Wizard** — 5-step flow: upload → area → column mapping → duplicate review → results
+- **CSV Import Wizard** — 5-step flow: upload → **SDR** (admin picks the destination SDR; area is derived from them) → column mapping → duplicate review → results. Column mapping already recognises `custom1`/`custom2` (connection/follow-up message columns), so a CSV of leads with pre-written outreach messages needs no separate flow — a warning banner appears once an SDR is picked and a message column is mapped, since that content was written with a specific sender in mind.
 - **Settings** — org name/language/logo/company context/blacklist, plan & usage, scraper credentials & sender profiles, support tickets
 
 ### LinkedIn Scraper (admin only)

@@ -180,15 +180,20 @@ For each feature, verify behavior for all applicable roles:
 
 - [ ] File size >5 MB rejected with error
 - [ ] Non-CSV file rejected
-- [ ] Step 2 (area select) shown to admin; hidden/auto-set for SDR
-- [ ] Column auto-detection works for standard LinkedIn export headers
+- [ ] Step 2 (**SDR select**, not area) shown to admin, listing active SDRs with their area badge; hidden/auto-set for SDR (self-import unchanged)
+- [ ] Selecting an SDR in Step 2 correctly carries their area into Step 3's header ("Area: X · SDR: Y")
+- [ ] Column auto-detection works for standard LinkedIn export headers, including `custom1`/`custom2` (connection/follow-up message columns — try headers like `mensaje1`, `message2`, `msg1`)
 - [ ] Manual column mapping works for unrecognized headers
 - [ ] Required field (Name) missing → import blocked with error
-- [ ] Duplicate detection: prospects matching by email or LinkedIn URL in same area shown in Step 4
+- [ ] **Mapping `custom1` or `custom2` to a column, with an SDR selected, shows the "these leads already have messages generated for [SDR]" warning banner in Step 3** — critical, this is the new pre-generated-messages flow's core safety check
+- [ ] Mapping neither `custom1` nor `custom2` → no warning banner shown, even with an SDR selected (a plain lead import shouldn't show a message-ownership warning)
+- [ ] **Duplicate detection is now org-wide, not area-scoped** — a lead already assigned to a *different* SDR in the same org still shows as a duplicate in Step 4
+- [ ] **Duplicate detection also checks `scraper_leads`** — a lead scraped but not yet exported to CRM (still sitting in `scraper_leads` with `exported_to_crm = false`) shows as a duplicate too, not just leads already in `prospects`
 - [ ] Skip duplicate → not imported; Force Import → imported
 - [ ] Results step shows correct breakdown: imported / duplicates / no name / forced
 - [ ] Global unique constraint violation (LinkedIn URL exists in another org's area) handled gracefully
-- [ ] Imported prospects appear in Prospects table immediately
+- [ ] Imported prospects appear in Prospects table immediately, assigned to the SDR chosen in Step 2 (not the importing admin)
+- [ ] Audit log's `csv_import` entry includes `assigned_sdr` with the correct SDR name
 
 ### UX/performance batch (F1/F5/F6/F7/F17, FUNC-F1/F2/F4/F6/F7/F13, S1/S2)
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
@@ -12,6 +12,13 @@ import type { AreaName } from '@/lib/types'
 import { AREA_NAMES } from '@/lib/types'
 import { AREA_LABELS } from '@/lib/utils/area-inference'
 import { SEARCH_COMBOS, LEAD_TEMPERATURES } from '@/lib/types'
+
+interface SdrOption {
+  id: string
+  full_name: string
+  area_id: string | null
+  area_name: AreaName | null
+}
 
 const PROSPECT_FIELDS = [
   { key: 'name', label: 'Full Name', required: true },
@@ -88,9 +95,42 @@ export function CSVImportWizard() {
 
   const [step, setStep] = useState<Step>(1)
 
-  // Step 2: area selection (admin only — SDRs use their own area automatically)
+  // Step 2: SDR selection (admin only — SDRs importing for themselves skip
+  // this and keep self-assigning, same as before). The area is derived from
+  // whichever SDR is picked, not chosen directly — a lead always needs an
+  // owner, and today's "self-assign to the importing admin" default wasn't a
+  // real destination for it to land on.
+  const [sdrs, setSdrs] = useState<SdrOption[]>([])
+  const [selectedSdrId, setSelectedSdrId] = useState<string>('')
   const [selectedArea, setSelectedArea] = useState<AreaName | null>(null)
   const [selectedAreaId, setSelectedAreaId] = useState<string>('')
+
+  useEffect(() => {
+    if (!isAdmin) return
+    createClient()
+      .from('users')
+      .select('id, full_name, area_id, area:areas(name)')
+      .eq('role', 'sdr')
+      .eq('is_active', true)
+      .order('full_name')
+      .then(({ data }) => {
+        if (!data) return
+        setSdrs((data as unknown as Array<{ id: string; full_name: string; area_id: string | null; area: { name: string } | null }>).map(s => ({
+          id: s.id,
+          full_name: s.full_name,
+          area_id: s.area_id,
+          area_name: (s.area?.name as AreaName) ?? null,
+        })))
+      })
+  }, [isAdmin])
+
+  function handleSdrSelect(sdrId: string) {
+    const sdr = sdrs.find(s => s.id === sdrId)
+    if (!sdr) return
+    setSelectedSdrId(sdrId)
+    setSelectedAreaId(sdr.area_id ?? '')
+    setSelectedArea(sdr.area_name)
+  }
 
   // Step 3: column mapping
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
@@ -108,13 +148,6 @@ export function CSVImportWizard() {
 
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  // Fetch area id when area is selected (admin flow)
-  async function handleAreaSelect(areaName: AreaName) {
-    setSelectedArea(areaName)
-    const { data } = await createClient().from('areas').select('id').eq('name', areaName).single()
-    if (data) setSelectedAreaId(data.id)
-  }
 
   function parseCSV(file: File) {
     Papa.parse<Record<string, string>>(file, {
@@ -172,7 +205,7 @@ export function CSVImportWizard() {
       const res = await fetch('/api/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ area_id: selectedAreaId, emails, linkedins }),
+        body: JSON.stringify({ emails, linkedins }),
       })
       if (res.ok) {
         const data = await res.json()
@@ -285,7 +318,9 @@ export function CSVImportWizard() {
         area_id: selectedAreaId,
         source: 'csv_import' as const,
         created_by: user?.id ?? null,
-        assigned_to: user?.id ?? null,
+        // Admins assign to the SDR picked in step 2; an SDR importing for
+        // themselves (no picker shown) still self-assigns as before.
+        assigned_to: selectedSdrId || user?.id || null,
         flag_tomorrow: false,
       }
     })
@@ -314,7 +349,10 @@ export function CSVImportWizard() {
 
     await logAuditEvent({
       event_type: 'csv_import',
-      metadata: { imported, skipped, forced, errors: errorRows.length, total: targetRows.length, area: selectedArea },
+      metadata: {
+        imported, skipped, forced, errors: errorRows.length, total: targetRows.length, area: selectedArea,
+        assigned_sdr: sdrs.find(s => s.id === selectedSdrId)?.full_name ?? null,
+      },
     })
 
     setResults({ imported, skipped, forced, errors: errorRows.length, totalRows: targetRows.length, skippedConstraint, blacklisted: blacklistedRows.length })
@@ -328,8 +366,9 @@ export function CSVImportWizard() {
 
   function resetWizard() {
     setStep(1)
-    // Keep SDR area pre-loaded — it never changes
+    // Keep the logged-in SDR's own area pre-loaded — it never changes
     if (isAdmin) {
+      setSelectedSdrId('')
       setSelectedArea(null)
       setSelectedAreaId('')
     }
@@ -421,43 +460,47 @@ export function CSVImportWizard() {
       {/* STEP 2: Area selection */}
       {step === 2 && (
         <div style={S.card}>
-          <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>Which area do these prospects belong to?</h2>
+          <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>Which SDR should these leads go to?</h2>
           <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', marginBottom: 28 }}>
-            The selected area will be applied to all {csvData.length} rows in the CSV.
+            All {csvData.length} rows in the CSV will be assigned to this SDR, in their area.
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 32 }}>
-            {AREA_OPTIONS.map(opt => {
-              const isSelected = selectedArea === opt.name
-              const color = AREA_COLORS[opt.name]
-              return (
-                <div key={opt.name} title={opt.disabled ? opt.disabledReason : undefined}>
+          {sdrs.length === 0 ? (
+            <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', marginBottom: 32 }}>No active SDRs found. Add one in Settings → Users first.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 32 }}>
+              {sdrs.map(sdr => {
+                const isSelected = selectedSdrId === sdr.id
+                const color = sdr.area_name ? AREA_COLORS[sdr.area_name] : 'var(--crm-text-muted)'
+                return (
                   <button
-                    disabled={opt.disabled}
-                    onClick={() => handleAreaSelect(opt.name)}
+                    key={sdr.id}
+                    onClick={() => handleSdrSelect(sdr.id)}
                     style={{
-                      width: '100%', padding: '20px 16px', borderRadius: 10, cursor: opt.disabled ? 'not-allowed' : 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 10, cursor: 'pointer',
                       border: `2px solid ${isSelected ? color : 'var(--crm-border)'}`,
-                      backgroundColor: isSelected ? color + '18' : opt.disabled ? 'var(--crm-background)' : 'var(--crm-surface-raised)',
-                      color: opt.disabled ? '#3A3A4A' : isSelected ? color : 'var(--crm-text-secondary)',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-                      transition: 'all 0.15s', opacity: opt.disabled ? 0.4 : 1,
+                      backgroundColor: isSelected ? color + '18' : 'var(--crm-surface-raised)',
+                      transition: 'all 0.15s', textAlign: 'left',
                     }}
                   >
                     <div style={{
-                      width: 18, height: 18, borderRadius: '50%', border: `2px solid ${isSelected ? color : '#3A3A4A'}`,
-                      backgroundColor: isSelected ? color : 'transparent', transition: 'all 0.15s',
+                      width: 16, height: 16, borderRadius: '50%', border: `2px solid ${isSelected ? color : '#3A3A4A'}`,
+                      backgroundColor: isSelected ? color : 'transparent', transition: 'all 0.15s', flexShrink: 0,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
-                      {isSelected && <div style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: '#FFF' }} />}
+                      {isSelected && <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#FFF' }} />}
                     </div>
-                    <span style={{ fontSize: 15, fontWeight: isSelected ? 700 : 500 }}>{opt.label}</span>
-                    {opt.disabled && <span style={{ fontSize: 10, color: '#3A3A4A' }}>{opt.disabledReason}</span>}
+                    <span style={{ fontSize: 14, fontWeight: isSelected ? 700 : 500, color: isSelected ? color : 'var(--crm-text-primary)', flex: 1 }}>
+                      {sdr.full_name}
+                    </span>
+                    {sdr.area_name && (
+                      <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>{AREA_LABELS[sdr.area_name]}</span>
+                    )}
                   </button>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          )}
 
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <Button onClick={() => setStep(1)} style={{ backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}>
@@ -465,8 +508,8 @@ export function CSVImportWizard() {
             </Button>
             <Button
               onClick={() => setStep(3)}
-              disabled={!selectedArea || !selectedAreaId}
-              style={{ backgroundColor: selectedArea ? 'var(--crm-accent)' : 'var(--crm-border)', color: '#FFF' }}
+              disabled={!selectedSdrId || !selectedAreaId}
+              style={{ backgroundColor: selectedSdrId ? 'var(--crm-accent)' : 'var(--crm-border)', color: '#FFF' }}
             >
               {tc('next_step')} <ChevronRight size={14} />
             </Button>
@@ -485,9 +528,21 @@ export function CSVImportWizard() {
                 <span style={{ color: AREA_COLORS[selectedArea!], fontWeight: 600 }}>
                   {AREA_OPTIONS.find(a => a.name === selectedArea)?.label}
                 </span>
+                {selectedSdrId && (
+                  <> · SDR: <span style={{ color: 'var(--crm-text-secondary)', fontWeight: 600 }}>{sdrs.find(s => s.id === selectedSdrId)?.full_name}</span></>
+                )}
               </p>
             </div>
           </div>
+
+          {selectedSdrId && (Object.values(mapping).includes('custom1') || Object.values(mapping).includes('custom2')) && (
+            <div style={{ display: 'flex', gap: 10, padding: '12px 14px', backgroundColor: '#F59E0B15', border: '1px solid #F59E0B40', borderRadius: 8, marginBottom: 20 }}>
+              <AlertTriangle size={15} color="#F59E0B" style={{ flexShrink: 0, marginTop: 1 }} />
+              <p style={{ fontSize: 12.5, color: 'var(--crm-text-secondary)', lineHeight: 1.5, margin: 0 }}>
+                These leads already have messages generated for <strong style={{ color: 'var(--crm-text-primary)' }}>{sdrs.find(s => s.id === selectedSdrId)?.full_name}</strong> — make sure this matches the SDR you&apos;re assigning to. The message content was written with a specific sender in mind and won&apos;t be regenerated.
+              </p>
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 }}>
             {csvHeaders.map(col => (
