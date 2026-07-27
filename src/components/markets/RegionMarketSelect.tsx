@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { AREA_NAMES, type AreaName, type Market } from '@/lib/types'
 import { areaLabel } from '@/lib/utils/area-inference'
 import { AlertCircle } from 'lucide-react'
@@ -38,6 +38,7 @@ export function RegionMarketSelect({
   markets, loading, error, region, onRegionChange, selectedMarkets, onToggleMarket,
 }: Props) {
   const locale = useLocale()
+  const t = useTranslations('marketPicker')
 
   const inRegion = region ? markets.filter(m => m.region === region) : []
   const allOn = inRegion.length > 0 && inRegion.every(m => selectedMarkets.includes(m.name))
@@ -56,7 +57,7 @@ export function RegionMarketSelect({
       {/* Step 2 — specific countries within the chosen region */}
       {region && (
         loading ? (
-          <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>Loading markets…</p>
+          <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>{t('loading')}</p>
         ) : error ? (
           <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 10, backgroundColor: '#EF444410', border: '1px solid #EF444430' }}>
             <AlertCircle size={16} color="#EF4444" style={{ flexShrink: 0, marginTop: 1 }} />
@@ -65,18 +66,18 @@ export function RegionMarketSelect({
         ) : inRegion.length === 0 ? (
           <div style={{ padding: '14px 16px', borderRadius: 10, backgroundColor: 'var(--crm-surface-raised)', border: '1px dashed var(--crm-border)' }}>
             <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', margin: '0 0 8px' }}>
-              No markets configured for {areaLabel(region)}.
+              {t('noMarketsConfiguredForRegion', { region: areaLabel(region) })}
             </p>
             <Link href={`/${locale}/settings?tab=organization`}
               style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-accent)', textDecoration: 'none' }}>
-              Go to Settings to select your markets →
+              {t('goToSettings')}
             </Link>
           </div>
         ) : (
           <div style={{ border: '1px solid var(--crm-border)', borderRadius: 10, padding: '12px 14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <span style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600 }}>
-                {selectedMarkets.length}/{inRegion.length} countries selected
+                {t('countriesSelected', { selected: selectedMarkets.length, total: inRegion.length })}
               </span>
               <button
                 onClick={() => inRegion.forEach(m => {
@@ -85,7 +86,7 @@ export function RegionMarketSelect({
                   if (!allOn && !isSelected) onToggleMarket(m.name)
                 })}
                 style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-secondary)', background: 'none', border: '1px solid var(--crm-border)', borderRadius: 6, padding: '3px 10px', cursor: 'pointer' }}>
-                {allOn ? 'Clear' : 'Select all'}
+                {allOn ? t('clear') : t('selectAll')}
               </button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 4 }}>

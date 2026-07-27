@@ -7,7 +7,15 @@
     "convertidos": "Đã Chốt",
     "audit": "Nhật Ký Kiểm Toán",
     "stats": "Thống Kê",
-    "users": "Quản Lý Người Dùng"
+    "users": "Quản Lý Người Dùng",
+    "support": "Hỗ Trợ",
+    "settings": "Cài Đặt",
+    "dashboard": "Bảng Điều Khiển",
+    "newRun": "Lượt Thu Thập Mới",
+    "history": "Lịch Sử",
+    "scraperSection": "Thu Thập Dữ Liệu",
+    "bridgeSection": "Bridge",
+    "partnerships": "Đối Tác"
   },
   "areas": {
     "taiwan": "Đài Loan",
@@ -26,6 +34,15 @@
     "demo_scheduled": "Đã Đặt Demo",
     "closed": "Đã Chốt",
     "nurture": "Nuôi Dưỡng"
+  },
+  "runStatus": {
+    "pending": "Đang chờ",
+    "running": "Đang thu thập",
+    "scoring": "Đang chấm điểm",
+    "drafting": "Đang soạn thảo",
+    "completed": "Hoàn thành",
+    "failed": "Thất bại",
+    "cancelled": "Đã hủy"
   },
   "temperature": {
     "all": "Tất Cả Nhiệt Độ",
@@ -301,6 +318,7 @@
     "noData": "Không có dữ liệu",
     "missingRequiredFields": "Thiếu các trường bắt buộc",
     "search": "Tìm kiếm...",
+    "noMatches": "Không tìm thấy kết quả",
     "filter": "Lọc",
     "clearFilters": "Xóa Bộ Lọc",
     "page": "Trang",
@@ -323,6 +341,7 @@
     "next_step": "Tiếp Theo",
     "unset": "Chưa đặt",
     "unassigned": "Chưa phân công",
+    "runHistory": "Lịch Sử Thu Thập",
     "reassign": "Phân công lại",
     "reassigning": "Đang phân công lại...",
     "reassignedTo": "Lead đã được phân công lại cho {name}",
@@ -347,5 +366,28 @@
     "tableCustom1": "Custom 1",
     "moreInCsv": "... và {count} nữa trong CSV",
     "csvColumns": "Cột CSV"
+  },
+  "dashboard": {
+    "title": "Bảng Điều Khiển Thu Thập",
+    "totalRuns": "Tổng Số Lượt Thu Thập",
+    "totalLeadsRequested": "Tổng Số Khách Hàng Yêu Cầu",
+    "activeRun": "Đang chạy — {market}",
+    "viewHistory": "Xem Lịch Sử",
+    "latestRun": "Lượt Thu Thập Gần Nhất",
+    "leadsRequested": "{count} khách hàng đã yêu cầu",
+    "recentRuns": "Các Lượt Thu Thập Gần Đây",
+    "leadsReq": "{count} khách hàng y.c.",
+    "noRunsYet": "Chưa có lượt thu thập nào.",
+    "startFirstRun": "Bắt đầu lượt thu thập đầu tiên",
+    "newRun": "Lượt Thu Thập Mới"
+  },
+  "marketPicker": {
+    "loading": "Đang tải thị trường…",
+    "noMarketsConfigured": "Chưa cấu hình thị trường nào.",
+    "noMarketsConfiguredForRegion": "Chưa cấu hình thị trường nào cho {region}.",
+    "goToSettings": "Đến Cài đặt để chọn thị trường của bạn →",
+    "clear": "Xóa",
+    "selectAll": "Chọn tất cả",
+    "countriesSelected": "Đã chọn {selected}/{total} quốc gia"
   }
 }

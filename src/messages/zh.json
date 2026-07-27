@@ -7,7 +7,15 @@
     "convertidos": "已成交",
     "audit": "審計日誌",
     "stats": "統計數據",
-    "users": "用戶管理"
+    "users": "用戶管理",
+    "support": "支援",
+    "settings": "設定",
+    "dashboard": "儀表板",
+    "newRun": "新抓取任務",
+    "history": "歷史記錄",
+    "scraperSection": "抓取工具",
+    "bridgeSection": "Bridge",
+    "partnerships": "合作夥伴"
   },
   "areas": {
     "taiwan": "台灣",
@@ -26,6 +34,15 @@
     "demo_scheduled": "已排定演示",
     "closed": "已成交",
     "nurture": "培育中"
+  },
+  "runStatus": {
+    "pending": "等待中",
+    "running": "抓取中",
+    "scoring": "評分中",
+    "drafting": "草擬中",
+    "completed": "已完成",
+    "failed": "失敗",
+    "cancelled": "已取消"
   },
   "temperature": {
     "all": "所有溫度",
@@ -301,6 +318,7 @@
     "noData": "無可用數據",
     "missingRequiredFields": "缺少必填欄位",
     "search": "搜索...",
+    "noMatches": "沒有符合的結果",
     "filter": "篩選",
     "clearFilters": "清除篩選",
     "page": "第",
@@ -323,6 +341,7 @@
     "next_step": "下一步",
     "unset": "未設定",
     "unassigned": "未分配",
+    "runHistory": "抓取歷史記錄",
     "reassign": "重新分配",
     "reassigning": "重新分配中...",
     "reassignedTo": "潛在客戶已重新分配給 {name}",
@@ -347,5 +366,28 @@
     "tableCustom1": "自訂 1",
     "moreInCsv": "...以及 CSV 中另外 {count} 筆",
     "csvColumns": "CSV 欄位"
+  },
+  "dashboard": {
+    "title": "抓取儀表板",
+    "totalRuns": "抓取任務總數",
+    "totalLeadsRequested": "請求線索總數",
+    "activeRun": "進行中的任務 — {market}",
+    "viewHistory": "查看歷史記錄",
+    "latestRun": "最新任務",
+    "leadsRequested": "已請求 {count} 個線索",
+    "recentRuns": "近期任務",
+    "leadsReq": "{count} 個線索",
+    "noRunsYet": "尚無抓取任務。",
+    "startFirstRun": "開始第一個抓取任務",
+    "newRun": "新抓取任務"
+  },
+  "marketPicker": {
+    "loading": "正在載入市場…",
+    "noMarketsConfigured": "尚未設定任何市場。",
+    "noMarketsConfiguredForRegion": "{region}尚未設定任何市場。",
+    "goToSettings": "前往設定選擇您的市場 →",
+    "clear": "清除",
+    "selectAll": "全選",
+    "countriesSelected": "已選擇 {selected}/{total} 個國家"
   }
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { useDroppable } from '@dnd-kit/core'
 import { Search, X } from 'lucide-react'
 import { ProspectCard } from './ProspectCard'
@@ -34,6 +35,7 @@ const COLUMN_ACCENT: Record<OutreachStatus, string> = {
 const TERMINAL: OutreachStatus[] = ['closed', 'nurture']
 
 export function KanbanColumn({ status, label, color, prospects, onCardClick, chatCounts, recentlyMovedId, setCardRef }: Props) {
+  const t = useTranslations('common')
   const { setNodeRef, isOver } = useDroppable({ id: status })
   const isTerminal = TERMINAL.includes(status)
   const accent = color ?? COLUMN_ACCENT[status]
@@ -96,7 +98,7 @@ export function KanbanColumn({ status, label, color, prospects, onCardClick, cha
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Search..."
+            placeholder={t('search')}
             style={{
               width: '100%',
               boxSizing: 'border-box',
@@ -166,7 +168,7 @@ export function KanbanColumn({ status, label, color, prospects, onCardClick, cha
               padding: '24px 8px',
             }}
           >
-            No matches
+            {t('noMatches')}
           </div>
         )}
       </div>

@@ -7,7 +7,15 @@
     "convertidos": "Convertidos",
     "audit": "Auditoría",
     "stats": "Estadísticas",
-    "users": "Gestión de Usuarios"
+    "users": "Gestión de Usuarios",
+    "support": "Soporte",
+    "settings": "Configuración",
+    "dashboard": "Panel",
+    "newRun": "Nueva Búsqueda",
+    "history": "Historial",
+    "scraperSection": "Scraper",
+    "bridgeSection": "Bridge",
+    "partnerships": "Sociedades"
   },
   "areas": {
     "taiwan": "Taiwán",
@@ -26,6 +34,15 @@
     "demo_scheduled": "Demo Agendado",
     "closed": "Cerrado",
     "nurture": "Nurture"
+  },
+  "runStatus": {
+    "pending": "Pendiente",
+    "running": "Extrayendo",
+    "scoring": "Puntuando",
+    "drafting": "Redactando",
+    "completed": "Completado",
+    "failed": "Fallido",
+    "cancelled": "Cancelado"
   },
   "temperature": {
     "all": "Todas las Temps",
@@ -301,6 +318,7 @@
     "noData": "Sin datos disponibles",
     "missingRequiredFields": "Faltan campos obligatorios",
     "search": "Buscar...",
+    "noMatches": "Sin resultados",
     "filter": "Filtrar",
     "clearFilters": "Limpiar filtros",
     "page": "Página",
@@ -323,6 +341,7 @@
     "next_step": "Siguiente",
     "unset": "Sin definir",
     "unassigned": "Sin asignar",
+    "runHistory": "Historial de Búsquedas",
     "reassign": "Reasignar",
     "reassigning": "Reasignando...",
     "reassignedTo": "Lead reasignado a {name}",
@@ -347,5 +366,28 @@
     "tableCustom1": "Custom 1",
     "moreInCsv": "... y {count} más en el CSV",
     "csvColumns": "Columnas del CSV"
+  },
+  "dashboard": {
+    "title": "Panel del Scraper",
+    "totalRuns": "Búsquedas Totales",
+    "totalLeadsRequested": "Total de Leads Solicitados",
+    "activeRun": "Búsqueda activa — {market}",
+    "viewHistory": "Ver Historial",
+    "latestRun": "Última Búsqueda",
+    "leadsRequested": "{count} leads solicitados",
+    "recentRuns": "Búsquedas Recientes",
+    "leadsReq": "{count} leads sol.",
+    "noRunsYet": "Aún no hay búsquedas.",
+    "startFirstRun": "Iniciar primera búsqueda",
+    "newRun": "Nueva Búsqueda"
+  },
+  "marketPicker": {
+    "loading": "Cargando mercados…",
+    "noMarketsConfigured": "No hay mercados configurados.",
+    "noMarketsConfiguredForRegion": "No hay mercados configurados para {region}.",
+    "goToSettings": "Ir a Configuración para elegir tus mercados →",
+    "clear": "Limpiar",
+    "selectAll": "Seleccionar todos",
+    "countriesSelected": "{selected}/{total} países seleccionados"
   }
 }

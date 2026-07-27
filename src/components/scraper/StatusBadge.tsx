@@ -1,16 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import type { RunStatus } from "@/lib/types";
-
-const STATUS_LABELS: Record<RunStatus, string> = {
-  pending:   "Pending",
-  running:   "Scraping",
-  scoring:   "Scoring",
-  drafting:  "Drafting",
-  completed: "Completed",
-  failed:    "Failed",
-  cancelled: "Cancelled",
-};
 
 const STATUS_COLORS: Record<RunStatus, string> = {
   pending:   { bg: 'var(--crm-border)', color: 'var(--crm-text-secondary)', border: '#3A3A4A' } as unknown as string,
@@ -29,7 +20,10 @@ interface Props {
 }
 
 export function StatusBadge({ status }: Props) {
-  const label = STATUS_LABELS[status] ?? status;
+  const t = useTranslations('runStatus');
+  // RunStatus is a closed union and every value has a runStatus.* key, so
+  // this always resolves — no fallback needed.
+  const label = t(status);
   const pulse = PULSE_STATUSES.has(status);
   const c = STATUS_COLORS[status] as unknown as { bg: string; color: string; border: string };
 

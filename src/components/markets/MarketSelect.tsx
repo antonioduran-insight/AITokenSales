@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { AREA_NAMES, type Market } from '@/lib/types'
 import { areaLabel } from '@/lib/utils/area-inference'
 import { AlertCircle } from 'lucide-react'
@@ -38,9 +38,10 @@ function orderRegions(markets: Market[]): string[] {
  */
 export function MarketSelect({ markets, loading, error, value, onChange }: Props) {
   const locale = useLocale()
+  const t = useTranslations('marketPicker')
 
   if (loading) {
-    return <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>Loading markets…</p>
+    return <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>{t('loading')}</p>
   }
 
   if (error) {
@@ -56,11 +57,11 @@ export function MarketSelect({ markets, loading, error, value, onChange }: Props
     return (
       <div style={{ padding: '14px 16px', borderRadius: 10, backgroundColor: 'var(--crm-surface-raised)', border: '1px dashed var(--crm-border)' }}>
         <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', margin: '0 0 8px' }}>
-          No markets configured.
+          {t('noMarketsConfigured')}
         </p>
         <Link href={`/${locale}/settings?tab=organization`}
           style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-accent)', textDecoration: 'none' }}>
-          Go to Settings to select your markets →
+          {t('goToSettings')}
         </Link>
       </div>
     )

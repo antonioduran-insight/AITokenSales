@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { createClient } from '@/lib/supabase/client';
 import { TemperatureBadge } from '@/components/scraper/TemperatureBadge';
 import { ICPScore } from '@/components/scraper/ICPScore';
@@ -53,6 +54,7 @@ function downloadCsv(runId: string, leads: Lead[]) {
 }
 
 function HistoryContent() {
+  const t = useTranslations('common');
   const searchParams = useSearchParams();
   const runParam = searchParams.get('run');
 
@@ -204,7 +206,7 @@ function HistoryContent() {
 
   return (
     <div style={S.page}>
-      <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 20px' }}>Run History</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 20px' }}>{t('runHistory')}</h1>
 
       {loading && <p style={{ color: 'var(--crm-text-muted)', textAlign: 'center', padding: 40 }}>Loading…</p>}
       {!loading && runs.length === 0 && <p style={{ color: 'var(--crm-text-muted)', textAlign: 'center', padding: 40 }}>No runs yet.</p>}

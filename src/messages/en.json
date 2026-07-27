@@ -7,7 +7,15 @@
     "convertidos": "Closed Deals",
     "audit": "Audit Log",
     "stats": "Statistics",
-    "users": "User Management"
+    "users": "User Management",
+    "support": "Support",
+    "settings": "Settings",
+    "dashboard": "Dashboard",
+    "newRun": "New Run",
+    "history": "History",
+    "scraperSection": "Scraper",
+    "bridgeSection": "Bridge",
+    "partnerships": "Partnerships"
   },
   "areas": {
     "taiwan": "Taiwan",
@@ -26,6 +34,15 @@
     "demo_scheduled": "Demo Scheduled",
     "closed": "Closed",
     "nurture": "Nurture"
+  },
+  "runStatus": {
+    "pending": "Pending",
+    "running": "Scraping",
+    "scoring": "Scoring",
+    "drafting": "Drafting",
+    "completed": "Completed",
+    "failed": "Failed",
+    "cancelled": "Cancelled"
   },
   "temperature": {
     "all": "All Temps",
@@ -301,6 +318,7 @@
     "noData": "No data available",
     "missingRequiredFields": "Missing required fields",
     "search": "Search...",
+    "noMatches": "No matches",
     "filter": "Filter",
     "clearFilters": "Clear Filters",
     "page": "Page",
@@ -323,6 +341,7 @@
     "next_step": "Next",
     "unset": "Unset",
     "unassigned": "Unassigned",
+    "runHistory": "Run History",
     "reassign": "Reassign",
     "reassigning": "Reassigning...",
     "reassignedTo": "Lead reassigned to {name}",
@@ -347,5 +366,28 @@
     "tableCustom1": "Custom 1",
     "moreInCsv": "... and {count} more in the CSV",
     "csvColumns": "CSV Columns"
+  },
+  "dashboard": {
+    "title": "Scraper Dashboard",
+    "totalRuns": "Total Runs",
+    "totalLeadsRequested": "Total Leads Requested",
+    "activeRun": "Active run — {market}",
+    "viewHistory": "View History",
+    "latestRun": "Latest Run",
+    "leadsRequested": "{count} leads requested",
+    "recentRuns": "Recent Runs",
+    "leadsReq": "{count} leads req.",
+    "noRunsYet": "No runs yet.",
+    "startFirstRun": "Start first run",
+    "newRun": "New Run"
+  },
+  "marketPicker": {
+    "loading": "Loading markets…",
+    "noMarketsConfigured": "No markets configured.",
+    "noMarketsConfiguredForRegion": "No markets configured for {region}.",
+    "goToSettings": "Go to Settings to select your markets →",
+    "clear": "Clear",
+    "selectAll": "Select all",
+    "countriesSelected": "{selected}/{total} countries selected"
   }
 }

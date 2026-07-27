@@ -71,17 +71,17 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
   // (middleware enforces this server-side too) — every other link here
   // would just redirect straight back, so don't show them at all.
   const navItems = isSupport
-    ? [{ href: '/support', label: 'Support', icon: Headphones, always: true }]
+    ? [{ href: '/support', label: t('support'), icon: Headphones, always: true }]
     : [
         { href: '/kanban', label: t('kanban'), icon: LayoutGrid, always: true },
         { href: '/prospects', label: t('prospects'), icon: Users2, always: true },
-        { href: '/import', label: 'Import', icon: UploadCloud, always: true, hideWhenImpersonating: true },
+        { href: '/import', label: t('import'), icon: UploadCloud, always: true, hideWhenImpersonating: true },
         { href: '/convertidos', label: t('convertidos'), icon: Trophy, always: true },
-        { href: '/support', label: 'Support', icon: Headphones, always: true },
+        { href: '/support', label: t('support'), icon: Headphones, always: true },
         { href: '/audit', label: t('audit'), icon: ClipboardList, adminOnly: true },
         { href: '/stats', label: t('stats'), icon: BarChart3, adminOnly: true },
         { href: '/admin/users', label: t('users'), icon: Users, adminOnly: true },
-        { href: '/settings', label: 'Settings', icon: Settings2, adminOnly: true },
+        { href: '/settings', label: t('settings'), icon: Settings2, adminOnly: true },
       ]
 
   async function handleLogout() {
@@ -210,14 +210,14 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
           <>
             <div style={{ margin: '10px 4px 6px', display: 'flex', alignItems: 'center', gap: 8 }}>
               {!isIconOnly && <div style={{ flex: 1, height: 1, backgroundColor: 'var(--crm-border)' }} />}
-              {!isIconOnly && <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Scraper</span>}
+              {!isIconOnly && <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>{t('scraperSection')}</span>}
               {!isIconOnly && <div style={{ flex: 1, height: 1, backgroundColor: 'var(--crm-border)' }} />}
               {isIconOnly && <div style={{ width: '100%', height: 1, backgroundColor: 'var(--crm-border)' }} />}
             </div>
             {[
-              { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-              { href: '/run',       label: 'New Run',   icon: Play },
-              { href: '/history',   label: 'History',   icon: History },
+              { href: '/dashboard', label: t('dashboard'), icon: LayoutDashboard },
+              { href: '/run',       label: t('newRun'),    icon: Play },
+              { href: '/history',   label: t('history'),   icon: History },
             ].map(item => {
               const fullHref = `/${locale}${item.href}`
               const isActive = pathname === fullHref || pathname.startsWith(fullHref + '/')
@@ -255,7 +255,7 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
             <>
               <div style={{ margin: '10px 4px 6px', display: 'flex', alignItems: 'center', gap: 8 }}>
                 {!isIconOnly && <div style={{ flex: 1, height: 1, backgroundColor: 'var(--crm-border)' }} />}
-                {!isIconOnly && <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Bridge</span>}
+                {!isIconOnly && <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>{t('bridgeSection')}</span>}
                 {!isIconOnly && <div style={{ flex: 1, height: 1, backgroundColor: 'var(--crm-border)' }} />}
                 {isIconOnly && <div style={{ width: '100%', height: 1, backgroundColor: 'var(--crm-border)' }} />}
               </div>
@@ -263,7 +263,7 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
                 href={fullHref}
                 prefetch={false}
                 onClick={onCloseMobile}
-                title={isIconOnly ? 'Partnerships' : undefined}
+                title={isIconOnly ? t('partnerships') : undefined}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: isIconOnly ? 'center' : 'flex-start', gap: 10,
                   padding: isIconOnly ? '10px 0' : '8px 12px', borderRadius: 8, marginBottom: 2,
@@ -275,7 +275,7 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
                 }}
               >
                 <Handshake size={14} strokeWidth={isActive ? 2.2 : 1.8} />
-                {!isIconOnly && 'Partnerships'}
+                {!isIconOnly && t('partnerships')}
               </Link>
             </>
           )
