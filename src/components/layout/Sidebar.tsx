@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
   LayoutGrid, Users2, ClipboardList, BarChart3, Users, LogOut, Trophy,
-  LayoutDashboard, Play, History, Headphones, Settings2, Handshake,
+  LayoutDashboard, Play, History, Headphones, Settings2, Handshake, UploadCloud,
 } from 'lucide-react'
 import { AreaBadge } from '@/components/ui/AreaBadge'
 import type { UserWithArea } from '@/contexts/UserContext'
@@ -60,6 +60,7 @@ export function Sidebar({ user }: Props) {
   const navItems = [
     { href: '/kanban', label: t('kanban'), icon: LayoutGrid, always: true },
     { href: '/prospects', label: t('prospects'), icon: Users2, always: true },
+    { href: '/import', label: 'Import', icon: UploadCloud, always: true },
     { href: '/convertidos', label: t('convertidos'), icon: Trophy, always: true },
     { href: '/support', label: 'Support', icon: Headphones, always: true },
     { href: '/audit', label: t('audit'), icon: ClipboardList, adminOnly: true },
