@@ -276,13 +276,13 @@ export default function RevenuePage() {
       {/* Costs section */}
       <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: '20px 24px', marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 16 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: colors.textPrimary }}>Costos Mensuales</div>
-          <span style={{ fontSize: 12, color: colors.textMuted }}>Total: <strong style={{ color: colors.textSecondary }}>{formatUSD(monthlyTotal)}/mo</strong> · {selectedQ}: <strong style={{ color: colors.danger }}>{formatUSD(qCosts)}</strong></span>
+          <div style={{ fontSize: 16, fontWeight: 700, color: colors.textPrimary }}>{t('monthlyCosts')}</div>
+          <span style={{ fontSize: 12, color: colors.textMuted }}>{t('total')}: <strong style={{ color: colors.textSecondary }}>{formatUSD(monthlyTotal)}/mo</strong> · {selectedQ}: <strong style={{ color: colors.danger }}>{formatUSD(qCosts)}</strong></span>
         </div>
         <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           {/* Infrastructure */}
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Infraestructura</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>{t('infrastructure')}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {([
                 { key: 'vercel', label: 'Vercel' },
@@ -306,7 +306,7 @@ export default function RevenuePage() {
                 </div>
               ))}
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${colors.border}`, paddingTop: 8, marginTop: 4 }}>
-                <span style={{ fontSize: 13, color: colors.textSecondary, fontWeight: 600 }}>Subtotal</span>
+                <span style={{ fontSize: 13, color: colors.textSecondary, fontWeight: 600 }}>{t('subtotal')}</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: colors.textPrimary }}>{formatUSD(monthlyInfra)}/mo</span>
               </div>
             </div>
@@ -314,7 +314,7 @@ export default function RevenuePage() {
 
           {/* API costs */}
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Costos API</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>{t('apiCosts')}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {([
                 { key: 'apify', label: 'Apify' },
@@ -337,17 +337,17 @@ export default function RevenuePage() {
                 </div>
               ))}
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${colors.border}`, paddingTop: 8, marginTop: 4 }}>
-                <span style={{ fontSize: 13, color: colors.textSecondary, fontWeight: 600 }}>Subtotal</span>
+                <span style={{ fontSize: 13, color: colors.textSecondary, fontWeight: 600 }}>{t('subtotal')}</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: colors.textPrimary }}>{formatUSD(monthlyAPI)}/mo</span>
               </div>
             </div>
           </div>
         </div>
         <div style={{ marginTop: 12, padding: '8px 12px', backgroundColor: colors.surfaceRaised, borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, color: colors.textMuted }}>Total mensual:</span>
+          <span style={{ fontSize: 12, color: colors.textMuted }}>{t('monthlyTotal')}:</span>
           <span style={{ fontSize: 13, fontWeight: 700, color: colors.danger }}>{formatUSD(monthlyTotal)}/mo</span>
           <span style={{ fontSize: 12, color: colors.textMuted }}>·</span>
-          <span style={{ fontSize: 12, color: colors.textMuted }}>Total {selectedQ} (× 3):</span>
+          <span style={{ fontSize: 12, color: colors.textMuted }}>{t('total')} {selectedQ} (× 3):</span>
           <span style={{ fontSize: 13, fontWeight: 700, color: colors.danger }}>{formatUSD(qCosts)}</span>
         </div>
       </div>

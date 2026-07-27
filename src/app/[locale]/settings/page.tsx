@@ -236,7 +236,7 @@ function PlanTab() {
   }, [])
 
   if (loading) return <div style={{ color: 'var(--crm-text-muted)', padding: 40, textAlign: 'center' }}>Loading…</div>
-  if (!data) return <div style={{ color: 'var(--crm-text-muted)', padding: 40, textAlign: 'center' }}>No se pudo cargar el plan. Recarga la página.</div>
+  if (!data) return <div style={{ color: 'var(--crm-text-muted)', padding: 40, textAlign: 'center' }}>Could not load the plan. Please reload the page.</div>
 
   const { org, sdrCount, sdrs, leadsCount, periodStart, addons } = data
   const maxSeats = org.max_seats ?? 0
