@@ -162,6 +162,7 @@
     "noEvents": "未找到事件",
     "events": {
       "prospect_created": "創建潛在客戶",
+      "prospect_updated": "更新潛在客戶",
       "status_changed": "狀態變更",
       "prospect_reassigned": "重新分配",
       "note_added": "新增備註",
@@ -300,6 +301,7 @@
     "no": "否",
     "all": "全部",
     "save": "儲存",
+    "saved": "已儲存",
     "cancel": "取消",
     "delete": "刪除",
     "edit": "編輯",

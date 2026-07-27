@@ -162,6 +162,7 @@
     "noEvents": "Không tìm thấy sự kiện",
     "events": {
       "prospect_created": "Tạo Khách Hàng",
+      "prospect_updated": "Cập Nhật Khách Hàng",
       "status_changed": "Thay Đổi Trạng Thái",
       "prospect_reassigned": "Phân Công Lại",
       "note_added": "Thêm Ghi Chú",
@@ -300,6 +301,7 @@
     "no": "Không",
     "all": "Tất Cả",
     "save": "Lưu",
+    "saved": "Đã lưu",
     "cancel": "Hủy",
     "delete": "Xóa",
     "edit": "Chỉnh Sửa",

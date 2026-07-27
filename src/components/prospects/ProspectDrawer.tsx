@@ -13,6 +13,7 @@ import { CloseDealModal } from '@/components/conversations/CloseDealModal'
 import { useUser } from '@/contexts/UserContext'
 import { useOrgId } from '@/lib/hooks/useOrgId'
 import { useComboLabels } from '@/lib/hooks/useComboLabels'
+import { useOrgMarkets } from '@/lib/hooks/useOrgMarkets'
 import { ExternalLink, Copy, Check, Star, ChevronDown, CheckCircle, X, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, LeadTemperature, User } from '@/lib/types'
@@ -68,9 +69,16 @@ const selectStyle: React.CSSProperties = {
   cursor: 'pointer', appearance: 'none' as const,
 }
 
+const textInputStyle: React.CSSProperties = {
+  width: '100%', padding: '7px 10px', boxSizing: 'border-box' as const,
+  backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)',
+  borderRadius: 6, color: 'var(--crm-text-primary)', fontSize: 13, outline: 'none',
+}
+
 export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: Props) {
   const t = useTranslations()
   const comboLabels = useComboLabels()
+  const { markets: orgMarkets } = useOrgMarkets()
   const { isAdmin, user } = useUser()
   const { isImpersonating } = useOrgId()
   const [prospect, setProspect] = useState(initial)
@@ -79,13 +87,27 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
 
   const [sdrsForArea, setSdrsForArea] = useState<User[]>([])
   const [reassigning, setReassigning] = useState(false)
-  const [reassignToast, setReassignToast] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
   const [pendingClose, setPendingClose] = useState(false)
   const [closingSaving, setClosingSaving] = useState(false)
   const [editingField, setEditingField] = useState<'custom1' | 'custom2' | null>(null)
   const [editValue, setEditValue] = useState('')
+  // Local drafts for the plain-text editable fields (company/title) so the
+  // input stays responsive while typing — committed to the DB on blur,
+  // rather than on every keystroke like the select-based fields below.
+  const [companyDraft, setCompanyDraft] = useState(initial.company ?? '')
+  const [titleDraft, setTitleDraft] = useState(initial.title ?? '')
 
-  if (initial.id !== prospect.id) setProspect(initial)
+  if (initial.id !== prospect.id) {
+    setProspect(initial)
+    setCompanyDraft(initial.company ?? '')
+    setTitleDraft(initial.title ?? '')
+  }
+
+  function showToast(message: string) {
+    setToast(message)
+    setTimeout(() => setToast(null), 3000)
+  }
 
   useEffect(() => {
     if (!isAdmin || !prospect.area_id) return
@@ -129,12 +151,13 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
         prospect_name: prospect.name,
         metadata: { from_sdr: fromName, to_sdr: data.sdr_name },
       })
-      setReassignToast(`Lead reasignado a ${data.sdr_name}`)
-      setTimeout(() => setReassignToast(null), 3000)
+      showToast(`Lead reasignado a ${data.sdr_name}`)
     } finally { setReassigning(false) }
   }
 
-  async function updateField(field: string, value: unknown) {
+  // QA-F11: every field save now surfaces the same generic confirmation —
+  // previously nothing in the drawer gave any visual feedback on save.
+  async function updateField(field: string, value: unknown, opts?: { silent?: boolean }) {
     if (isImpersonating) return
     setSaving(true)
     const supabase = createClient()
@@ -143,8 +166,25 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
       const updated = { ...prospect, [field]: value }
       setProspect(updated)
       onUpdated(updated)
+      if (!opts?.silent) showToast(t('common.saved'))
     }
     setSaving(false)
+  }
+
+  // Company/Job Title/Market/Search Combo are now editable, matching the
+  // rest of the drawer's fields, and log to the Audit Log the same way
+  // status changes already do.
+  async function saveEditableField(field: 'company' | 'title' | 'market' | 'search_combo', value: string | null, label: string) {
+    const prev = prospect[field] ?? null
+    if (value === prev) return
+    await updateField(field, value, { silent: true })
+    await logAuditEvent({
+      event_type: 'prospect_updated',
+      prospect_id: prospect.id,
+      prospect_name: prospect.name,
+      metadata: { field: label, from: prev ?? '—', to: value ?? '—' },
+    })
+    showToast(t('common.saved'))
   }
 
   function startEditMessage(field: 'custom1' | 'custom2') {
@@ -343,16 +383,69 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
                   </Field>
                 )}
                 {prospect.email && <Field label={t('prospect.email')}>{prospect.email}</Field>}
+
+                <Field label={t('prospect.company')}>
+                  <input
+                    type="text"
+                    value={companyDraft}
+                    disabled={isImpersonating}
+                    onChange={e => setCompanyDraft(e.target.value)}
+                    onBlur={() => saveEditableField('company', companyDraft.trim() || null, t('prospect.company'))}
+                    style={textInputStyle}
+                  />
+                </Field>
+
+                <Field label={t('prospect.title')}>
+                  <input
+                    type="text"
+                    value={titleDraft}
+                    disabled={isImpersonating}
+                    onChange={e => setTitleDraft(e.target.value)}
+                    onBlur={() => saveEditableField('title', titleDraft.trim() || null, t('prospect.title'))}
+                    style={textInputStyle}
+                  />
+                </Field>
+
                 {prospect.industry && <Field label={t('prospect.industry')}>{prospect.industry}</Field>}
                 {prospect.company_size && <Field label={t('prospect.companySize')}>{prospect.company_size}</Field>}
-                {prospect.market && <Field label={t('prospect.market')}>{prospect.market}</Field>}
-                {prospect.search_combo && (
-                  <Field label={t('prospect.searchCombo')}>
-                    <span style={{ backgroundColor: 'var(--crm-surface-raised)', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>
-                      {comboLabels[prospect.search_combo] ?? prospect.search_combo}
-                    </span>
-                  </Field>
-                )}
+
+                <Field label={t('prospect.market')}>
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      value={prospect.market ?? ''}
+                      disabled={isImpersonating}
+                      onChange={e => saveEditableField('market', e.target.value || null, t('prospect.market'))}
+                      style={selectStyle}
+                    >
+                      <option value="">{t('common.none')}</option>
+                      {orgMarkets.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                      {/* A market the org no longer has activated still shows, so the field doesn't silently blank out an existing value */}
+                      {prospect.market && !orgMarkets.some(m => m.name === prospect.market) && (
+                        <option value={prospect.market}>{prospect.market}</option>
+                      )}
+                    </select>
+                    <ChevronDown size={12} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--crm-text-muted)', pointerEvents: 'none' }} />
+                  </div>
+                </Field>
+
+                <Field label={t('prospect.searchCombo')}>
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      value={prospect.search_combo ?? ''}
+                      disabled={isImpersonating}
+                      onChange={e => saveEditableField('search_combo', e.target.value || null, t('prospect.searchCombo'))}
+                      style={selectStyle}
+                    >
+                      <option value="">{t('common.none')}</option>
+                      {Object.entries(comboLabels).map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+                      {/* A combo that's since been deactivated org-wide still shows, same fallback as elsewhere */}
+                      {prospect.search_combo && !(prospect.search_combo in comboLabels) && (
+                        <option value={prospect.search_combo}>{prospect.search_combo}</option>
+                      )}
+                    </select>
+                    <ChevronDown size={12} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--crm-text-muted)', pointerEvents: 'none' }} />
+                  </div>
+                </Field>
                 {prospect.scrape_date && (
                   <Field label={t('prospect.scrapeDate')}>
                     <span className="font-mono-data" style={{ fontSize: 12 }}>
@@ -464,11 +557,11 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
 
         </div>
 
-        {/* Reassign toast */}
-        {reassignToast && (
+        {/* Save/reassign confirmation toast (QA-F11) */}
+        {toast && (
           <div style={{ position: 'absolute', bottom: 20, left: 20, right: 20, backgroundColor: '#1A3A2A', border: '1px solid #22C55E40', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#22C55E', zIndex: 10 }}>
             <CheckCircle size={14} />
-            {reassignToast}
+            {toast}
           </div>
         )}
       </div>

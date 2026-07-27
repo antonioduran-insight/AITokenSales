@@ -14,6 +14,7 @@ type TimeFilter = 'today' | 'week' | 'month' | 'all'
 
 const EVENT_COLORS: Record<AuditEventType, string> = {
   prospect_created: '#22C55E',
+  prospect_updated: '#0EA5E9',
   status_changed: '#6C63FF',
   prospect_reassigned: '#3B82F6',
   note_added: '#8B8BA0',
@@ -25,7 +26,7 @@ const EVENT_COLORS: Record<AuditEventType, string> = {
 }
 
 const ALL_EVENTS: AuditEventType[] = [
-  'prospect_created', 'status_changed', 'prospect_reassigned', 'note_added',
+  'prospect_created', 'prospect_updated', 'status_changed', 'prospect_reassigned', 'note_added',
   'conversation_added', 'duplicate_attempt', 'sdr_created', 'sdr_deactivated', 'csv_import',
 ]
 
@@ -49,6 +50,7 @@ function getFromDate(filter: TimeFilter): string | null {
 function formatDetail(log: AuditLog, statusLabel: (status: unknown) => string): string {
   const m = log.metadata ?? {}
   switch (log.event_type) {
+    case 'prospect_updated': return `${m.field ?? 'field'}: ${m.from ?? '—'} → ${m.to ?? '—'}`
     case 'status_changed': return `${statusLabel(m.from_status)} → ${statusLabel(m.to_status)}`
     case 'prospect_reassigned': {
       const from = (m.from_sdr ?? m.from) as string | undefined

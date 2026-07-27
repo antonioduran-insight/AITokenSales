@@ -162,6 +162,7 @@
     "noEvents": "No events found",
     "events": {
       "prospect_created": "Lead Created",
+      "prospect_updated": "Lead Updated",
       "status_changed": "Status Changed",
       "prospect_reassigned": "Lead Reassigned",
       "note_added": "Note Added",
@@ -300,6 +301,7 @@
     "no": "No",
     "all": "All",
     "save": "Save",
+    "saved": "Saved",
     "cancel": "Cancel",
     "delete": "Delete",
     "edit": "Edit",

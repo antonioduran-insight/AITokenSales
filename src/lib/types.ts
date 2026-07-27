@@ -22,6 +22,7 @@ export type AreaName = 'asia' | 'latin_america' | 'europe' | 'usa'
 
 export type AuditEventType =
   | 'prospect_created'
+  | 'prospect_updated'
   | 'status_changed'
   | 'prospect_reassigned'
   | 'note_added'
