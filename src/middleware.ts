@@ -50,10 +50,25 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     const locale = pathnameHasLocale ? pathname.split('/')[1] : defaultLocale
-    return NextResponse.redirect(new URL(`/${locale}/login`, request.url))
+    const redirectResponse = NextResponse.redirect(new URL(`/${locale}/login`, request.url))
+    // Relay whatever Supabase wrote to `response` (e.g. clearing an invalid
+    // session) so the browser doesn't keep resending stale cookies.
+    response.cookies.getAll().forEach(cookie => redirectResponse.cookies.set(cookie))
+    return redirectResponse
   }
 
   const intlResponse = intlMiddleware(request)
+
+  // `intlResponse` is a separate NextResponse from `response` above, so it
+  // doesn't carry whatever Supabase just refreshed on `response` inside
+  // setAll(). Without copying those cookies over, a rotated session cookie
+  // never reaches the browser — the browser keeps sending the old, now
+  // server-invalidated refresh token, which makes the very next request's
+  // getUser() fail and forces a login redirect (the "logged out on every
+  // navigation" bug). intlMiddleware's own response (locale rewrite/
+  // redirect, NEXT_LOCALE cookie) is preserved; we're only layering
+  // Supabase's cookies on top.
+  response.cookies.getAll().forEach(cookie => intlResponse.cookies.set(cookie))
 
   // Fetch profile to expose role + org_id via cookies — race against 900ms
   // to avoid MIDDLEWARE_INVOCATION_TIMEOUT on slow Supabase responses
