@@ -240,7 +240,7 @@ function HistoryContent() {
           <div key={run.id} style={S.row} ref={el => { rowRefs.current[run.id] = el; }}>
             {/* Header */}
             <div onClick={() => toggleExpand(run.id)}
-              style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', cursor: 'pointer' }}>
+              style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', rowGap: 8, gap: 14, padding: '14px 18px', cursor: 'pointer' }}>
               <div style={{ minWidth: 130 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-primary)' }}>
                   {new Date(run.created_at).toLocaleDateString()}

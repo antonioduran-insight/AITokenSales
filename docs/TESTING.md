@@ -131,6 +131,15 @@ For each feature, verify behavior for all applicable roles:
 - [ ] Reviewed only, no code changes needed — page container, preset/pill rows, and the region/country market picker (`RegionMarketSelect`) were already responsive by construction (`maxWidth` caps, `flexWrap`, and an auto-fill grid with no fixed column count)
 - [ ] Spot-check anyway on phone width: combo picker, leads stepper, and SDR picker list don't overflow; Phase 2/3 progress and result screens fit within their `maxWidth: 420-520` caps
 
+### Dashboard / History / Export (mobile + tablet) — Block 3
+
+- [ ] Dashboard: the active-run banner (pulsing dot / market+combos / status badge / "View history" link) wraps onto a second line on narrow phones instead of overflowing
+- [ ] Dashboard: latest-run and recent-runs rows keep truncating long market/combo text with an ellipsis rather than overflowing (already correct before this pass — just confirm no regression)
+- [ ] History: each run's collapsed header row (date/time · market+combo badges · lead count · status badge · cancel button · chevron) wraps onto multiple lines on narrow phones instead of clipping off-screen — this was a real overflow risk (five+ fixed-width items in one non-wrapping flex row) fixed this pass
+- [ ] History: expanding a run still works after the header wraps; toolbar (leads count / Send to another SDR / Download CSV) and the leads table's horizontal scroll are unaffected
+- [ ] Export: the "N leads a exportar" text + "Descargar CSV" button row wraps onto a second line on narrow phones instead of overflowing
+- [ ] Export: run-select dropdown and the leads preview table (horizontal scroll, ellipsis on Company/Title/Custom 1) are unaffected
+
 ### Settings (mobile + tablet) — Block 3
 
 - [ ] Tab strip (Organization / Plan & Usage / Scraper) scrolls horizontally on narrow phones instead of wrapping — the connected underline strip look is preserved, no tab clips off-screen

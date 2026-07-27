@@ -84,7 +84,7 @@ function ExportContent() {
             </option>
           ))}
         </select>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--crm-border)', paddingTop: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 10, borderTop: '1px solid var(--crm-border)', paddingTop: 16 }}>
           <div style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>
             {loading ? 'Contando...' : (
               <span>

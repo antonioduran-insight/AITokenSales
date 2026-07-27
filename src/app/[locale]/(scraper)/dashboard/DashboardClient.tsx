@@ -61,7 +61,7 @@ export function DashboardClient() {
 
       {/* Active run banner */}
       {activeRun && (
-        <div style={{ borderRadius: 12, border: '1px solid #6C63FF40', backgroundColor: '#6C63FF10', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        <div style={{ borderRadius: 12, border: '1px solid #6C63FF40', backgroundColor: '#6C63FF10', padding: '12px 16px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', rowGap: 8, gap: 12, marginBottom: 24 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--crm-accent)', animation: 'pulse 1.5s ease-in-out infinite', flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontSize: 13, color: 'var(--crm-text-primary)', fontWeight: 600, margin: 0 }}>Active run — {runMarket(activeRun)}</p>
