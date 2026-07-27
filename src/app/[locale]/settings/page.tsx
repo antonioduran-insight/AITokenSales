@@ -127,7 +127,7 @@ function OrgTab() {
           <input value={name} onChange={e => setName(e.target.value)} style={S.input} />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+        <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
           <div>
             <label style={S.label}>Default Language</label>
             <select value={language} onChange={e => setLanguage(e.target.value)} style={S.select}>
@@ -324,12 +324,12 @@ function PlanTab() {
             <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Active SDRs</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {sdrs.map(sdr => (
-                <div key={sdr.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', backgroundColor: 'var(--crm-surface-raised)', borderRadius: 7 }}>
-                  <div>
+                <div key={sdr.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '8px 12px', backgroundColor: 'var(--crm-surface-raised)', borderRadius: 7 }}>
+                  <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--crm-text-primary)' }}>{sdr.full_name}</span>
                     <span style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginLeft: 8 }}>{sdr.email}</span>
                   </div>
-                  <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>since {new Date(sdr.created_at).toLocaleDateString()}</span>
+                  <span style={{ fontSize: 11, color: 'var(--crm-text-muted)', flexShrink: 0 }}>since {new Date(sdr.created_at).toLocaleDateString()}</span>
                 </div>
               ))}
             </div>
@@ -389,7 +389,7 @@ function PlanTab() {
       {/* Buy Seats modal */}
       {showBuySeats && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
-          <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 28, width: 380 }}>
+          <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 28, width: 380, maxWidth: '90vw', boxSizing: 'border-box' }}>
             <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Buy More Seats</h3>
             <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', marginBottom: 20 }}>
               Contact us to add more seats to your plan. We&apos;ll get back to you within one business day.
@@ -529,8 +529,8 @@ function ScraperTab() {
               return (
                 <div key={sdr.id} style={{ border: '1px solid var(--crm-border)', borderRadius: 8, overflow: 'hidden' }}>
                   {/* SDR header */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', backgroundColor: 'var(--crm-surface-raised)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 8, padding: '12px 16px', backgroundColor: 'var(--crm-surface-raised)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', rowGap: 4 }}>
                       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-primary)' }}>{sdr.full_name}</span>
                       {defaultProfile ? (
                         <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, backgroundColor: '#22C55E20', color: '#22C55E', fontWeight: 700 }}>
@@ -555,7 +555,7 @@ function ScraperTab() {
                     <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {profiles.map(p => (
                         <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--crm-border)' }}>
-                          <div style={{ flex: 1 }}>
+                          <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <span style={{ fontSize: 13, fontWeight: p.is_default ? 700 : 400, color: 'var(--crm-text-primary)' }}>{p.display_name}</span>
                             <span style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginLeft: 8 }}>{p.title} · {p.company}</span>
                           </div>
@@ -586,7 +586,7 @@ function ScraperTab() {
                   {isOpen && (
                     <div style={{ padding: '12px 16px', borderTop: '1px solid var(--crm-border)', backgroundColor: '#6C63FF06' }}>
                       {profileError && <p style={{ fontSize: 12, color: '#EF4444', margin: '0 0 10px' }}>{profileError}</p>}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                      <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                         <div>
                           <label style={S.label}>Display name *</label>
                           <input value={formFields.display_name} onChange={e => setFormFields(p => ({ ...p, display_name: e.target.value }))} placeholder="John D." style={S.input} />
@@ -741,8 +741,9 @@ function SettingsContent() {
     <div style={S.page}>
       <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 24 }}>Settings</h1>
 
-      {/* Tab nav */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: 28, borderBottom: '1px solid var(--crm-border)', paddingBottom: 0 }}>
+      {/* Tab nav — scrolls horizontally instead of wrapping (wrapping would
+          break the connected underline strip look) if it doesn't fit */}
+      <div style={{ display: 'flex', gap: 2, marginBottom: 28, borderBottom: '1px solid var(--crm-border)', paddingBottom: 0, overflowX: 'auto' }}>
         {TABS.map(t => (
           <button
             key={t.key}
@@ -755,6 +756,8 @@ function SettingsContent() {
               borderBottom: tab === t.key ? '2px solid var(--crm-accent)' : '2px solid transparent',
               marginBottom: -1,
               transition: 'color 0.15s',
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
             }}
           >
             {t.label}

@@ -126,6 +126,22 @@ For each feature, verify behavior for all applicable roles:
 - [ ] Delete-confirm, SDR-reassign, and Reassign-selected modals all fit within the viewport on phone width (capped at `90vw`) with no horizontal overflow
 - [ ] Pagination controls (prev/page N of M/next) stay centered and usable at phone width
 
+### New Run (mobile + tablet) — Block 3
+
+- [ ] Reviewed only, no code changes needed — page container, preset/pill rows, and the region/country market picker (`RegionMarketSelect`) were already responsive by construction (`maxWidth` caps, `flexWrap`, and an auto-fill grid with no fixed column count)
+- [ ] Spot-check anyway on phone width: combo picker, leads stepper, and SDR picker list don't overflow; Phase 2/3 progress and result screens fit within their `maxWidth: 420-520` caps
+
+### Settings (mobile + tablet) — Block 3
+
+- [ ] Tab strip (Organization / Plan & Usage / Scraper) scrolls horizontally on narrow phones instead of wrapping — the connected underline strip look is preserved, no tab clips off-screen
+- [ ] Organization tab: Default Language + Logo fields stack into a single column on phone width instead of squeezing into two ~130px columns
+- [ ] Plan & Usage tab: Active SDRs list rows (name + email + join date) truncate the name/email with an ellipsis instead of pushing the join date off-screen or overflowing the card
+- [ ] Plan & Usage tab: "Buy More Seats" modal fits within the viewport on phone width (capped at `90vw`) — previously missing, would have overflowed edge-to-edge
+- [ ] Scraper tab: each SDR's sender-profile header row (name + default-profile badge + Add profile button) wraps onto a second line on narrow phones instead of overflowing
+- [ ] Scraper tab: sender-profile create form's two-column field grid (Display name / Title / Company / Language) collapses to one column on phone width
+- [ ] Scraper tab: existing sender-profile list rows (name + title + company) truncate with an ellipsis instead of overflowing
+- [ ] Scraper tab: Search Combos list rows wrap naturally (title/description/keyword-badges on the left, Enabled/Disabled toggle on the right) without the toggle clipping off-screen
+
 ### Authentication
 
 - [ ] Valid credentials → redirected to correct landing page by role

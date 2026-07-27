@@ -211,6 +211,9 @@
   .crm-hide-mobile {
     display: none !important;
   }
+  .crm-grid-1-mobile {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 @media (min-width: 768px) {
