@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { DndContext, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core'
+import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
 import { useUser } from '@/contexts/UserContext'
@@ -53,6 +53,13 @@ export function KanbanBoard() {
 
   const isSdr = user?.role === 'sdr'
   const sdrAreaIds = sdrAreas.map(a => a.id)
+
+  // A short activation distance means a drag only starts once the pointer
+  // has actually moved a few px — without it, a touch tap (which always
+  // wobbles a little) could misfire as a drag instead of opening the card,
+  // and on touch a drag competes with the column list's own horizontal
+  // scroll gesture until it's clear the user means to drag, not swipe.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   // Single init effect: fetch meta (areas, stages) and prospects in parallel.
   // Avoids the cascade where sdrAreas state change would trigger a second prospects fetch.
@@ -316,98 +323,107 @@ export function KanbanBoard() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* Header */}
+      {/* Header — two groups (filters / actions) so it wraps to a second
+          line as a whole on narrow screens instead of overflowing, or the
+          actions group getting squeezed against a flex:1 spacer that doesn't
+          make sense once the row wraps. */}
       <div
         style={{
           padding: '14px 20px',
           borderBottom: '1px solid var(--crm-border)',
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          rowGap: 10,
           gap: 12,
           flexShrink: 0,
           backgroundColor: 'var(--crm-surface)',
         }}
       >
-        {showAreaFilter ? (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setSelectedAreaId(null)}
-              style={{
-                padding: '4px 10px', borderRadius: 6, border: '1px solid',
-                borderColor: selectedAreaId === null ? 'var(--crm-accent)' : 'var(--crm-border)',
-                backgroundColor: selectedAreaId === null ? '#6C63FF20' : 'transparent',
-                color: selectedAreaId === null ? 'var(--crm-accent)' : 'var(--crm-text-secondary)',
-                fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              }}
-            >
-              {t('areas.all')}
-            </button>
-            {filterAreas.map(area => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {showAreaFilter ? (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <button
-                key={area.id}
-                onClick={() => setSelectedAreaId(area.id)}
+                onClick={() => setSelectedAreaId(null)}
                 style={{
                   padding: '4px 10px', borderRadius: 6, border: '1px solid',
-                  borderColor: selectedAreaId === area.id ? 'var(--crm-accent)' : 'var(--crm-border)',
-                  backgroundColor: selectedAreaId === area.id ? '#6C63FF20' : 'transparent',
-                  color: selectedAreaId === area.id ? 'var(--crm-accent)' : 'var(--crm-text-secondary)',
-                  fontSize: 12, fontWeight: 600, cursor: area.is_active ? 'pointer' : 'not-allowed',
-                  opacity: area.is_active ? 1 : 0.4,
+                  borderColor: selectedAreaId === null ? 'var(--crm-accent)' : 'var(--crm-border)',
+                  backgroundColor: selectedAreaId === null ? '#6C63FF20' : 'transparent',
+                  color: selectedAreaId === null ? 'var(--crm-accent)' : 'var(--crm-text-secondary)',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
                 }}
-                disabled={!area.is_active}
               >
-                {area.label_en}
+                {t('areas.all')}
               </button>
-            ))}
-          </div>
-        ) : (
-          currentArea && <AreaBadge area={currentArea as Area} size="md" />
-        )}
+              {filterAreas.map(area => (
+                <button
+                  key={area.id}
+                  onClick={() => setSelectedAreaId(area.id)}
+                  style={{
+                    padding: '4px 10px', borderRadius: 6, border: '1px solid',
+                    borderColor: selectedAreaId === area.id ? 'var(--crm-accent)' : 'var(--crm-border)',
+                    backgroundColor: selectedAreaId === area.id ? '#6C63FF20' : 'transparent',
+                    color: selectedAreaId === area.id ? 'var(--crm-accent)' : 'var(--crm-text-secondary)',
+                    fontSize: 12, fontWeight: 600, cursor: area.is_active ? 'pointer' : 'not-allowed',
+                    opacity: area.is_active ? 1 : 0.4,
+                  }}
+                  disabled={!area.is_active}
+                >
+                  {area.label_en}
+                </button>
+              ))}
+            </div>
+          ) : (
+            currentArea && <AreaBadge area={currentArea as Area} size="md" />
+          )}
 
-        {isAdmin && orgSdrs.length > 0 && (
-          <select
-            value={selectedSdrId ?? ''}
-            onChange={e => setSelectedSdrId(e.target.value || null)}
+          {isAdmin && orgSdrs.length > 0 && (
+            <select
+              value={selectedSdrId ?? ''}
+              onChange={e => setSelectedSdrId(e.target.value || null)}
+              style={{
+                padding: '4px 10px', borderRadius: 6, border: '1px solid var(--crm-border)',
+                backgroundColor: selectedSdrId ? '#6C63FF20' : 'transparent',
+                color: selectedSdrId ? 'var(--crm-accent)' : 'var(--crm-text-secondary)',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                maxWidth: '100%',
+              }}
+            >
+              <option value="">{t('convertidos.allSdrs')}</option>
+              {orgSdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+            </select>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button
+            onClick={fetchProspects}
+            disabled={loading}
             style={{
-              padding: '4px 10px', borderRadius: 6, border: '1px solid var(--crm-border)',
-              backgroundColor: selectedSdrId ? '#6C63FF20' : 'transparent',
-              color: selectedSdrId ? 'var(--crm-accent)' : 'var(--crm-text-secondary)',
-              fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              padding: '6px 8px', borderRadius: 6, border: '1px solid var(--crm-border)',
+              backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center',
             }}
           >
-            <option value="">{t('convertidos.allSdrs')}</option>
-            {orgSdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
-          </select>
-        )}
+            <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+          </button>
 
-        <div style={{ flex: 1 }} />
-
-        <button
-          onClick={fetchProspects}
-          disabled={loading}
-          style={{
-            padding: '6px 8px', borderRadius: 6, border: '1px solid var(--crm-border)',
-            backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer',
-            display: 'flex', alignItems: 'center',
-          }}
-        >
-          <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-        </button>
-
-        {!isImpersonating && (
-          <Button
-            onClick={() => setFormOpen(true)}
-            style={{ backgroundColor: 'var(--crm-accent)', color: 'var(--crm-text-primary)', fontSize: 13, height: 34, gap: 6, display: 'flex', alignItems: 'center' }}
-          >
-            <Plus size={14} />
-            {t('prospect.new')}
-          </Button>
-        )}
+          {!isImpersonating && (
+            <Button
+              onClick={() => setFormOpen(true)}
+              style={{ backgroundColor: 'var(--crm-accent)', color: 'var(--crm-text-primary)', fontSize: 13, height: 34, gap: 6, display: 'flex', alignItems: 'center' }}
+            >
+              <Plus size={14} />
+              {t('prospect.new')}
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Columns */}
-      <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden', padding: '16px 16px 0' }}>
-        <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      {/* Columns — horizontal scroll/swipe between them on phone, same as desktop scroll-with-a-mouse-wheel */}
+      <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden', padding: '16px 16px 0', WebkitOverflowScrolling: 'touch' }}>
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={{ display: 'flex', gap: 12, height: '100%', minWidth: 'max-content' }}>
             {OUTREACH_STATUSES.map(status => {
               const stage = stageMap.get(status)

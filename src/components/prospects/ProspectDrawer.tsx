@@ -288,7 +288,7 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
           {tab === 'info' && (
             <div>
               {/* Status + Temperature */}
-              <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
                     {t('prospect.outreachStatus')}

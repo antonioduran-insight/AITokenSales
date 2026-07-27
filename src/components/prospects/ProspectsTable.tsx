@@ -609,6 +609,7 @@ export function ProspectsTable() {
           position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40,
           backgroundColor: '#0D0D14', borderTop: '1px solid var(--crm-border)',
           padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 12,
+          flexWrap: 'wrap', rowGap: 8,
         }}>
           <span style={{ fontSize: 13, color: 'var(--crm-text-primary)', fontWeight: 600 }}>
             {selected.size} lead{selected.size > 1 ? 's' : ''} selected

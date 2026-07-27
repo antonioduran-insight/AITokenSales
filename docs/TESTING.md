@@ -107,7 +107,24 @@ For each feature, verify behavior for all applicable roles:
 - [ ] Clicking a nav link while the drawer is open actually navigates (closing doesn't swallow the click)
 - [ ] Impersonation banner (Global Admin viewing an org) wraps onto a second line on narrow phones instead of overflowing horizontally; the "Exit" button stays fully visible and tappable
 - [ ] No horizontal scrollbar on the page body itself at any of the three widths, on any page — the content area (`min-width: 0` fix) must actually shrink instead of forcing the whole layout wider than the viewport
-- [ ] This is shell-only so far — most individual page content (Kanban, tables, forms) is not yet responsive; only the sidebar/header chrome should be expected to work well below tablet width at this stage
+- [ ] The mobile drawer always shows full labels (not just icons), **even if the desktop sidebar was previously collapsed to icon-only** — this was a real bug found and fixed after Block 1 shipped; open the sidebar on desktop, collapse it, then shrink to phone width and open the drawer to confirm labels are back
+- [ ] Kanban/Leads/etc. are covered separately below (Block 2) — this shell section covers only the sidebar/header chrome
+
+### Kanban board (mobile + tablet) — Block 2
+
+- [ ] On a real touchscreen (not just a resized desktop browser — touch emulation in dev tools doesn't always catch this): press and drag a card to a different column → it moves. A short tap (no real movement) opens the drawer instead of starting a drag.
+- [ ] Dragging a card doesn't fight with the column row's own horizontal scroll — the drag should track the finger smoothly, not jump or get stuck mid-swipe
+- [ ] The header (area filter / SDR dropdown / refresh / New Prospect) wraps onto a second line on narrow phones instead of overflowing or clipping any control
+- [ ] The 7-column board scrolls horizontally on phone width (swipe between columns) without the *page itself* gaining a horizontal scrollbar — only the column row scrolls
+- [ ] Tapping a card opens the same drawer as desktop, sized to the viewport (`width: 100%, maxWidth: 720` inside a padded overlay) — no clipped edges
+
+### Leads / Prospects table (mobile + tablet) — Block 2
+
+- [ ] Filter row (search / area / SDR / status / temperature / clear) wraps onto multiple lines on narrow phones without any control overflowing off-screen
+- [ ] The table itself scrolls horizontally within its own bordered container — the page around it does not gain a horizontal scrollbar
+- [ ] Select some leads → the fixed bottom action bar ("N leads selected", Reassign selected, Delete, Cancel) wraps onto a second line on narrow phones instead of clipping the Cancel button off the right edge
+- [ ] Delete-confirm, SDR-reassign, and Reassign-selected modals all fit within the viewport on phone width (capped at `90vw`) with no horizontal overflow
+- [ ] Pagination controls (prev/page N of M/next) stay centered and usable at phone width
 
 ### Authentication
 

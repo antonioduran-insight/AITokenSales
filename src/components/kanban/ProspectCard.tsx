@@ -31,6 +31,11 @@ export function ProspectCard({ prospect, onClick, isDragOverlay = false, missing
     transform: CSS.Translate.toString(transform),
     opacity: isDragging && !isDragOverlay ? 0.35 : 1,
     cursor: isDragOverlay ? 'grabbing' : 'grab',
+    // Without this, touch browsers treat any drag start as a scroll gesture
+    // on the column's horizontally-scrolling container, and dnd-kit's pointer
+    // tracking never gets a clean signal — drag effectively doesn't work on
+    // a touchscreen without it.
+    touchAction: 'none' as const,
   }
 
   return (
