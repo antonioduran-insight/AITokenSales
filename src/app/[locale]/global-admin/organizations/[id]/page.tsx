@@ -6,7 +6,7 @@ import { useLocale } from 'next-intl'
 import { ArrowLeft } from 'lucide-react'
 import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
 import { createClient } from '@/lib/supabase/client'
-import type { Organization, OrganizationAddon } from '@/lib/types'
+import type { Organization, OrganizationAddon, Vendor } from '@/lib/types'
 import { ADDON_LIST, PLAN_DEFAULTS } from '@/lib/types'
 
 const PLAN_COLORS: Record<string, string> = {
@@ -46,7 +46,9 @@ export default function OrgDetailPage() {
   const [plan, setPlan] = useState<'basic' | 'premium' | 'enterprise' | 'ultra'>('basic')
   const [maxSeats, setMaxSeats] = useState<number>(3)
   const [maxLeads, setMaxLeads] = useState<number>(1000)
-  const [vendor, setVendor] = useState('')
+  const [vendors, setVendors] = useState<Vendor[]>([])
+  const [vendor, setVendor] = useState('direct')
+  const [vendorCustom, setVendorCustom] = useState('')
   const [billingDay, setBillingDay] = useState<number>(10)
   const [defaultLanguage, setDefaultLanguage] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
@@ -80,16 +82,21 @@ export default function OrgDetailPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/global-admin/organizations/${id}`)
+      const [res, vendorsRes] = await Promise.all([
+        fetch(`/api/global-admin/organizations/${id}`),
+        fetch('/api/global-admin/vendors'),
+      ])
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
+      const vendorsData: Vendor[] = await vendorsRes.json().then(d => Array.isArray(d) ? d : []).catch(() => [])
+      setVendors(vendorsData)
+
       setOrg(data)
       setName(data.name)
       setSlug(data.slug)
       setPlan(data.plan ?? 'basic')
       setMaxSeats(data.max_seats ?? 3)
       setMaxLeads(data.max_leads_per_month ?? 1000)
-      setVendor(data.vendor ?? '')
       setBillingDay(data.billing_day ?? 10)
       setDefaultLanguage(data.default_language ?? 'zh')
       setLogoUrl(data.logo_url ?? '')
@@ -101,6 +108,18 @@ export default function OrgDetailPage() {
       setAnthropicBaseUrl(data.anthropic_base_url ?? 'https://api.aitokenking.com.tw/api/v1')
       setAnthropicModel(data.anthropic_model ?? 'claude-sonnet-4.6')
       setActiveAddons(new Set(data.addons.map((a: OrganizationAddon) => a.addon_type)))
+
+      // QA-F28: Vendor used to be free text, risking silent duplicates from
+      // a typo (e.g. "testvendor" vs "TestVendor") that split revenue
+      // reporting. Derive the select's value here (vendors are guaranteed
+      // loaded by this point, fetched above alongside the org itself) — an
+      // exact match selects that vendor directly, anything else (including
+      // a pre-existing free-text value from before this fix) falls back to
+      // "other" with the raw text preserved instead of losing it.
+      const rawVendor = data.vendor ?? ''
+      if (!rawVendor) { setVendor('direct'); setVendorCustom('') }
+      else if (vendorsData.some(v => v.name === rawVendor)) { setVendor(rawVendor); setVendorCustom('') }
+      else { setVendor('other'); setVendorCustom(rawVendor) }
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -147,11 +166,12 @@ export default function OrgDetailPage() {
     setSavingInfo(true)
     setSaveInfoError('')
     try {
+      const effectiveVendor = vendor === 'direct' ? null : vendor === 'other' ? (vendorCustom.trim() || null) : vendor
       const res = await fetch(`/api/global-admin/organizations/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name, slug, vendor: vendor || null, billing_day: billingDay, default_language: defaultLanguage, logo_url: logoUrl || null,
+          name, slug, vendor: effectiveVendor, billing_day: billingDay, default_language: defaultLanguage, logo_url: logoUrl || null,
           plan, max_seats: maxSeats, max_leads_per_month: maxLeads,
           admin_email: adminEmail || undefined,
           admin_password: adminPassword || undefined,
@@ -339,7 +359,23 @@ export default function OrgDetailPage() {
             <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div>
                 <label style={labelStyle}>{t('vendor')}</label>
-                <input value={vendor} onChange={e => setVendor(e.target.value)} style={inputStyle} placeholder="Partner Name" />
+                <select value={vendor} onChange={e => setVendor(e.target.value)} style={inputStyle}>
+                  <option value="direct">Direct (no vendor)</option>
+                  {vendors.filter(v => v.is_active).map(v => (
+                    <option key={v.id} value={v.name}>{v.name} ({v.commission_pct}%)</option>
+                  ))}
+                  <option value="other">Other (type below)</option>
+                </select>
+                {vendor === 'other' && (
+                  <input
+                    type="text"
+                    placeholder="Vendor name"
+                    value={vendorCustom}
+                    onChange={e => setVendorCustom(e.target.value)}
+                    style={{ ...inputStyle, marginTop: 6 }}
+                    autoComplete="off"
+                  />
+                )}
               </div>
               <div>
                 <label style={labelStyle}>{t('billingDay')}</label>
@@ -394,7 +430,7 @@ export default function OrgDetailPage() {
               disabled={savingInfo}
               style={{ backgroundColor: colors.accent, color: '#fff', border: 'none', borderRadius: 7, padding: '8px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: savingInfo ? 0.6 : 1 }}
             >
-              {savingInfo ? t('saving') : savedInfo ? '✓ Saved' : t('save')}
+              {savingInfo ? t('saving') : savedInfo ? '✓ Saved' : 'Save Organization Info'}
             </button>
           </div>
 
