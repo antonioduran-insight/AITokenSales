@@ -1,6 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
+import { Search, X } from 'lucide-react'
 import { ProspectCard } from './ProspectCard'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import type { Prospect, OutreachStatus } from '@/lib/types'
@@ -35,6 +37,13 @@ export function KanbanColumn({ status, label, color, prospects, onCardClick, cha
   const { setNodeRef, isOver } = useDroppable({ id: status })
   const isTerminal = TERMINAL.includes(status)
   const accent = color ?? COLUMN_ACCENT[status]
+  // QA-F15: filters cards within this column only — doesn't touch other
+  // columns' counts/contents or refetch anything, purely a client-side view filter.
+  const [query, setQuery] = useState('')
+  const q = query.trim().toLowerCase()
+  const visibleProspects = q
+    ? prospects.filter(p => p.name.toLowerCase().includes(q) || (p.company ?? '').toLowerCase().includes(q))
+    : prospects
 
   return (
     <div
@@ -75,9 +84,40 @@ export function KanbanColumn({ status, label, color, prospects, onCardClick, cha
             justifyContent: 'center',
           }}
         >
-          {prospects.length}
+          {q ? visibleProspects.length : prospects.length}
         </span>
       </div>
+
+      {/* Per-column search — filters this column's cards only (QA-F15) */}
+      {prospects.length > 0 && (
+        <div style={{ position: 'relative', margin: '0 4px 6px' }}>
+          <Search size={12} color="var(--crm-text-muted)" style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)' }} />
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search..."
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              padding: '5px 24px',
+              fontSize: 11,
+              borderRadius: 6,
+              border: '1px solid var(--crm-border)',
+              backgroundColor: 'var(--crm-surface)',
+              color: 'var(--crm-text-primary)',
+            }}
+          />
+          {query && (
+            <button
+              onClick={() => setQuery('')}
+              style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', color: 'var(--crm-text-muted)' }}
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Drop zone */}
       <div
@@ -92,7 +132,7 @@ export function KanbanColumn({ status, label, color, prospects, onCardClick, cha
           minHeight: 80,
         }}
       >
-        {prospects.map(p => (
+        {visibleProspects.map(p => (
           <ProspectCard
             key={p.id}
             prospect={p}
@@ -115,6 +155,18 @@ export function KanbanColumn({ status, label, color, prospects, onCardClick, cha
             }}
           >
             —
+          </div>
+        )}
+        {prospects.length > 0 && visibleProspects.length === 0 && (
+          <div
+            style={{
+              textAlign: 'center',
+              color: 'var(--crm-text-muted)',
+              fontSize: 12,
+              padding: '24px 8px',
+            }}
+          >
+            No matches
           </div>
         )}
       </div>

@@ -96,6 +96,7 @@
   "import": {
     "title": "Importar CSV",
     "step1": "Subir Archivo",
+    "assignSdrStep": "Asignar SDR",
     "step2": "Mapeo de Columnas",
     "step3": "Revisar Duplicados",
     "step4": "Importar",
@@ -237,6 +238,8 @@
     "addAnotherChat": "+ Otro chat",
     "viewChats": "Ver chats",
     "chats": "chats",
+    "chatSingular": "chat",
+    "withChats": "con chat",
     "noChat": "Sin chat",
     "firstChatTitle": "Subir chat de cierre",
     "firstChatHint": "Pegá la conversación de cierre de esta venta.",
@@ -248,7 +251,14 @@
     "modalHint": "Pegá la conversación completa que llevó a este cierre. Es obligatorio para mover el deal a Cerrado.",
     "skipForNow": "Omitir por ahora",
     "confirmClose": "Guardar y cerrar deal",
-    "missingConversation": "Falta la conversación"
+    "missingConversation": "Falta la conversación",
+    "salesChatsTitle": "Chats de Venta",
+    "noChatsUploaded": "Sin chats subidos.",
+    "addSalesChat": "Agregar chat de venta",
+    "pasteConversationLabel": "Pegá la conversación completa con el cliente:",
+    "conversationPlaceholder": "Conversación...",
+    "saveChat": "Guardar chat",
+    "errorSaving": "Error al guardar"
   },
   "users": {
     "title": "Gestión de Usuarios",

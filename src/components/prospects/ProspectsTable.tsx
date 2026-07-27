@@ -9,7 +9,7 @@ import { useOrgId } from '@/lib/hooks/useOrgId'
 import { ProspectDrawer } from './ProspectDrawer'
 import { TemperatureBadge } from '@/components/ui/TemperatureBadge'
 import { AreaBadge } from '@/components/ui/AreaBadge'
-import { Search, ChevronLeft, ChevronRight, Users, RefreshCw, X, Trash2, CheckCircle, ArrowRight, MessageSquareWarning } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, Users, RefreshCw, X, Trash2, CheckCircle, ArrowRight, MessageSquareWarning, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, Area, User, LeadTemperature } from '@/lib/types'
@@ -512,7 +512,10 @@ export function ProspectsTable() {
                   </td>
                 )}
                 <td style={S.td}>
-                  <div style={{ fontWeight: 500, color: 'var(--crm-text-primary)' }}>{p.name}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    {p.flag_tomorrow && <Star size={12} fill="#F59E0B" stroke="#F59E0B" style={{ flexShrink: 0 }} />}
+                    <div style={{ fontWeight: 500, color: 'var(--crm-text-primary)' }}>{p.name}</div>
+                  </div>
                   {p.title && <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 2 }}>{p.title}</div>}
                 </td>
                 <td style={{ ...S.td, color: 'var(--crm-text-secondary)' }}>{p.company ?? '—'}</td>

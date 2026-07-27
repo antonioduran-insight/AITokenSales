@@ -187,7 +187,7 @@ export function ConvertidosPage() {
               {withoutChat} {t('noChat')}
             </div>
             <div style={{ padding: '6px 14px', borderRadius: 6, backgroundColor: '#22C55E15', border: '1px solid #22C55E30', fontSize: 12, color: '#22C55E', fontWeight: 600 }}>
-              {withChat} with {t('chats')}
+              {withChat} {t('withChats')}
             </div>
           </div>
         )}
@@ -260,7 +260,7 @@ export function ConvertidosPage() {
                     {/* Chat badge */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600, backgroundColor: hasChat ? '#22C55E15' : '#EF444415', color: hasChat ? '#22C55E' : '#EF4444', border: `1px solid ${hasChat ? '#22C55E30' : '#EF444430'}`, flexShrink: 0 }}>
                       <MessageSquare size={11} />
-                      {hasChat ? `${p.chatCount} ${t('chats')}` : t('noChat')}
+                      {hasChat ? `${p.chatCount} ${p.chatCount === 1 ? t('chatSingular') : t('chats')}` : t('noChat')}
                     </div>
                   </div>
 

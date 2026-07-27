@@ -40,6 +40,13 @@ const PROSPECT_FIELDS = [
 
 type ProspectFieldKey = typeof PROSPECT_FIELDS[number]['key']
 
+// QA-F13: values like "N/A" or a plain name were being accepted silently as
+// a LinkedIn URL. Loose on purpose — just requires an actual linkedin.com
+// link, not a strict path/protocol shape, since real exports vary a lot.
+function isValidLinkedinUrl(value: string): boolean {
+  return /linkedin\.com\//i.test(value)
+}
+
 function autoDetect(col: string): ProspectFieldKey | '' {
   const c = col.toLowerCase().replace(/[\s_-]/g, '')
   if (['name', 'fullname', 'leadname', 'contactname'].includes(c)) return 'name'
@@ -243,6 +250,11 @@ export function CSVImportWizard() {
         return { raw, mapped, status: 'error', error: 'Missing name', skip: true }
       }
 
+      const linkedinRaw = mapped.linkedin_url?.trim()
+      if (linkedinRaw && !isValidLinkedinUrl(linkedinRaw)) {
+        return { raw, mapped, status: 'error', error: 'Invalid LinkedIn URL', skip: true }
+      }
+
       // Domain blacklist check (email domain or linkedin domain)
       if (blacklistedDomains.length > 0) {
         const emailDomain = mapped.email?.trim().toLowerCase().split('@')[1] ?? ''
@@ -431,7 +443,7 @@ export function CSVImportWizard() {
   // SDRs skip step 2 (area), so remap display steps
   const adminSteps = [
     { s: 1 as Step, label: t('step1') },
-    { s: 2 as Step, label: 'Area' },
+    { s: 2 as Step, label: t('assignSdrStep') },
     { s: 3 as Step, label: t('step2') },
     { s: 4 as Step, label: t('step3') },
     { s: 5 as Step, label: t('step4') },

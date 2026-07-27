@@ -96,6 +96,7 @@
   "import": {
     "title": "匯入 CSV",
     "step1": "上傳檔案",
+    "assignSdrStep": "指派銷售",
     "step2": "欄位對應",
     "step3": "重複確認",
     "step4": "匯入",
@@ -237,6 +238,8 @@
     "addAnotherChat": "+ 再上傳",
     "viewChats": "查看對話",
     "chats": "條對話",
+    "chatSingular": "條對話",
+    "withChats": "有對話",
     "noChat": "無對話",
     "firstChatTitle": "上傳成交對話",
     "firstChatHint": "粘貼此成交的完整對話。",
@@ -248,7 +251,14 @@
     "modalHint": "請貼上促成此次成交的完整對話。移至「已成交」前必須上傳。",
     "skipForNow": "暫時跳過",
     "confirmClose": "保存並成交",
-    "missingConversation": "缺少對話記錄"
+    "missingConversation": "缺少對話記錄",
+    "salesChatsTitle": "銷售對話",
+    "noChatsUploaded": "尚未上傳對話。",
+    "addSalesChat": "添加銷售對話",
+    "pasteConversationLabel": "請貼上與客戶的完整對話：",
+    "conversationPlaceholder": "對話...",
+    "saveChat": "保存對話",
+    "errorSaving": "保存失敗"
   },
   "users": {
     "title": "用戶管理",

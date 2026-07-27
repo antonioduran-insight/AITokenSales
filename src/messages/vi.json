@@ -96,6 +96,7 @@
   "import": {
     "title": "Nhập CSV",
     "step1": "Tải Lên Tệp",
+    "assignSdrStep": "Chỉ Định SDR",
     "step2": "Ánh Xạ Cột",
     "step3": "Xem Xét Trùng Lặp",
     "step4": "Nhập",
@@ -237,6 +238,8 @@
     "addAnotherChat": "+ Chat khác",
     "viewChats": "Xem chat",
     "chats": "chat",
+    "chatSingular": "chat",
+    "withChats": "có chat",
     "noChat": "Chưa có chat",
     "firstChatTitle": "Tải lên chat chốt deal",
     "firstChatHint": "Dán toàn bộ cuộc trò chuyện chốt deal.",
@@ -248,7 +251,14 @@
     "modalHint": "Dán toàn bộ cuộc trò chuyện đã dẫn đến việc chốt deal này. Bắt buộc để chuyển deal sang trạng thái Đã Chốt.",
     "skipForNow": "Bỏ qua lúc này",
     "confirmClose": "Lưu & chốt deal",
-    "missingConversation": "Thiếu cuộc trò chuyện"
+    "missingConversation": "Thiếu cuộc trò chuyện",
+    "salesChatsTitle": "Chat Bán Hàng",
+    "noChatsUploaded": "Chưa tải lên chat nào.",
+    "addSalesChat": "Thêm chat bán hàng",
+    "pasteConversationLabel": "Dán toàn bộ cuộc trò chuyện với khách hàng:",
+    "conversationPlaceholder": "Cuộc trò chuyện...",
+    "saveChat": "Lưu chat",
+    "errorSaving": "Lỗi khi lưu"
   },
   "users": {
     "title": "Quản Lý Người Dùng",
