@@ -2,6 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+// Shared by DELETE (removing a user) and PATCH's 'edit' action (changing a
+// user's role away from admin) — an org must always keep at least one admin,
+// or nobody is left with permission to fix it. Mirrors the org-wide admin
+// count check that already existed for delete, so both paths agree on what
+// "last admin" means (role = 'admin' in this org, regardless of is_active).
+async function isLastAdmin(adminClient: SupabaseClient, organizationId: string | null): Promise<boolean> {
+  if (!organizationId) return false
+  const { count } = await adminClient
+    .from('users')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', organizationId)
+    .eq('role', 'admin')
+  return (count ?? 0) <= 1
+}
 
 async function verifyAdminWithOrg() {
   const cookieStore = await cookies()
@@ -141,15 +157,8 @@ export async function DELETE(req: NextRequest) {
   )
 
   const { data: profile } = await adminClient.from('users').select('role, organization_id').eq('id', id).single()
-  if (profile?.role === 'admin') {
-    const { count: adminCount } = await adminClient
-      .from('users')
-      .select('id', { count: 'exact', head: true })
-      .eq('organization_id', profile.organization_id)
-      .eq('role', 'admin')
-    if ((adminCount ?? 0) <= 1) {
-      return NextResponse.json({ error: 'Cannot delete the last admin. Promote another user to admin first.' }, { status: 403 })
-    }
+  if (profile?.role === 'admin' && await isLastAdmin(adminClient, profile.organization_id)) {
+    return NextResponse.json({ error: 'Cannot delete the last admin. Promote another user to admin first.' }, { status: 403 })
   }
 
   await adminClient.from('prospects').update({ assigned_to: null }).eq('assigned_to', id)
@@ -181,6 +190,20 @@ export async function PATCH(req: NextRequest) {
 
   if (action === 'edit') {
     const { full_name, role, area_ids, years_experience, seniority, expertise_area } = body
+
+    // Demoting the org's last admin (self-change or another admin doing it)
+    // would leave nobody able to promote anyone back — same protection as
+    // deleting the last admin, applied before a role change instead.
+    if (role === 'sdr') {
+      const { data: target } = await adminClient.from('users').select('role, organization_id').eq('id', id).single()
+      if (target?.role === 'admin' && await isLastAdmin(adminClient, target.organization_id)) {
+        const { data: org } = await adminClient.from('organizations').select('name').eq('id', target.organization_id).single()
+        return NextResponse.json({
+          error: `Cannot change role — ${org?.name ?? 'this organization'} must have at least one admin. Assign another admin first.`,
+        }, { status: 403 })
+      }
+    }
+
     const updates: Record<string, unknown> = {}
     if (full_name) updates.full_name = full_name.trim()
     if (role === 'admin' || role === 'sdr') updates.role = role
