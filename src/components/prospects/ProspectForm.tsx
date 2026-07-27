@@ -134,6 +134,36 @@ export function ProspectForm({ open, onClose, onCreated, defaultAreaId }: Props)
       setFormError(`${t('common.missingRequiredFields')}: ${missing.join(', ')}`)
       return
     }
+
+    // QA-F21: Settings promises the domain blacklist blocks "CSV imports and
+    // manual creation" — manual creation never actually checked it. Same
+    // email/linkedin/company domain check CSVImportWizard already does.
+    try {
+      const blRes = await fetch('/api/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emails: [], linkedins: [] }),
+      })
+      const blData = await blRes.json()
+      const blacklistedDomains: string[] = blData.blacklistedDomains ?? []
+      if (blacklistedDomains.length > 0) {
+        const emailDomain = form.email.trim().toLowerCase().split('@')[1] ?? ''
+        const linkedinDomain = (() => {
+          try { return new URL(form.linkedin_url.trim()).hostname.replace('www.', '') } catch { return '' }
+        })()
+        const companyDomain = form.company.trim().toLowerCase()
+        const isBlacklisted = blacklistedDomains.some(d =>
+          (emailDomain && emailDomain.includes(d)) ||
+          (linkedinDomain && linkedinDomain.includes(d)) ||
+          (companyDomain && companyDomain.includes(d))
+        )
+        if (isBlacklisted) {
+          setFormError('This company/domain is on the blacklist (Settings → Domain Blacklist).')
+          return
+        }
+      }
+    } catch { /* if the check itself fails, don't block creation on a network blip */ }
+
     setSaving(true)
 
     const supabase = createClient()

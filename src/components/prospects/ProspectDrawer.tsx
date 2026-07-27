@@ -14,6 +14,8 @@ import { useUser } from '@/contexts/UserContext'
 import { useOrgId } from '@/lib/hooks/useOrgId'
 import { useComboLabels } from '@/lib/hooks/useComboLabels'
 import { useOrgMarkets } from '@/lib/hooks/useOrgMarkets'
+import { useMarketAreaMap } from '@/lib/hooks/useMarketAreaMap'
+import { inferAreaFromCountry } from '@/lib/utils/area-inference'
 import { ExternalLink, Copy, Check, Star, ChevronDown, CheckCircle, X, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, LeadTemperature, User } from '@/lib/types'
@@ -79,6 +81,7 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
   const t = useTranslations()
   const comboLabels = useComboLabels()
   const { markets: orgMarkets } = useOrgMarkets()
+  const marketAreaMap = useMarketAreaMap()
   const { isAdmin, user } = useUser()
   const { isImpersonating } = useOrgId()
   const [prospect, setProspect] = useState(initial)
@@ -157,13 +160,22 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
 
   // QA-F11: every field save now surfaces the same generic confirmation —
   // previously nothing in the drawer gave any visual feedback on save.
-  async function updateField(field: string, value: unknown, opts?: { silent?: boolean }) {
+  // `extraDb` merges more real columns into the same UPDATE (used by the
+  // Market edit below to also persist area_id); `extraLocal` merges
+  // additional fields into local state only, for values (like the joined
+  // `area` object) that aren't real prospects columns.
+  async function updateField(
+    field: string,
+    value: unknown,
+    opts?: { silent?: boolean; extraDb?: Record<string, unknown>; extraLocal?: Record<string, unknown> }
+  ) {
     if (isImpersonating) return
     setSaving(true)
     const supabase = createClient()
-    const { error } = await supabase.from('prospects').update({ [field]: value }).eq('id', prospect.id)
+    const dbPatch = { [field]: value, ...(opts?.extraDb ?? {}) }
+    const { error } = await supabase.from('prospects').update(dbPatch).eq('id', prospect.id)
     if (!error) {
-      const updated = { ...prospect, [field]: value }
+      const updated = { ...prospect, ...dbPatch, ...(opts?.extraLocal ?? {}) }
       setProspect(updated)
       onUpdated(updated)
       if (!opts?.silent) showToast(t('common.saved'))
@@ -177,7 +189,26 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
   async function saveEditableField(field: 'company' | 'title' | 'market' | 'search_combo', value: string | null, label: string) {
     const prev = prospect[field] ?? null
     if (value === prev) return
-    await updateField(field, value, { silent: true })
+
+    // QA-F31: editing Market must keep area_id (and the board it lands on)
+    // in sync — otherwise the lead is stuck on whatever area it started
+    // with regardless of its real market, the same class of bug QA-F25
+    // fixed for run-assignment. Same market→area lookup either way.
+    let extraDb: Record<string, unknown> | undefined
+    let extraLocal: Record<string, unknown> | undefined
+    if (field === 'market') {
+      const areaName = inferAreaFromCountry(value, marketAreaMap)
+      if (areaName) {
+        const supabase = createClient()
+        const { data: areaRow } = await supabase.from('areas').select('*').eq('name', areaName).maybeSingle()
+        if (areaRow) {
+          extraDb = { area_id: areaRow.id }
+          extraLocal = { area: areaRow }
+        }
+      }
+    }
+
+    await updateField(field, value, { silent: true, extraDb, extraLocal })
     await logAuditEvent({
       event_type: 'prospect_updated',
       prospect_id: prospect.id,
