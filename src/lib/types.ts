@@ -351,6 +351,13 @@ export const PLAN_PRICES: Record<string, number> = {
 
 export const MAX_INT = 2147483647
 
+// Hard cap on rows per CSV import — keeps a single PUT /api/import insert
+// well within the serverless function's time limit even in the worst case
+// (every row hitting the per-record fallback in that route). Enforced both
+// in CSVImportWizard.tsx (immediate feedback before column mapping) and in
+// the route itself (the frontend check is never the correctness boundary).
+export const MAX_IMPORT_ROWS = 500
+
 export const PLAN_DEFAULTS: Record<string, { max_seats: number; max_leads_per_month: number }> = {
   basic:      { max_seats: 3,        max_leads_per_month: 1000 },
   premium:    { max_seats: 7,        max_leads_per_month: 3000 },

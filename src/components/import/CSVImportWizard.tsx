@@ -11,7 +11,7 @@ import Papa from 'papaparse'
 import type { AreaName } from '@/lib/types'
 import { AREA_NAMES } from '@/lib/types'
 import { AREA_LABELS } from '@/lib/utils/area-inference'
-import { SEARCH_COMBOS, LEAD_TEMPERATURES } from '@/lib/types'
+import { SEARCH_COMBOS, LEAD_TEMPERATURES, MAX_IMPORT_ROWS } from '@/lib/types'
 
 interface SdrOption {
   id: string
@@ -151,6 +151,7 @@ export function CSVImportWizard() {
   const [importUnknown, setImportUnknown] = useState(false)
 
   const [dragOver, setDragOver] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function parseCSV(file: File) {
@@ -158,6 +159,11 @@ export function CSVImportWizard() {
       header: true,
       skipEmptyLines: true,
       complete: async (result) => {
+        if (result.data.length > MAX_IMPORT_ROWS) {
+          setUploadError(`Maximum ${MAX_IMPORT_ROWS} leads per import. Your file has ${result.data.length} rows — please split it into multiple files and import them separately.`)
+          return
+        }
+
         const headers = result.meta.fields ?? []
         setCsvHeaders(headers)
         setCsvData(result.data)
@@ -185,6 +191,7 @@ export function CSVImportWizard() {
   function handleFile(file: File) {
     if (!file.name.endsWith('.csv')) return
     if (file.size > 5 * 1024 * 1024) return
+    setUploadError(null)
     parseCSV(file)
   }
 
@@ -407,6 +414,7 @@ export function CSVImportWizard() {
     setResults(null)
     setImportError(null)
     setImportUnknown(false)
+    setUploadError(null)
   }
 
   const newCount = rows.filter(r => r.status === 'new').length
@@ -469,24 +477,32 @@ export function CSVImportWizard() {
 
       {/* STEP 1: Upload */}
       {step === 1 && (
-        <div
-          style={{
-            ...S.card,
-            border: `2px dashed ${dragOver ? 'var(--crm-accent)' : 'var(--crm-border)'}`,
-            backgroundColor: dragOver ? '#6C63FF08' : 'var(--crm-surface)',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            minHeight: 240, cursor: 'pointer', transition: 'all 0.2s',
-          }}
-          onClick={() => fileInputRef.current?.click()}
-          onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
-        >
-          <UploadCloud size={44} color={dragOver ? 'var(--crm-accent)' : 'var(--crm-text-muted)'} />
-          <p style={{ marginTop: 14, fontSize: 16, color: 'var(--crm-text-primary)', fontWeight: 500 }}>{t('dropzone')}</p>
-          <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 6 }}>{t('csvOnly')} · {t('maxSize')}</p>
-          <input ref={fileInputRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
-        </div>
+        <>
+          {uploadError && (
+            <div style={{ display: 'flex', gap: 10, padding: '12px 14px', backgroundColor: '#EF444415', border: '1px solid #EF444440', borderRadius: 10, marginBottom: 16 }}>
+              <AlertTriangle size={16} color="#EF4444" style={{ flexShrink: 0, marginTop: 1 }} />
+              <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{uploadError}</span>
+            </div>
+          )}
+          <div
+            style={{
+              ...S.card,
+              border: `2px dashed ${dragOver ? 'var(--crm-accent)' : 'var(--crm-border)'}`,
+              backgroundColor: dragOver ? '#6C63FF08' : 'var(--crm-surface)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              minHeight: 240, cursor: 'pointer', transition: 'all 0.2s',
+            }}
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
+          >
+            <UploadCloud size={44} color={dragOver ? 'var(--crm-accent)' : 'var(--crm-text-muted)'} />
+            <p style={{ marginTop: 14, fontSize: 16, color: 'var(--crm-text-primary)', fontWeight: 500 }}>{t('dropzone')}</p>
+            <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 6 }}>{t('csvOnly')} · {t('maxSize')}</p>
+            <input ref={fileInputRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+          </div>
+        </>
       )}
 
       {/* STEP 2: Area selection */}

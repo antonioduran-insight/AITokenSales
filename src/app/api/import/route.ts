@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { MAX_IMPORT_ROWS } from '@/lib/types'
 
 async function getCallerProfile() {
   const cookieStore = await cookies()
@@ -108,6 +109,11 @@ export async function PUT(req: NextRequest) {
   const { records } = await req.json()
   if (!Array.isArray(records) || records.length === 0) {
     return NextResponse.json({ error: 'No records to insert' }, { status: 400 })
+  }
+  // Defense in depth — the wizard already blocks this before column mapping,
+  // but this route must not trust that check alone.
+  if (records.length > MAX_IMPORT_ROWS) {
+    return NextResponse.json({ error: `Maximum ${MAX_IMPORT_ROWS} leads per import. Got ${records.length} rows.` }, { status: 400 })
   }
 
   const admin = createAdminClient(
