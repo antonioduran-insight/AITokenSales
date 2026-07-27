@@ -1,11 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   bridgeApi, CHANNEL_FAMILIES, HEADCOUNTS,
   type SeedList, type BridgeRun, type BridgeCandidate, type BridgeLog, type VerificationStatus,
 } from '@/lib/bridge-api'
-import { Plus, X, ExternalLink, Check, Ban, RotateCcw, AlertCircle, Handshake } from 'lucide-react'
+import { Plus, X, ExternalLink, Check, Ban, RotateCcw, AlertCircle, Handshake, Building2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useOrgMarkets } from '@/lib/hooks/useOrgMarkets'
 import { MarketSelect } from '@/components/markets/MarketSelect'
@@ -276,6 +276,27 @@ export function BridgeClient() {
     confirmed: candidates.filter(c => c.verification_status === 'confirmed').length,
     rejected: candidates.filter(c => c.verification_status === 'rejected').length,
   }
+
+  // Purely a display grouping — selection/actions below stay per-contact.
+  // Grouped by company_id when the backend provided one; older rows (scraped
+  // before company_id was persisted) fall back to the company name so they
+  // still get a sensible header instead of one group per contact.
+  const groupedShown = useMemo(() => {
+    const order: string[] = []
+    const groups = new Map<string, { key: string; company: string; companyLinkedinUrl?: string | null; items: BridgeCandidate[] }>()
+    for (const c of shown) {
+      const key = c.company_id || c.company || '—'
+      let group = groups.get(key)
+      if (!group) {
+        group = { key, company: c.company || 'Unknown company', companyLinkedinUrl: c.company_linkedin_url, items: [] }
+        groups.set(key, group)
+        order.push(key)
+      }
+      if (!group.companyLinkedinUrl && c.company_linkedin_url) group.companyLinkedinUrl = c.company_linkedin_url
+      group.items.push(c)
+    }
+    return order.map(key => groups.get(key)!)
+  }, [shown])
 
   return (
     <div style={S.page}>
@@ -598,8 +619,23 @@ export function BridgeClient() {
                   {candidates.length === 0 ? 'No candidates for this search.' : 'No candidates match this filter.'}
                 </p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {shown.map(c => {
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+                  {groupedShown.map(group => (
+                    <div key={group.key} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 6, borderBottom: '1px solid var(--crm-border)' }}>
+                        <Building2 size={14} color="var(--crm-text-muted)" />
+                        <span style={{ fontSize: 13, fontWeight: 700 }}>{group.company}</span>
+                        <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>
+                          {group.items.length} contact{group.items.length === 1 ? '' : 's'}
+                        </span>
+                        {group.companyLinkedinUrl && (
+                          <a href={group.companyLinkedinUrl} target="_blank" rel="noopener noreferrer"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--crm-accent)', textDecoration: 'none' }}>
+                            Company page <ExternalLink size={11} />
+                          </a>
+                        )}
+                      </div>
+                      {group.items.map(c => {
                     const sc = STATUS_COLORS[c.verification_status] ?? STATUS_COLORS.pending
                     const busy = updating === c.id
                     const isRejected = c.verification_status === 'rejected'
@@ -703,7 +739,9 @@ export function BridgeClient() {
                         )}
                       </div>
                     )
-                  })}
+                      })}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

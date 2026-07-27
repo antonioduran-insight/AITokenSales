@@ -50,6 +50,10 @@ export interface BridgeCandidate {
   run_id: string
   full_name?: string
   company?: string
+  /** LinkedIn's internal id for the company — used to group candidates. */
+  company_id?: string | null
+  /** Company's LinkedIn page, when the backend could construct one. */
+  company_linkedin_url?: string | null
   title?: string
   location?: string
   linkedin_url?: string
