@@ -48,9 +48,6 @@ export function ProspectCard({ prospect, onClick, isDragOverlay = false, missing
       {...attributes}
       {...listeners}
       onClick={e => {
-        // TEMP diagnostic — investigating a report that clicking a card
-        // doesn't open the drawer. Remove once the cause is confirmed.
-        console.log('[Kanban click diag]', { prospectId: prospect.id, isDragging })
         e.stopPropagation()
         if (!isDragging) onClick(prospect)
       }}

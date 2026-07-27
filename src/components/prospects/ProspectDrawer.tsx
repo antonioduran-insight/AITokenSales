@@ -12,6 +12,7 @@ import { CloseDealModal } from '@/components/conversations/CloseDealModal'
 
 import { useUser } from '@/contexts/UserContext'
 import { useOrgId } from '@/lib/hooks/useOrgId'
+import { useComboLabels } from '@/lib/hooks/useComboLabels'
 import { ExternalLink, Copy, Check, Star, ChevronDown, CheckCircle, X, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, LeadTemperature, User } from '@/lib/types'
@@ -69,6 +70,7 @@ const selectStyle: React.CSSProperties = {
 
 export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: Props) {
   const t = useTranslations()
+  const comboLabels = useComboLabels()
   const { isAdmin, user } = useUser()
   const { isImpersonating } = useOrgId()
   const [prospect, setProspect] = useState(initial)
@@ -347,7 +349,7 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
                 {prospect.search_combo && (
                   <Field label={t('prospect.searchCombo')}>
                     <span style={{ backgroundColor: 'var(--crm-surface-raised)', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>
-                      {t(`searchCombo.${prospect.search_combo}`)}
+                      {comboLabels[prospect.search_combo] ?? prospect.search_combo}
                     </span>
                   </Field>
                 )}
