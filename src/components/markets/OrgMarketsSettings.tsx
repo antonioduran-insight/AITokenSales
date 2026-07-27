@@ -2,9 +2,32 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useUser } from '@/contexts/UserContext'
+import { createClient } from '@/lib/supabase/client'
 import { AREA_NAMES, type Market } from '@/lib/types'
 import { areaLabel } from '@/lib/utils/area-inference'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react'
+
+interface MarketImpact { leads: number; sdrs: number; activeRuns: number }
+
+const ACTIVE_RUN_STATUSES = ['pending', 'running', 'scoring', 'drafting']
+
+// QA-F30: deactivating a market used to be a silent checkbox toggle — no
+// warning about existing leads/runs that depend on it. Scoped to the
+// current org (RLS-enforced via the browser client), same as the rest of
+// this component.
+async function fetchDeactivationImpact(marketNames: string[]): Promise<Record<string, MarketImpact>> {
+  const supabase = createClient()
+  const results: Record<string, MarketImpact> = {}
+  await Promise.all(marketNames.map(async name => {
+    const [{ data: prospects }, { count: activeRuns }] = await Promise.all([
+      supabase.from('prospects').select('assigned_to').eq('market', name),
+      supabase.from('runs').select('id', { count: 'exact', head: true }).contains('markets', [name]).in('status', ACTIVE_RUN_STATUSES),
+    ])
+    const sdrSet = new Set((prospects ?? []).map(p => p.assigned_to).filter(Boolean))
+    results[name] = { leads: prospects?.length ?? 0, sdrs: sdrSet.size, activeRuns: activeRuns ?? 0 }
+  }))
+  return results
+}
 
 const S: Record<string, React.CSSProperties> = {
   card: { backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: '20px 24px', marginBottom: 16 },
@@ -38,6 +61,8 @@ export function OrgMarketsSettings() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [checkingImpact, setCheckingImpact] = useState(false)
+  const [confirmDeactivate, setConfirmDeactivate] = useState<{ names: string[]; impact: Record<string, MarketImpact> } | null>(null)
 
   useEffect(() => {
     if (!orgId) return
@@ -97,7 +122,7 @@ export function OrgMarketsSettings() {
     })
   }
 
-  async function save() {
+  async function commitSave() {
     if (!orgId || saving) return
     setSaving(true); setError(null)
     try {
@@ -116,6 +141,27 @@ export function OrgMarketsSettings() {
     } finally {
       setSaving(false)
     }
+  }
+
+  // Gatekeeper for the Save button: if any previously-active market is
+  // being turned off, check its impact first and require an explicit
+  // confirmation instead of silently deactivating it.
+  async function handleSaveClick() {
+    const deactivatedIds = [...initial].filter(id => !selected.has(id))
+    if (deactivatedIds.length === 0) { await commitSave(); return }
+
+    setCheckingImpact(true)
+    const names = deactivatedIds
+      .map(id => catalogue.find(m => m.id === id)?.name)
+      .filter((n): n is string => !!n)
+    const impact = await fetchDeactivationImpact(names)
+    setCheckingImpact(false)
+    setConfirmDeactivate({ names, impact })
+  }
+
+  async function confirmAndSave() {
+    setConfirmDeactivate(null)
+    await commitSave()
   }
 
   return (
@@ -175,9 +221,9 @@ export function OrgMarketsSettings() {
           {error && <p style={{ color: '#EF4444', fontSize: 13, margin: '14px 0 0' }}>{error}</p>}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
-            <button onClick={save} disabled={saving || !dirty}
-              style={{ ...S.btn, opacity: saving || !dirty ? 0.45 : 1, cursor: saving || !dirty ? 'default' : 'pointer' }}>
-              {saving ? 'Saving…' : 'Save Markets'}
+            <button onClick={handleSaveClick} disabled={saving || checkingImpact || !dirty}
+              style={{ ...S.btn, opacity: saving || checkingImpact || !dirty ? 0.45 : 1, cursor: saving || checkingImpact || !dirty ? 'default' : 'pointer' }}>
+              {checkingImpact ? 'Checking…' : saving ? 'Saving…' : 'Save Markets'}
             </button>
             <span style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>
               {selected.size} market{selected.size !== 1 ? 's' : ''} selected
@@ -185,6 +231,55 @@ export function OrgMarketsSettings() {
             {saved && <span style={{ fontSize: 12, color: '#22C55E', fontWeight: 600 }}>✓ Saved</span>}
           </div>
         </>
+      )}
+
+      {/* QA-F30: shows what depends on each market being turned off before
+          it's actually deactivated. */}
+      {confirmDeactivate && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
+          <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 24, width: 480, maxWidth: '92vw', boxSizing: 'border-box' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <AlertTriangle size={16} color="#F59E0B" />
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--crm-text-primary)', margin: 0 }}>
+                Deactivate {confirmDeactivate.names.length} market{confirmDeactivate.names.length !== 1 ? 's' : ''}?
+              </h3>
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: '0 0 14px' }}>
+              Existing leads and runs keep their market — this only stops it from being offered for new runs and seed lists.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+              {confirmDeactivate.names.map(name => {
+                const impact = confirmDeactivate.impact[name]
+                const hasImpact = !!impact && (impact.leads > 0 || impact.sdrs > 0 || impact.activeRuns > 0)
+                return (
+                  <div key={name} style={{ padding: '10px 12px', borderRadius: 8, backgroundColor: 'var(--crm-surface-raised)', border: `1px solid ${hasImpact ? '#F59E0B40' : 'var(--crm-border)'}` }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-primary)', marginBottom: 4 }}>{name}</div>
+                    <div style={{ fontSize: 12, color: hasImpact ? '#F59E0B' : 'var(--crm-text-muted)' }}>
+                      {impact
+                        ? `${impact.leads} lead${impact.leads !== 1 ? 's' : ''} · ${impact.sdrs} SDR${impact.sdrs !== 1 ? 's' : ''} with leads here · ${impact.activeRuns} active run${impact.activeRuns !== 1 ? 's' : ''}`
+                        : 'No usage found.'}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setConfirmDeactivate(null)}
+                style={{ flex: 1, padding: '9px 0', borderRadius: 7, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer', fontSize: 13 }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmAndSave}
+                disabled={saving}
+                style={{ flex: 1, padding: '9px 0', borderRadius: 7, border: 'none', backgroundColor: '#EF4444', color: '#FFF', cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: saving ? 0.6 : 1 }}
+              >
+                {saving ? 'Saving…' : 'Deactivate'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
