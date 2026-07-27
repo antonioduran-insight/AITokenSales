@@ -175,6 +175,10 @@ For each feature, verify behavior for all applicable roles:
 - [ ] Back / Next / Proceed-to-Review / Start Import button rows wrap onto a second line on narrow phones instead of overflowing — "Proceed to Review" was close to the overflow threshold on the smallest phones
 - [ ] Step 1 (drag-and-drop upload) and Step 5 (results) were already safe — confirm no regression
 
+### Login (mobile + tablet) — Block 3
+
+- [ ] Reviewed only, no code changes needed — the card is already `width: '100%', maxWidth: 360` inside a centered flex column with no fixed-pixel siblings, and the language switcher sits in an absolutely-positioned corner that doesn't compete for layout space
+
 ### Settings (mobile + tablet) — Block 3
 
 - [ ] Tab strip (Organization / Plan & Usage / Scraper) scrolls horizontally on narrow phones instead of wrapping — the connected underline strip look is preserved, no tab clips off-screen
