@@ -49,6 +49,12 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
     localStorage.setItem('sidebar_collapsed', String(next))
   }
 
+  // The desktop icon-only preference must never apply to the mobile drawer —
+  // it has plenty of width (240px) and no reason to hide labels. Every layout
+  // decision below reads this instead of the raw `collapsed` state; only the
+  // toggle button itself (hidden on mobile) reflects the real preference.
+  const isIconOnly = collapsed && !mobileOpen
+
   const isAdmin = user?.role === 'admin'
   const impersonateOrgId = searchParams.get('impersonate_org_id')
   const impersonateOrgName = searchParams.get('impersonate_org_name')
@@ -83,8 +89,8 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
     <aside
       className={`crm-sidebar${mobileOpen ? ' crm-sidebar-open' : ''}`}
       style={{
-        width: collapsed ? 64 : 240,
-        minWidth: collapsed ? 64 : 240,
+        width: isIconOnly ? 64 : 240,
+        minWidth: isIconOnly ? 64 : 240,
         backgroundColor: 'var(--crm-surface)',
         borderRight: '1px solid var(--crm-border)',
         display: 'flex',
@@ -141,8 +147,8 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
       </button>
 
       {/* Logo */}
-      <div style={{ padding: collapsed ? '20px 0 16px' : '20px 20px 16px', borderBottom: '1px solid var(--crm-border)', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', overflow: 'hidden' }}>
-        {collapsed ? (
+      <div style={{ padding: isIconOnly ? '20px 0 16px' : '20px 20px 16px', borderBottom: '1px solid var(--crm-border)', display: 'flex', alignItems: 'center', justifyContent: isIconOnly ? 'center' : 'flex-start', overflow: 'hidden' }}>
+        {isIconOnly ? (
           <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--crm-accent)' }}>A</span>
         ) : (
           <div>
@@ -155,7 +161,7 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
       </div>
 
       {/* Nav */}
-      <nav style={{ flex: 1, padding: collapsed ? '12px 4px' : '12px 10px', overflowY: 'auto', overflowX: 'hidden' }}>
+      <nav style={{ flex: 1, padding: isIconOnly ? '12px 4px' : '12px 10px', overflowY: 'auto', overflowX: 'hidden' }}>
         {navItems.map(item => {
           if (item.adminOnly && !showAdmin) return null
           const fullHref = `/${locale}${item.href}`
@@ -169,13 +175,13 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
               href={linkHref}
               prefetch={false}
               onClick={onCloseMobile}
-              title={collapsed ? item.label : undefined}
+              title={isIconOnly ? item.label : undefined}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: collapsed ? 'center' : 'flex-start',
+                justifyContent: isIconOnly ? 'center' : 'flex-start',
                 gap: 10,
-                padding: collapsed ? '10px 0' : '9px 12px',
+                padding: isIconOnly ? '10px 0' : '9px 12px',
                 borderRadius: 8,
                 marginBottom: 2,
                 fontSize: 14,
@@ -187,7 +193,7 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
               }}
             >
               <Icon size={16} strokeWidth={isActive ? 2.2 : 1.8} />
-              {!collapsed && item.label}
+              {!isIconOnly && item.label}
             </Link>
           )
         })}
@@ -196,10 +202,10 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
         {isAdmin && !isImpersonating && (
           <>
             <div style={{ margin: '10px 4px 6px', display: 'flex', alignItems: 'center', gap: 8 }}>
-              {!collapsed && <div style={{ flex: 1, height: 1, backgroundColor: 'var(--crm-border)' }} />}
-              {!collapsed && <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Scraper</span>}
-              {!collapsed && <div style={{ flex: 1, height: 1, backgroundColor: 'var(--crm-border)' }} />}
-              {collapsed && <div style={{ width: '100%', height: 1, backgroundColor: 'var(--crm-border)' }} />}
+              {!isIconOnly && <div style={{ flex: 1, height: 1, backgroundColor: 'var(--crm-border)' }} />}
+              {!isIconOnly && <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Scraper</span>}
+              {!isIconOnly && <div style={{ flex: 1, height: 1, backgroundColor: 'var(--crm-border)' }} />}
+              {isIconOnly && <div style={{ width: '100%', height: 1, backgroundColor: 'var(--crm-border)' }} />}
             </div>
             {[
               { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -215,10 +221,10 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
                   href={`/${locale}${item.href}`}
                   prefetch={false}
                   onClick={onCloseMobile}
-                  title={collapsed ? item.label : undefined}
+                  title={isIconOnly ? item.label : undefined}
                   style={{
-                    display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: 10,
-                    padding: collapsed ? '10px 0' : '8px 12px', borderRadius: 8, marginBottom: 2,
+                    display: 'flex', alignItems: 'center', justifyContent: isIconOnly ? 'center' : 'flex-start', gap: 10,
+                    padding: isIconOnly ? '10px 0' : '8px 12px', borderRadius: 8, marginBottom: 2,
                     fontSize: 13,
                     fontWeight: isActive ? 600 : 400,
                     color: isActive ? '#A78BFA' : 'var(--crm-text-muted)',
@@ -227,7 +233,7 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
                   }}
                 >
                   <Icon size={14} strokeWidth={isActive ? 2.2 : 1.8} />
-                  {!collapsed && item.label}
+                  {!isIconOnly && item.label}
                 </Link>
               )
             })}
@@ -241,19 +247,19 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
           return (
             <>
               <div style={{ margin: '10px 4px 6px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                {!collapsed && <div style={{ flex: 1, height: 1, backgroundColor: 'var(--crm-border)' }} />}
-                {!collapsed && <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Bridge</span>}
-                {!collapsed && <div style={{ flex: 1, height: 1, backgroundColor: 'var(--crm-border)' }} />}
-                {collapsed && <div style={{ width: '100%', height: 1, backgroundColor: 'var(--crm-border)' }} />}
+                {!isIconOnly && <div style={{ flex: 1, height: 1, backgroundColor: 'var(--crm-border)' }} />}
+                {!isIconOnly && <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Bridge</span>}
+                {!isIconOnly && <div style={{ flex: 1, height: 1, backgroundColor: 'var(--crm-border)' }} />}
+                {isIconOnly && <div style={{ width: '100%', height: 1, backgroundColor: 'var(--crm-border)' }} />}
               </div>
               <Link
                 href={fullHref}
                 prefetch={false}
                 onClick={onCloseMobile}
-                title={collapsed ? 'Partnerships' : undefined}
+                title={isIconOnly ? 'Partnerships' : undefined}
                 style={{
-                  display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: 10,
-                  padding: collapsed ? '10px 0' : '8px 12px', borderRadius: 8, marginBottom: 2,
+                  display: 'flex', alignItems: 'center', justifyContent: isIconOnly ? 'center' : 'flex-start', gap: 10,
+                  padding: isIconOnly ? '10px 0' : '8px 12px', borderRadius: 8, marginBottom: 2,
                   fontSize: 13,
                   fontWeight: isActive ? 600 : 400,
                   color: isActive ? '#A78BFA' : 'var(--crm-text-muted)',
@@ -262,7 +268,7 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
                 }}
               >
                 <Handshake size={14} strokeWidth={isActive ? 2.2 : 1.8} />
-                {!collapsed && 'Partnerships'}
+                {!isIconOnly && 'Partnerships'}
               </Link>
             </>
           )
@@ -270,9 +276,9 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
       </nav>
 
       {/* User footer */}
-      <div style={{ padding: collapsed ? '12px 0' : '12px 16px', borderTop: '1px solid var(--crm-border)', display: 'flex', flexDirection: 'column', alignItems: collapsed ? 'center' : 'stretch' }}>
+      <div style={{ padding: isIconOnly ? '12px 0' : '12px 16px', borderTop: '1px solid var(--crm-border)', display: 'flex', flexDirection: 'column', alignItems: isIconOnly ? 'center' : 'stretch' }}>
         {user && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 10, marginBottom: 10, justifyContent: collapsed ? 'center' : 'flex-start' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isIconOnly ? 0 : 10, marginBottom: 10, justifyContent: isIconOnly ? 'center' : 'flex-start' }}>
             <div
               style={{
                 width: 32, height: 32, borderRadius: '50%',
@@ -283,7 +289,7 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
             >
               {user.full_name?.[0]?.toUpperCase() ?? '?'}
             </div>
-            {!collapsed && (
+            {!isIconOnly && (
               <div style={{ overflow: 'hidden' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {user.full_name}
@@ -301,10 +307,10 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
 
         <button
           onClick={handleLogout}
-          title={collapsed ? 'Logout' : undefined}
+          title={isIconOnly ? 'Logout' : undefined}
           style={{
-            display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: 8,
-            width: '100%', padding: collapsed ? '7px 0' : '7px 10px',
+            display: 'flex', alignItems: 'center', justifyContent: isIconOnly ? 'center' : 'flex-start', gap: 8,
+            width: '100%', padding: isIconOnly ? '7px 0' : '7px 10px',
             borderRadius: 6, border: 'none', cursor: 'pointer',
             backgroundColor: 'transparent',
             color: 'var(--crm-text-muted)', fontSize: 13,
@@ -314,7 +320,7 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
           onMouseLeave={e => (e.currentTarget.style.color = 'var(--crm-text-muted)')}
         >
           <LogOut size={14} />
-          {!collapsed && 'Logout'}
+          {!isIconOnly && 'Logout'}
         </button>
       </div>
     </aside>
