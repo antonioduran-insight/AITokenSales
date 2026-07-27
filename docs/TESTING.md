@@ -372,15 +372,20 @@ For each feature, verify behavior for all applicable roles:
 - [ ] With the `bridge` add-on **off**: no Partnerships entry in the sidebar; `GET /api/bridge/seed-lists` returns 403
 - [ ] Turn the add-on on in Global Admin → entry appears after reload
 - [ ] As SDR (add-on on): still no entry; API returns 403
-- [ ] Create a seed list with **companies only** — saves and appears in the list
-- [ ] Create one with **criteria only** (industry / headcount / market)
-- [ ] Create one with **both** — both are stored
+- [ ] Create a seed list with **companies only** — check in Supabase that `company_names` (not `companies`) is populated on the backend row
+- [ ] Create one with **criteria only** (headcount + market) — check `company_headcounts` and `geo_codes` are populated (not empty arrays) — this was the actual bug (F-payload-mismatch): the CRM form's field names didn't match the backend's schema and Pydantic silently dropped everything, so every seed list before this fix has empty `company_names`/`company_headcounts`/`geo_codes`/`industry_codes` regardless of what was filled in the form
+- [ ] Create one with **criteria only** including industry — confirm `industry_codes` is sent as `[]` (known gap, no industry-to-code mapping exists yet — documented in CLAUDE.md, not silently guessed at)
+- [ ] Create one with **both** — both are stored, correctly renamed
 - [ ] Save is blocked until a name and at least one populated source exist
+- [ ] The two seed lists that existed **before** this fix ("Hong Kong Software Companies", "Taiwan Software Reseller") still have empty backend fields — confirm whether they were recreated/edited per the team's decision, don't assume this fix retroactively repairs them
 - [ ] Run a search: `POST /bridge/runs` succeeds (no 422 "Field required" for `run_id`, no 404 "Bridge run not found") — the proxy inserts a `bridge_runs` row first and passes its real id, same pattern as `/api/runs`
 - [ ] The created `bridge_runs` row's `id` is what the client polls with, and `GET /bridge/runs/[id]` finds it immediately (no race)
 - [ ] Force a backend rejection (e.g. temporarily break the Apify token) — the `bridge_runs` row ends up `status='failed'` with `error_message` set, not stuck at `pending` forever
 - [ ] Run a search: progress ring + logs poll every 3s
 - [ ] On completion, candidate count shown and candidates load
+- [ ] Candidates are grouped by company: one header per company (name + LinkedIn link if `company_linkedin_url` is set) with up to 3 contacts shown underneath — a company with more than 3 confirmed/pending contacts only shows the first 3, by design
+- [ ] A candidate with no `company_id` groups by its `company` name string instead (fallback), and one with neither groups under "Unknown company" rather than erroring
+- [ ] Checkboxes/Confirm/Reject/Restore still operate per-contact inside a group — selecting one contact in a company group does not select its siblings
 - [ ] **Reject** turns a candidate red and persists after reload
 - [ ] **Restore** on a rejected candidate returns it to Pending
 - [ ] Checkboxes appear **only** on pending candidates (not confirmed/rejected)

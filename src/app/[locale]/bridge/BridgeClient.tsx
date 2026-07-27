@@ -280,7 +280,8 @@ export function BridgeClient() {
   // Purely a display grouping — selection/actions below stay per-contact.
   // Grouped by company_id when the backend provided one; older rows (scraped
   // before company_id was persisted) fall back to the company name so they
-  // still get a sensible header instead of one group per contact.
+  // still get a sensible header instead of one group per contact. Only the
+  // first 3 contacts per company are shown, per the same-day follow-up spec.
   const groupedShown = useMemo(() => {
     const order: string[] = []
     const groups = new Map<string, { key: string; company: string; companyLinkedinUrl?: string | null; items: BridgeCandidate[] }>()
@@ -635,7 +636,7 @@ export function BridgeClient() {
                           </a>
                         )}
                       </div>
-                      {group.items.map(c => {
+                      {group.items.slice(0, 3).map(c => {
                     const sc = STATUS_COLORS[c.verification_status] ?? STATUS_COLORS.pending
                     const busy = updating === c.id
                     const isRejected = c.verification_status === 'rejected'

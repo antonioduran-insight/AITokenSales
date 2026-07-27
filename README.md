@@ -47,7 +47,7 @@ A separate product from the lead scraper. Bridge finds **B2B partnership contact
 
 - **Seed Lists** — named target definitions with a channel family (Reseller, Referral, Technology Integration, Affiliate, Channel Distribution). Two sources that can be **combined**: a list of specific companies and/or search criteria (industry, headcount, market).
 - **Search** — pick a seed list and launch a run. Live progress ring + streamed logs, polled every 3s.
-- **Candidate Review** — each candidate shows name, company, title, location, LinkedIn and a short bio, with **Confirm** / **Reject** actions and **Restore** for rejected ones. Filter by All / Pending / Confirmed / Rejected.
+- **Candidate Review** — candidates are grouped by company (a header with the company name + LinkedIn link, up to 3 contacts shown underneath), each contact showing name, title, location, LinkedIn and a short bio, with **Confirm** / **Reject** actions and **Restore** for rejected ones — selection and actions stay per-contact, only the layout groups. Filter by All / Pending / Confirmed / Rejected.
 - **Past Searches** — a tab listing previous runs; opening one reloads its candidates.
 
 Bridge is gated twice: the sidebar entry only renders for admins whose org has the `bridge` add-on active, and `/api/bridge/[...path]` re-checks session, role and add-on before proxying to the backend. The proxy injects `organization_id` (and `apify_token` for runs) server-side, so a client can never read or mutate another org's Bridge data.

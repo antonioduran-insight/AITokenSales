@@ -98,6 +98,40 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
 
     body.organization_id = orgId
 
+    // The backend's seed-list schema doesn't match what the CRM's form was
+    // sending (companies/criteria.headcounts/criteria.market/criteria.industry)
+    // — Pydantic silently dropped every one of those fields instead of
+    // erroring, so every seed list ever created (including the two that
+    // already exist) has empty company_names/company_headcounts/geo_codes/
+    // industry_codes. Transform to the backend's real field names here.
+    if (pathStr === '/bridge/seed-lists' && req.method === 'POST') {
+      const companies = Array.isArray(body.companies) ? (body.companies as string[]) : []
+      const criteria = (body.criteria ?? {}) as { industry?: string | null; headcounts?: string[]; market?: string | null }
+
+      let geoCodes: number[] = []
+      if (criteria.market) {
+        const { data: marketRows } = await admin
+          .from('markets')
+          .select('geo_code')
+          .ilike('name', criteria.market)
+        geoCodes = (marketRows ?? [])
+          .map(m => (m as { geo_code: unknown }).geo_code)
+          .filter((c): c is number => typeof c === 'number')
+      }
+
+      body.company_names = companies
+      body.company_headcounts = criteria.headcounts ?? []
+      body.geo_codes = geoCodes
+      // No industry-name -> industry-code mapping exists anywhere in this
+      // project yet (checked: no table, no constant). Sending [] rather than
+      // guessing a code — criteria.industry is a known, documented gap until
+      // that mapping is built as its own task.
+      body.industry_codes = []
+
+      delete body.companies
+      delete body.criteria
+    }
+
     // Starting a Bridge run needs the org's Apify token, same as the scraper.
     if (pathStr === '/bridge/runs') {
       const { data: org } = await admin
