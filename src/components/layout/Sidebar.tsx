@@ -65,18 +65,24 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
     : ''
 
   const showAdmin = isAdmin || isImpersonating
+  const isSupport = user?.role === 'support'
 
-  const navItems = [
-    { href: '/kanban', label: t('kanban'), icon: LayoutGrid, always: true },
-    { href: '/prospects', label: t('prospects'), icon: Users2, always: true },
-    { href: '/import', label: 'Import', icon: UploadCloud, always: true, hideWhenImpersonating: true },
-    { href: '/convertidos', label: t('convertidos'), icon: Trophy, always: true },
-    { href: '/support', label: 'Support', icon: Headphones, always: true },
-    { href: '/audit', label: t('audit'), icon: ClipboardList, adminOnly: true },
-    { href: '/stats', label: t('stats'), icon: BarChart3, adminOnly: true },
-    { href: '/admin/users', label: t('users'), icon: Users, adminOnly: true },
-    { href: '/settings', label: 'Settings', icon: Settings2, adminOnly: true },
-  ]
+  // Support is org-independent internal staff confined to the ticket queue
+  // (middleware enforces this server-side too) — every other link here
+  // would just redirect straight back, so don't show them at all.
+  const navItems = isSupport
+    ? [{ href: '/support', label: 'Support', icon: Headphones, always: true }]
+    : [
+        { href: '/kanban', label: t('kanban'), icon: LayoutGrid, always: true },
+        { href: '/prospects', label: t('prospects'), icon: Users2, always: true },
+        { href: '/import', label: 'Import', icon: UploadCloud, always: true, hideWhenImpersonating: true },
+        { href: '/convertidos', label: t('convertidos'), icon: Trophy, always: true },
+        { href: '/support', label: 'Support', icon: Headphones, always: true },
+        { href: '/audit', label: t('audit'), icon: ClipboardList, adminOnly: true },
+        { href: '/stats', label: t('stats'), icon: BarChart3, adminOnly: true },
+        { href: '/admin/users', label: t('users'), icon: Users, adminOnly: true },
+        { href: '/settings', label: 'Settings', icon: Settings2, adminOnly: true },
+      ]
 
   async function handleLogout() {
     const supabase = createClient()

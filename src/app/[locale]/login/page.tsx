@@ -46,7 +46,10 @@ async function resolveLoginOutcome(locale: string): Promise<LoginOutcome | null>
 
   const role = profile.role
   if (role === 'admin_global') return { ok: true, redirectTo: `/${locale}/global-admin/organizations` }
-  if (role === 'support') return { ok: true, redirectTo: `/${locale}/global-admin/support` }
+  // Support's own working page is the plain /support route (under AppShell,
+  // not Global Admin) — GlobalAdminLayout hard-redirects anyone who isn't
+  // admin_global away from /global-admin/*, so that path was never reachable.
+  if (role === 'support') return { ok: true, redirectTo: `/${locale}/support` }
   return { ok: true, redirectTo: `/${locale}/kanban` }
 }
 

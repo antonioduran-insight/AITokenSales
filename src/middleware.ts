@@ -113,6 +113,20 @@ export async function middleware(request: NextRequest) {
       return redirectResponse
     }
 
+    // Support is org-independent internal staff — its only job is the
+    // ticket queue, so it must never see the rest of the CRM (Kanban,
+    // Prospects, etc. would just render empty/broken for an org-less user
+    // anyway, since every query there is organization_id-scoped).
+    if (userData.role === 'support') {
+      const locale = pathnameHasLocale ? pathname.split('/')[1] : defaultLocale
+      const pathAfterLocale = pathnameHasLocale ? pathname.slice(`/${locale}`.length) || '/' : pathname
+      if (pathAfterLocale !== '/support') {
+        const redirectResponse = NextResponse.redirect(new URL(`/${locale}/support`, request.url))
+        response.cookies.getAll().forEach(cookie => redirectResponse.cookies.set(cookie))
+        return redirectResponse
+      }
+    }
+
     intlResponse.cookies.set('user_role',   userData.role ?? '',             { path: '/', sameSite: 'lax' })
     intlResponse.cookies.set('user_org_id', userData.organization_id ?? '', { path: '/', sameSite: 'lax' })
   }

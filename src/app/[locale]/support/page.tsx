@@ -11,6 +11,7 @@ interface TicketMessage {
   created_by: string
   content: string
   created_at: string
+  author_name?: string
 }
 
 interface SupportTicket {
@@ -23,6 +24,7 @@ interface SupportTicket {
   created_by: string
   messages: TicketMessage[]
   created_by_user?: { id: string; full_name: string }
+  organization?: { id: string; name: string } | null
 }
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -182,13 +184,27 @@ export default function SupportPage() {
 
   const openCount = tickets.filter(t => t.status === 'open' || t.status === 'in_progress').length
 
+  // support/admin_global are org-independent — they see every org's
+  // tickets, not just their own (org admins/SDRs never hit this branch,
+  // since they always have a real organization_id).
+  const isCrossOrgViewer = user?.role === 'support' || user?.role === 'admin_global'
+  const canManage = isAdmin || isCrossOrgViewer
+
+  const gridColsBase = ['1fr', '100px', '100px', ...(isCrossOrgViewer ? ['140px'] : []), ...(canManage ? ['140px'] : []), '80px']
+  const gridTemplateColumns = gridColsBase.join(' ')
+  const gridTemplateColumnsWithChevron = [...gridColsBase, '20px'].join(' ')
+  const gridMinWidth = 360 + gridColsBase.reduce((sum, c) => sum + (c === '1fr' ? 0 : parseInt(c)), 0) + (gridColsBase.length - 1) * 12
+  const gridMinWidthWithChevron = gridMinWidth + 32
+
   return (
     <div style={S.page}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 10, marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>Support</h1>
           <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
-            {isAdmin
+            {isCrossOrgViewer
+              ? `${openCount} open ticket${openCount !== 1 ? 's' : ''} across all organizations`
+              : isAdmin
               ? `${openCount} open ticket${openCount !== 1 ? 's' : ''} across your organization`
               : 'Submit and track your support requests'}
           </p>
@@ -197,14 +213,18 @@ export default function SupportPage() {
           <button onClick={fetchTickets} disabled={loading} style={{ ...S.btnGhost, display: 'flex', alignItems: 'center', padding: '7px 10px' }}>
             <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
           </button>
-          <button onClick={() => setShowNew(true)} style={{ ...S.btn, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Plus size={14} /> New Ticket
-          </button>
+          {/* Support/admin_global don't belong to any org, so filing a
+              ticket "for" an org doesn't make sense from this account. */}
+          {!isCrossOrgViewer && (
+            <button onClick={() => setShowNew(true)} style={{ ...S.btn, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Plus size={14} /> New Ticket
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Filters (admin only) */}
-      {isAdmin && (
+      {/* Filters (admin/support/admin_global) */}
+      {canManage && (
         <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
             style={{ ...S.input, width: 'auto', padding: '6px 10px' }}>
@@ -228,11 +248,12 @@ export default function SupportPage() {
       {/* Table header */}
       {filtered.length > 0 && (
         <div style={{ overflowX: 'auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1fr 100px 100px 140px 80px' : '1fr 100px 100px 80px', gap: 12, padding: '8px 16px', marginBottom: 4, minWidth: isAdmin ? 620 : 480 }}>
+          <div style={{ display: 'grid', gridTemplateColumns, gap: 12, padding: '8px 16px', marginBottom: 4, minWidth: gridMinWidth }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Subject</span>
             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Priority</span>
             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</span>
-            {isAdmin && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Created by</span>}
+            {isCrossOrgViewer && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Organization</span>}
+            {canManage && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Created by</span>}
             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</span>
           </div>
         </div>
@@ -251,7 +272,7 @@ export default function SupportPage() {
       {/* Ticket rows */}
       {!loading && filtered.map(ticket => {
         const isExpanded = expandedId === ticket.id
-        const createdByName = ticket.created_by_user?.full_name ?? (isAdmin ? getUserName(ticket.created_by) : 'Me')
+        const createdByName = ticket.created_by_user?.full_name ?? (canManage ? getUserName(ticket.created_by) : 'Me')
         return (
           <div key={ticket.id} style={S.card}>
             {/* Row */}
@@ -259,8 +280,8 @@ export default function SupportPage() {
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: isAdmin ? '1fr 100px 100px 140px 80px 20px' : '1fr 100px 100px 80px 20px',
-                  gap: 12, alignItems: 'center', cursor: 'pointer', minWidth: isAdmin ? 660 : 520,
+                  gridTemplateColumns: gridTemplateColumnsWithChevron,
+                  gap: 12, alignItems: 'center', cursor: 'pointer', minWidth: gridMinWidthWithChevron,
                 }}
                 onClick={() => setExpandedId(isExpanded ? null : ticket.id)}
               >
@@ -272,7 +293,8 @@ export default function SupportPage() {
                 </div>
                 <Badge label={ticket.priority} color={PRIORITY_COLORS[ticket.priority] ?? '#6B7280'} />
                 <Badge label={ticket.status.replace('_', ' ')} color={STATUS_COLORS[ticket.status] ?? 'var(--crm-text-muted)'} />
-                {isAdmin && <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{createdByName}</span>}
+                {isCrossOrgViewer && <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{ticket.organization?.name ?? '—'}</span>}
+                {canManage && <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{createdByName}</span>}
                 <span style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{new Date(ticket.created_at).toLocaleDateString()}</span>
                 {isExpanded ? <ChevronUp size={14} color="var(--crm-text-muted)" /> : <ChevronDown size={14} color="var(--crm-text-muted)" />}
               </div>
@@ -301,7 +323,7 @@ export default function SupportPage() {
                     {ticket.messages.map(msg => (
                       <div key={msg.id} style={{ backgroundColor: msg.created_by === user?.id ? '#6C63FF12' : 'var(--crm-surface-raised)', border: `1px solid ${msg.created_by === user?.id ? '#6C63FF30' : 'var(--crm-border)'}`, borderRadius: 8, padding: '10px 14px' }}>
                         <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginBottom: 6, fontWeight: 600 }}>
-                          {msg.created_by === user?.id ? 'You' : (isAdmin ? getUserName(msg.created_by) : 'Support')} · {new Date(msg.created_at).toLocaleString()}
+                          {msg.created_by === user?.id ? 'You' : (msg.author_name ?? (canManage ? getUserName(msg.created_by) : 'Support'))} · {new Date(msg.created_at).toLocaleString()}
                         </div>
                         <div style={{ fontSize: 13, color: 'var(--crm-text-primary)', lineHeight: 1.6 }}>{msg.content}</div>
                       </div>
@@ -331,7 +353,7 @@ export default function SupportPage() {
                 )}
 
                 {/* Status controls — only for support/admin_global roles */}
-                {(user?.role === 'support' || user?.role === 'admin_global') && (
+                {isCrossOrgViewer && (
                   <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 12, color: 'var(--crm-text-muted)', alignSelf: 'center' }}>Change status:</span>
                     {(['open', 'in_progress', 'closed'] as const).map(s => (

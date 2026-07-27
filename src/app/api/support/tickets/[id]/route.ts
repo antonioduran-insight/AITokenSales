@@ -19,8 +19,10 @@ async function getAuthUser() {
     .eq('id', user.id)
     .single()
 
-  if (!profile?.organization_id) return null
-  return { userId: user.id, role: profile.role as string, orgId: profile.organization_id as string }
+  if (!profile) return null
+  const role = profile.role as string
+  if (!profile.organization_id && role !== 'support' && role !== 'admin_global') return null
+  return { userId: user.id, role, orgId: profile.organization_id as string | null }
 }
 
 // POST message to a ticket
@@ -40,17 +42,20 @@ export async function POST(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Verify ticket belongs to org (and SDR owns it)
+  const isCrossOrg = ctx.role === 'support' || ctx.role === 'admin_global'
+
+  // Verify ticket belongs to org (and SDR owns it) — support/admin_global
+  // aren't scoped to any single org, so they skip the org check entirely.
   const { data: ticket } = await admin
     .from('support_tickets')
     .select('organization_id, created_by')
     .eq('id', id)
     .single()
 
-  if (!ticket || ticket.organization_id !== ctx.orgId) {
+  if (!ticket || (!isCrossOrg && ticket.organization_id !== ctx.orgId)) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
-  const canReply = ctx.role === 'admin' || ctx.role === 'support' || ctx.role === 'admin_global'
+  const canReply = ctx.role === 'admin' || isCrossOrg
   if (!canReply && ticket.created_by !== ctx.userId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
@@ -71,7 +76,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const ctx = await getAuthUser()
-  const canChangeStatus = ctx && (ctx.role === 'admin' || ctx.role === 'support' || ctx.role === 'admin_global')
+  const isCrossOrg = !!ctx && (ctx.role === 'support' || ctx.role === 'admin_global')
+  const canChangeStatus = ctx && (ctx.role === 'admin' || isCrossOrg)
   if (!canChangeStatus) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
@@ -82,13 +88,10 @@ export async function PATCH(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  const { data, error } = await admin
-    .from('support_tickets')
-    .update({ status })
-    .eq('id', id)
-    .eq('organization_id', ctx.orgId)
-    .select()
-    .single()
+  let query = admin.from('support_tickets').update({ status }).eq('id', id)
+  if (!isCrossOrg) query = query.eq('organization_id', ctx.orgId as string)
+
+  const { data, error } = await query.select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   return NextResponse.json(data)
