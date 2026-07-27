@@ -70,12 +70,28 @@ export async function middleware(request: NextRequest) {
   // Supabase's cookies on top.
   response.cookies.getAll().forEach(cookie => intlResponse.cookies.set(cookie))
 
-  // Fetch profile to expose role + org_id via cookies — race against 900ms
-  // to avoid MIDDLEWARE_INVOCATION_TIMEOUT on slow Supabase responses
+  // Fetch profile to expose role + org_id via cookies, and to enforce
+  // is_active (QA-F1) — race against 900ms to avoid
+  // MIDDLEWARE_INVOCATION_TIMEOUT on slow Supabase responses.
+  //
+  // A deactivated user/org still has a perfectly valid Supabase Auth
+  // session (is_active lives in our own tables, decoupled from Auth), so
+  // without this check a deactivated account would keep working normally
+  // until its JWT happened to expire. This runs on every navigation, so a
+  // deactivation takes effect on the very next request under normal
+  // conditions.
+  //
+  // On a timeout (userData stays null) this deliberately fails OPEN —
+  // same tradeoff the existing 900ms race already makes for role/org
+  // cookies. Failing closed here would mean any transient Supabase
+  // slowness force-logs-out active users, which is exactly the
+  // "logged out constantly" class of bug already fixed once this
+  // session; a rare, brief window where a just-deactivated account
+  // isn't caught on one single slow request is the safer tradeoff.
   const userData = await Promise.race([
     supabase
       .from('users')
-      .select('role, organization_id')
+      .select('role, organization_id, is_active, organizations(is_active)')
       .eq('id', user.id)
       .single()
       .then(r => r.data),
@@ -83,6 +99,20 @@ export async function middleware(request: NextRequest) {
   ])
 
   if (userData) {
+    // Supabase types this embedded relation as an array regardless of the
+    // FK's actual to-one cardinality — a user belongs to at most one org.
+    const orgs = userData.organizations as unknown as { is_active: boolean }[] | null
+    const orgInactive = !!orgs && orgs.length > 0 && !orgs[0].is_active
+    const deactivated = !userData.is_active ? 'user' : (orgInactive ? 'org' : null)
+
+    if (deactivated) {
+      await supabase.auth.signOut()
+      const locale = pathnameHasLocale ? pathname.split('/')[1] : defaultLocale
+      const redirectResponse = NextResponse.redirect(new URL(`/${locale}/login?deactivated=${deactivated}`, request.url))
+      response.cookies.getAll().forEach(cookie => redirectResponse.cookies.set(cookie))
+      return redirectResponse
+    }
+
     intlResponse.cookies.set('user_role',   userData.role ?? '',             { path: '/', sameSite: 'lax' })
     intlResponse.cookies.set('user_org_id', userData.organization_id ?? '', { path: '/', sameSite: 'lax' })
   }

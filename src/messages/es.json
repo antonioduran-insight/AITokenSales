@@ -48,7 +48,9 @@
     "password": "Contraseña",
     "loginButton": "Ingresar",
     "loginError": "Email o contraseña inválidos",
-    "signingIn": "Ingresando..."
+    "signingIn": "Ingresando...",
+    "accountDeactivated": "Tu cuenta ha sido desactivada. Contactá a tu administrador.",
+    "orgDeactivated": "El acceso de esta organización ha sido suspendido."
   },
   "prospect": {
     "new": "Nuevo Lead",

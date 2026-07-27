@@ -48,7 +48,9 @@
     "password": "Password",
     "loginButton": "Sign In",
     "loginError": "Invalid email or password",
-    "signingIn": "Signing in..."
+    "signingIn": "Signing in...",
+    "accountDeactivated": "Your account has been deactivated. Contact your administrator.",
+    "orgDeactivated": "This organization's access has been suspended."
   },
   "prospect": {
     "new": "New Lead",

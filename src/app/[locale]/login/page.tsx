@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations, useLocale } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -9,41 +9,77 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LanguageSwitcher } from '@/components/layout/LanguageSwitcher'
 
-async function getRoleRedirect(locale: string): Promise<string> {
+type LoginOutcome =
+  | { ok: true; redirectTo: string }
+  | { ok: false; reason: 'user_inactive' | 'org_inactive' }
+
+// Supabase Auth's own session validity (a valid JWT) says nothing about
+// whether the app has deactivated this user or their organization — that's
+// tracked separately in public.users.is_active / public.organizations.is_active
+// and was never checked anywhere (QA-F1). A deactivated account/org still has
+// a perfectly valid Supabase session, so this must explicitly sign them back
+// out — otherwise they'd just keep bouncing between login and their
+// destination page on every visit.
+async function resolveLoginOutcome(locale: string): Promise<LoginOutcome | null> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return `/${locale}/login`
+  if (!user) return null
 
   const { data: profile } = await supabase
     .from('users')
-    .select('role')
+    .select('role, is_active, organizations(is_active)')
     .eq('id', user.id)
     .single()
 
-  const role = profile?.role
-  if (role === 'admin_global') return `/${locale}/global-admin/organizations`
-  if (role === 'support') return `/${locale}/global-admin/support`
-  return `/${locale}/kanban`
+  if (!profile || !profile.is_active) {
+    await supabase.auth.signOut()
+    return { ok: false, reason: 'user_inactive' }
+  }
+
+  // Supabase types this embedded relation as an array regardless of the
+  // FK's actual to-one cardinality — a user belongs to at most one org.
+  const orgs = profile.organizations as unknown as { is_active: boolean }[] | null
+  if (orgs && orgs.length > 0 && !orgs[0].is_active) {
+    await supabase.auth.signOut()
+    return { ok: false, reason: 'org_inactive' }
+  }
+
+  const role = profile.role
+  if (role === 'admin_global') return { ok: true, redirectTo: `/${locale}/global-admin/organizations` }
+  if (role === 'support') return { ok: true, redirectTo: `/${locale}/global-admin/support` }
+  return { ok: true, redirectTo: `/${locale}/kanban` }
 }
 
-export default function LoginPage() {
+function LoginContent() {
   const t = useTranslations('auth')
   const locale = useLocale()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  // Arrived here via middleware kicking out a session that was deactivated
+  // mid-session (QA-F1) — the session's already been cleared server-side by
+  // that point, so there's no session left to re-check; just show why. Read
+  // synchronously from the initial state rather than an effect, since
+  // useSearchParams() is already available at render time.
+  const [error, setError] = useState<string | null>(() => {
+    const deactivated = searchParams.get('deactivated')
+    if (deactivated === 'org') return t('orgDeactivated')
+    if (deactivated === 'user') return t('accountDeactivated')
+    return null
+  })
   const [loading, setLoading] = useState(false)
 
   // Redirect if already authenticated
   useEffect(() => {
     createClient().auth.getSession().then(async ({ data: { session } }) => {
-      if (session) {
-        const dest = await getRoleRedirect(locale)
-        router.replace(dest)
-      }
+      if (!session) return
+      const outcome = await resolveLoginOutcome(locale)
+      if (!outcome) return
+      if (outcome.ok) { router.replace(outcome.redirectTo); return }
+      setError(outcome.reason === 'org_inactive' ? t('orgDeactivated') : t('accountDeactivated'))
     })
-  }, [locale, router])
+  }, [locale, router, t])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -59,8 +95,14 @@ export default function LoginPage() {
       return
     }
 
-    const dest = await getRoleRedirect(locale)
-    router.push(dest)
+    const outcome = await resolveLoginOutcome(locale)
+    if (!outcome || !outcome.ok) {
+      setError(outcome?.reason === 'org_inactive' ? t('orgDeactivated') : t('accountDeactivated'))
+      setLoading(false)
+      return
+    }
+
+    router.push(outcome.redirectTo)
     router.refresh()
   }
 
@@ -160,5 +202,13 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
   )
 }

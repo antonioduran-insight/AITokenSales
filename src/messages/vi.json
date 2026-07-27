@@ -48,7 +48,9 @@
     "password": "Mật Khẩu",
     "loginButton": "Đăng Nhập",
     "loginError": "Email hoặc mật khẩu không hợp lệ",
-    "signingIn": "Đang đăng nhập..."
+    "signingIn": "Đang đăng nhập...",
+    "accountDeactivated": "Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.",
+    "orgDeactivated": "Quyền truy cập của tổ chức này đã bị tạm ngưng."
   },
   "prospect": {
     "new": "Khách Hàng Tiềm Năng Mới",

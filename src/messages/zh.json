@@ -48,7 +48,9 @@
     "password": "密碼",
     "loginButton": "登入",
     "loginError": "電子郵件或密碼無效",
-    "signingIn": "登入中..."
+    "signingIn": "登入中...",
+    "accountDeactivated": "您的帳戶已被停用，請聯絡您的管理員。",
+    "orgDeactivated": "此組織的存取權限已被暫停。"
   },
   "prospect": {
     "new": "新潛在客戶",
