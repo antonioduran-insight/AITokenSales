@@ -408,8 +408,10 @@ export function CSVImportWizard() {
         <h1 style={{ fontSize: 22, fontWeight: 700 }}>{t('title')}</h1>
       </div>
 
-      {/* Step indicator */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 28 }}>
+      {/* Step indicator — scrolls horizontally instead of wrapping so the
+          connected step/line look survives narrow phones */}
+      <div style={{ overflowX: 'auto', marginBottom: 28 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0, width: 'max-content' }}>
         {displaySteps.map(({ s, label }, i) => {
           const done = step > s
           const active = step === s
@@ -433,6 +435,7 @@ export function CSVImportWizard() {
             </div>
           )
         })}
+      </div>
       </div>
 
       {/* STEP 1: Upload */}
@@ -502,7 +505,7 @@ export function CSVImportWizard() {
             </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 10 }}>
             <Button onClick={() => setStep(1)} style={{ backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}>
               <ChevronLeft size={14} /> {tc('back')}
             </Button>
@@ -544,7 +547,7 @@ export function CSVImportWizard() {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 }}>
+          <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 }}>
             {csvHeaders.map(col => (
               <div key={col} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ flex: 1, padding: '7px 10px', backgroundColor: 'var(--crm-background)', border: '1px solid var(--crm-border)', borderRadius: 6, fontSize: 13, color: 'var(--crm-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -598,7 +601,7 @@ export function CSVImportWizard() {
             </table>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 10, marginTop: 24 }}>
             <Button onClick={() => setStep(isAdmin ? 2 : 1)} style={{ backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}>
               <ChevronLeft size={14} /> {tc('back')}
             </Button>
@@ -652,8 +655,8 @@ export function CSVImportWizard() {
             </button>
           </div>
 
-          <div style={{ maxHeight: 400, overflowY: 'auto', border: '1px solid var(--crm-border)', borderRadius: 8 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <div style={{ maxHeight: 400, overflow: 'auto', border: '1px solid var(--crm-border)', borderRadius: 8 }}>
+            <table style={{ width: '100%', minWidth: 480, borderCollapse: 'collapse', fontSize: 13 }}>
               <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--crm-surface-raised)' }}>
                 <tr>
                   <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--crm-text-muted)', fontWeight: 500, fontSize: 11 }}>CSV Record</th>
@@ -709,7 +712,7 @@ export function CSVImportWizard() {
             {blacklistedCount > 0 && ` · ${blacklistedCount} blocked by blacklist`}
           </p>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 10, marginTop: 16 }}>
             <Button onClick={() => setStep(3)} style={{ backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}>
               <ChevronLeft size={14} /> {tc('back')}
             </Button>

@@ -166,6 +166,15 @@ For each feature, verify behavior for all applicable roles:
 - [ ] Support: expanding a ticket, replying, and changing status still work normally after the summary row's scroll wrapper was added
 - [ ] Support: New Ticket modal still fits the viewport on phone width (already capped at `92vw`) — confirm no regression
 
+### CSV Import Wizard (mobile + tablet) — Block 3
+
+- [ ] Step indicator (1/2/3/4/5 circles + connecting lines) scrolls horizontally on narrow phones instead of overflowing — it had five-plus non-shrinking items with no wrap or scroll protection at all
+- [ ] Step 3 column-mapping grid (CSV column → target field, previously a fixed `1fr 1fr` grid) collapses to one column on phone width
+- [ ] Step 3 CSV preview table already scrolls horizontally (pre-existing) — confirm no regression
+- [ ] Step 4 duplicate-review table scrolls both vertically (pre-existing `maxHeight`) and now horizontally instead of squeezing its four columns unreadably thin
+- [ ] Back / Next / Proceed-to-Review / Start Import button rows wrap onto a second line on narrow phones instead of overflowing — "Proceed to Review" was close to the overflow threshold on the smallest phones
+- [ ] Step 1 (drag-and-drop upload) and Step 5 (results) were already safe — confirm no regression
+
 ### Settings (mobile + tablet) — Block 3
 
 - [ ] Tab strip (Organization / Plan & Usage / Scraper) scrolls horizontally on narrow phones instead of wrapping — the connected underline strip look is preserved, no tab clips off-screen
