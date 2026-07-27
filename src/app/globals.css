@@ -145,6 +145,80 @@
   font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
 }
 
+/* ============================================================
+   Responsive breakpoints (project-wide convention)
+   Components stay inline-style-only (CLAUDE.md) — these classes
+   exist purely so layout-critical properties (position, transform,
+   width, display) can differ per breakpoint, which plain inline
+   `style` objects can't express. Apply via `className` alongside
+   the existing inline `style` prop; don't move colors/fonts/spacing
+   here — those stay inline as before.
+
+   - Desktop:      >= 1025px  (no override — current behavior)
+   - Tablet:        768–1024px
+   - Mobile/phone: <= 767px
+   ============================================================ */
+
+/* Mobile app shell: sidebar becomes a slide-in drawer instead of a
+   permanent flex column, triggered by a hamburger button in the header. */
+.crm-mobile-menu-btn {
+  display: none;
+}
+
+.crm-sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .crm-mobile-menu-btn {
+    display: flex;
+  }
+
+  .crm-sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    height: 100%;
+    width: 240px !important;
+    min-width: 240px !important;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .crm-sidebar.crm-sidebar-open {
+    transform: translateX(0);
+  }
+
+  .crm-sidebar-backdrop.crm-sidebar-open {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 150;
+  }
+}
+
+/* Generic helpers used across pages as we make them responsive.
+   `crm-stack-mobile` turns a row flex container into a column below
+   768px; `crm-hide-mobile` / `crm-hide-desktop` swap visibility. */
+@media (max-width: 767px) {
+  .crm-stack-mobile {
+    flex-direction: column !important;
+  }
+  .crm-hide-mobile {
+    display: none !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .crm-hide-desktop {
+    display: none !important;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

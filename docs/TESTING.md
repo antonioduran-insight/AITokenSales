@@ -97,6 +97,18 @@ For each feature, verify behavior for all applicable roles:
 
 ## Feature Test Checklists
 
+### Responsive shell (mobile + tablet) — ongoing effort, CRITICAL for this piece
+
+- [ ] Desktop (>= 1025px): sidebar and collapse-to-icons toggle behave exactly as before — no regression
+- [ ] Tablet (768–1024px, e.g. iPad portrait/landscape): sidebar still shown persistently beside content (not a drawer) — same as desktop, just check nothing overflows horizontally
+- [ ] Phone (<= 767px): sidebar is hidden by default; a hamburger button appears at the top-left of the header
+- [ ] Tapping the hamburger slides the sidebar in from the left as an overlay (not pushing content aside), with a dark backdrop behind it
+- [ ] Tapping the backdrop, tapping the sidebar's own close (X) button, or tapping any nav link all close the drawer
+- [ ] Clicking a nav link while the drawer is open actually navigates (closing doesn't swallow the click)
+- [ ] Impersonation banner (Global Admin viewing an org) wraps onto a second line on narrow phones instead of overflowing horizontally; the "Exit" button stays fully visible and tappable
+- [ ] No horizontal scrollbar on the page body itself at any of the three widths, on any page — the content area (`min-width: 0` fix) must actually shrink instead of forcing the whole layout wider than the viewport
+- [ ] This is shell-only so far — most individual page content (Kanban, tables, forms) is not yet responsive; only the sidebar/header chrome should be expected to work well below tablet width at this stage
+
 ### Authentication
 
 - [ ] Valid credentials → redirected to correct landing page by role

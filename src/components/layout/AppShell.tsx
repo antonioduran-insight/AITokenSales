@@ -2,11 +2,12 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useLocale } from 'next-intl'
+import { Menu } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { LanguageSwitcher } from './LanguageSwitcher'
 
 import { UserProvider, type UserWithArea } from '@/contexts/UserContext'
-import { Suspense } from 'react'
+import { Suspense, useState } from 'react'
 
 interface Props {
   children: React.ReactNode
@@ -33,12 +34,14 @@ function ImpersonateBanner() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        gap: 10,
+        flexWrap: 'wrap',
         fontSize: 13,
         color: '#FCD34D',
         flexShrink: 0,
       }}
     >
-      <span>👁 Viewing <strong>{decodeURIComponent(impersonateOrgName ?? '')}</strong> — Read Only Mode</span>
+      <span style={{ overflowWrap: 'anywhere' }}>👁 Viewing <strong>{decodeURIComponent(impersonateOrgName ?? '')}</strong> — Read Only Mode</span>
       <button
         onClick={() => router.push(`/${locale}/global-admin/organizations`)}
         style={{
@@ -49,6 +52,7 @@ function ImpersonateBanner() {
           padding: '4px 12px',
           fontSize: 12,
           cursor: 'pointer',
+          flexShrink: 0,
         }}
       >
         Exit
@@ -61,6 +65,7 @@ export function AppShell({ children, initialUser, orgPlan }: Props) {
   const pathname = usePathname()
   const isLoginPage = /\/login$/.test(pathname)
   const isGlobalAdminPage = pathname.includes('/global-admin')
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   if (isLoginPage) return <>{children}</>
   if (isGlobalAdminPage) return <>{children}</>
@@ -71,11 +76,16 @@ export function AppShell({ children, initialUser, orgPlan }: Props) {
         <Suspense fallback={null}>
           <ImpersonateBanner />
         </Suspense>
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-          <Suspense fallback={<aside style={{ width: 240, minWidth: 240, backgroundColor: 'var(--crm-surface)', borderRight: '1px solid var(--crm-border)' }} />}>
-            <Sidebar user={initialUser} />
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
+          <Suspense fallback={<aside className="crm-sidebar" style={{ width: 240, minWidth: 240, backgroundColor: 'var(--crm-surface)', borderRight: '1px solid var(--crm-border)' }} />}>
+            <Sidebar user={initialUser} mobileOpen={mobileNavOpen} onCloseMobile={() => setMobileNavOpen(false)} />
           </Suspense>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: 'var(--crm-background)' }}>
+          {/* Tapping outside the open mobile drawer closes it */}
+          <div
+            className={`crm-sidebar-backdrop${mobileNavOpen ? ' crm-sidebar-open' : ''}`}
+            onClick={() => setMobileNavOpen(false)}
+          />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: 'var(--crm-background)', minWidth: 0 }}>
             <header
               style={{
                 height: 52,
@@ -89,6 +99,17 @@ export function AppShell({ children, initialUser, orgPlan }: Props) {
                 flexShrink: 0,
               }}
             >
+              <button
+                onClick={() => setMobileNavOpen(true)}
+                className="crm-mobile-menu-btn"
+                style={{
+                  marginRight: 'auto', alignItems: 'center', justifyContent: 'center',
+                  width: 32, height: 32, borderRadius: 8, border: 'none',
+                  backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer',
+                }}
+              >
+                <Menu size={20} />
+              </button>
               <LanguageSwitcher />
             </header>
             <main style={{ flex: 1, overflow: 'auto', backgroundColor: 'var(--crm-background)' }}>

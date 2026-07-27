@@ -8,16 +8,19 @@ import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
   LayoutGrid, Users2, ClipboardList, BarChart3, Users, LogOut, Trophy,
-  LayoutDashboard, Play, History, Headphones, Settings2, Handshake, UploadCloud,
+  LayoutDashboard, Play, History, Headphones, Settings2, Handshake, UploadCloud, X,
 } from 'lucide-react'
 import { AreaBadge } from '@/components/ui/AreaBadge'
 import type { UserWithArea } from '@/contexts/UserContext'
 
 interface Props {
   user: UserWithArea | null
+  /** Mobile slide-in drawer state — irrelevant at tablet/desktop widths, where the sidebar is always visible regardless of this prop. */
+  mobileOpen?: boolean
+  onCloseMobile?: () => void
 }
 
-export function Sidebar({ user }: Props) {
+export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
   const t = useTranslations('nav')
   const locale = useLocale()
   const pathname = usePathname()
@@ -78,6 +81,7 @@ export function Sidebar({ user }: Props) {
 
   return (
     <aside
+      className={`crm-sidebar${mobileOpen ? ' crm-sidebar-open' : ''}`}
       style={{
         width: collapsed ? 64 : 240,
         minWidth: collapsed ? 64 : 240,
@@ -91,9 +95,10 @@ export function Sidebar({ user }: Props) {
         overflow: 'visible',
       }}
     >
-      {/* Toggle button */}
+      {/* Toggle button — desktop/tablet only, mobile uses the drawer's own close button */}
       <button
         onClick={toggleCollapsed}
+        className="crm-hide-mobile"
         style={{
           position: 'absolute',
           right: -12,
@@ -112,6 +117,27 @@ export function Sidebar({ user }: Props) {
         }}
       >
         {collapsed ? '›' : '‹'}
+      </button>
+
+      {/* Close button — mobile drawer only */}
+      <button
+        onClick={onCloseMobile}
+        className="crm-mobile-menu-btn"
+        style={{
+          position: 'absolute',
+          right: 12,
+          top: 16,
+          width: 28, height: 28,
+          borderRadius: 8,
+          backgroundColor: 'transparent',
+          border: 'none',
+          color: 'var(--crm-text-muted)',
+          cursor: 'pointer',
+          alignItems: 'center', justifyContent: 'center',
+          zIndex: 10,
+        }}
+      >
+        <X size={18} />
       </button>
 
       {/* Logo */}
@@ -142,6 +168,7 @@ export function Sidebar({ user }: Props) {
               key={item.href}
               href={linkHref}
               prefetch={false}
+              onClick={onCloseMobile}
               title={collapsed ? item.label : undefined}
               style={{
                 display: 'flex',
@@ -187,6 +214,7 @@ export function Sidebar({ user }: Props) {
                   key={item.href}
                   href={`/${locale}${item.href}`}
                   prefetch={false}
+                  onClick={onCloseMobile}
                   title={collapsed ? item.label : undefined}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: 10,
@@ -221,6 +249,7 @@ export function Sidebar({ user }: Props) {
               <Link
                 href={fullHref}
                 prefetch={false}
+                onClick={onCloseMobile}
                 title={collapsed ? 'Partnerships' : undefined}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: 10,
