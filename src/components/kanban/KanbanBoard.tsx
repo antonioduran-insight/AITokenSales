@@ -50,6 +50,10 @@ export function KanbanBoard() {
   const [recentlyMovedId, setRecentlyMovedId] = useState<string | null>(null)
   const recentlyMovedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isInitialMount = useRef(true)
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const setCardRef = useCallback((id: string, node: HTMLDivElement | null) => {
+    cardRefs.current[id] = node
+  }, [])
 
   const isSdr = user?.role === 'sdr'
   const sdrAreaIds = sdrAreas.map(a => a.id)
@@ -191,6 +195,17 @@ export function KanbanBoard() {
     fetch(url).then(r => r.json()).then(setChatCounts).catch(() => {})
   }, [closedIds, isImpersonating, impersonateOrgId])
 
+  // Scroll the moved card into view — commitStatusChange doesn't reorder
+  // `prospects`, so the card can land anywhere in its new column (including
+  // fully outside the current scroll position in a long column), making the
+  // highlight itself invisible without this. Runs after the re-render that
+  // moved the card's ProspectCard instance into its new column, so the ref
+  // in cardRefs already points at the new node by the time this fires.
+  useEffect(() => {
+    if (!recentlyMovedId) return
+    cardRefs.current[recentlyMovedId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+  }, [recentlyMovedId])
+
   function handleDragStart({ active }: DragStartEvent) {
     setDraggingId(active.id as string)
   }
@@ -210,10 +225,13 @@ export function KanbanBoard() {
     }
 
     // Transient highlight on the card's new column so it's clear where it
-    // landed instead of just disappearing and reappearing (F13).
+    // landed instead of just disappearing and reappearing (F13). Scrolling
+    // it into view (below, via the recentlyMovedId effect) is what actually
+    // makes this visible in a long column — the highlight alone did nothing
+    // if the card landed outside the current scroll position.
     setRecentlyMovedId(prospect.id)
     if (recentlyMovedTimeoutRef.current) clearTimeout(recentlyMovedTimeoutRef.current)
-    recentlyMovedTimeoutRef.current = setTimeout(() => setRecentlyMovedId(null), 1800)
+    recentlyMovedTimeoutRef.current = setTimeout(() => setRecentlyMovedId(null), 2200)
 
     await logAuditEvent({
       event_type: 'status_changed',
@@ -437,6 +455,7 @@ export function KanbanBoard() {
                   onCardClick={handleCardClick}
                   chatCounts={status === 'closed' ? chatCounts : undefined}
                   recentlyMovedId={recentlyMovedId}
+                  setCardRef={setCardRef}
                 />
               )
             })}

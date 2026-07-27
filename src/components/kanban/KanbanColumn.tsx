@@ -15,6 +15,8 @@ interface Props {
   chatCounts?: Record<string, number>
   /** Prospect id that just landed in a new column — briefly highlighted. */
   recentlyMovedId?: string | null
+  /** Captures each card's DOM node so KanbanBoard can scroll a moved card into view. */
+  setCardRef?: (id: string, node: HTMLDivElement | null) => void
 }
 
 const COLUMN_ACCENT: Record<OutreachStatus, string> = {
@@ -29,7 +31,7 @@ const COLUMN_ACCENT: Record<OutreachStatus, string> = {
 
 const TERMINAL: OutreachStatus[] = ['closed', 'nurture']
 
-export function KanbanColumn({ status, label, color, prospects, onCardClick, chatCounts, recentlyMovedId }: Props) {
+export function KanbanColumn({ status, label, color, prospects, onCardClick, chatCounts, recentlyMovedId, setCardRef }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: status })
   const isTerminal = TERMINAL.includes(status)
   const accent = color ?? COLUMN_ACCENT[status]
@@ -97,6 +99,7 @@ export function KanbanColumn({ status, label, color, prospects, onCardClick, cha
             onClick={onCardClick}
             missingConversation={!!chatCounts && (chatCounts[p.id] ?? 0) === 0}
             justMoved={p.id === recentlyMovedId}
+            cardRef={setCardRef ? node => setCardRef(p.id, node) : undefined}
           />
         ))}
         {prospects.length === 0 && (

@@ -18,9 +18,11 @@ interface Props {
   missingConversation?: boolean
   /** Just landed in this column — briefly highlighted so the move is visible (F13). */
   justMoved?: boolean
+  /** Lets KanbanBoard capture this card's DOM node to scroll it into view on move. */
+  cardRef?: (node: HTMLDivElement | null) => void
 }
 
-export function ProspectCard({ prospect, onClick, isDragOverlay = false, missingConversation = false, justMoved = false }: Props) {
+export function ProspectCard({ prospect, onClick, isDragOverlay = false, missingConversation = false, justMoved = false, cardRef }: Props) {
   const t = useTranslations('convertidos')
   const comboLabels = useComboLabels()
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -40,27 +42,36 @@ export function ProspectCard({ prospect, onClick, isDragOverlay = false, missing
 
   return (
     <div
-      ref={setNodeRef}
+      ref={node => { setNodeRef(node); cardRef?.(node) }}
+      data-prospect-id={prospect.id}
       style={style}
       {...attributes}
       {...listeners}
       onClick={e => {
+        // TEMP diagnostic — investigating a report that clicking a card
+        // doesn't open the drawer. Remove once the cause is confirmed.
+        console.log('[Kanban click diag]', { prospectId: prospect.id, isDragging })
         e.stopPropagation()
         if (!isDragging) onClick(prospect)
       }}
     >
       <div
         style={{
-          backgroundColor: 'var(--crm-surface)',
-          border: `1px solid ${justMoved ? 'var(--crm-accent)' : 'var(--crm-border)'}`,
+          // A stronger green tint (distinct from the purple accent used for
+          // hover/selection below) plus a higher-opacity ring — the previous
+          // 19%-opacity ring was too subtle to notice, especially in a
+          // long column where the card might not even be in view (that part
+          // is handled by KanbanBoard's scrollIntoView on move).
+          backgroundColor: justMoved ? '#22C55E1A' : 'var(--crm-surface)',
+          border: `1px solid ${justMoved ? '#22C55E' : 'var(--crm-border)'}`,
           borderRadius: 8,
           padding: '14px',
           marginBottom: 8,
-          transition: 'border-color 0.15s, box-shadow 1.6s ease-out',
-          boxShadow: isDragOverlay ? '0 8px 24px rgba(0,0,0,0.5)' : justMoved ? '0 0 0 3px #6C63FF30' : '0 0 0 0px transparent',
+          transition: 'background-color 0.2s ease-out, border-color 0.2s ease-out, box-shadow 0.2s ease-out',
+          boxShadow: isDragOverlay ? '0 8px 24px rgba(0,0,0,0.5)' : justMoved ? '0 0 0 3px #22C55E80' : '0 0 0 0px transparent',
         }}
         onMouseEnter={e => !isDragOverlay && ((e.currentTarget as HTMLElement).style.borderColor = 'var(--crm-accent)')}
-        onMouseLeave={e => !isDragOverlay && ((e.currentTarget as HTMLElement).style.borderColor = 'var(--crm-border)')}
+        onMouseLeave={e => !isDragOverlay && ((e.currentTarget as HTMLElement).style.borderColor = justMoved ? '#22C55E' : 'var(--crm-border)')}
       >
         {/* Top row: flag + name */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
