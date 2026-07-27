@@ -152,6 +152,20 @@ For each feature, verify behavior for all applicable roles:
 - [ ] Individual candidate cards (checkbox / name+badge+LinkedIn link / actions) already wrap (pre-existing) — confirm no regression
 - [ ] Delete-seed-list confirm modal fits within the viewport on phone width (already capped at `90vw`) — confirm no regression
 
+### Convertidos / Audit / Stats / Support (mobile + tablet) — Block 3
+
+- [ ] Convertidos: closed-deal cards grid no longer forces a fixed 340px-minimum column — on phone width it renders one full-width column instead of overflowing horizontally (this was a real bug: `minmax(340px, 1fr)` guarantees overflow below ~388px viewport width; fixed with `minmax(min(340px, 100%), 1fr)`)
+- [ ] Convertidos: search/filter/clear-filters row wraps onto multiple lines with the refresh button staying on its own line via `justify-content: space-between`, instead of the old bare `flex: 1` spacer (which doesn't wrap predictably — same lesson as Kanban's header)
+- [ ] Convertidos: the "N without chat / N with chats" stat pills wrap instead of overflowing
+- [ ] Audit Log: the time-range pill group (All time / Today / This week / This month) scrolls horizontally on narrow phones instead of clipping the later buttons off-screen (previously `overflow: hidden` silently cut them)
+- [ ] Audit Log: header row (title + refresh/export buttons) wraps instead of overflowing
+- [ ] Stats: the Conversion Rate section (Global / By SDR / By Area cards, previously a fixed `200px 1fr 1fr` grid) stacks into one column on phone width
+- [ ] Stats: the Pipeline Funnel / Temperature+Area section (previously a fixed `1fr 1fr` grid) stacks into one column on phone width
+- [ ] Stats: the SDR Performance table scrolls horizontally within its own container instead of overflowing the page — it had no scroll wrapper before this pass
+- [ ] Support: ticket list header row and each ticket's summary row (Subject / Priority / Status / Created by / Date / chevron — a fixed-width grid) scroll horizontally instead of overflowing badly off-screen; this was the worst offender found this pass (400px+ of fixed-width columns with zero scroll protection)
+- [ ] Support: expanding a ticket, replying, and changing status still work normally after the summary row's scroll wrapper was added
+- [ ] Support: New Ticket modal still fits the viewport on phone width (already capped at `92vw`) — confirm no regression
+
 ### Settings (mobile + tablet) — Block 3
 
 - [ ] Tab strip (Organization / Plan & Usage / Scraper) scrolls horizontally on narrow phones instead of wrapping — the connected underline strip look is preserved, no tab clips off-screen

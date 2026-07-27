@@ -25,7 +25,7 @@ interface ClosedProspect {
 
 const S: Record<string, React.CSSProperties> = {
   page: { padding: '20px 24px', color: 'var(--crm-text-primary)', height: '100%', display: 'flex', flexDirection: 'column' },
-  header: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' as const },
+  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16, flexWrap: 'wrap' as const },
   input: { backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 6, color: 'var(--crm-text-primary)', padding: '7px 10px 7px 32px', fontSize: 13, width: 220, outline: 'none' },
   select: { backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 6, color: 'var(--crm-text-primary)', padding: '7px 10px', fontSize: 13 },
   textarea: { width: '100%', backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 6, padding: '8px 10px', color: 'var(--crm-text-primary)', fontSize: 13, resize: 'vertical' as const, outline: 'none', fontFamily: 'inherit', lineHeight: 1.5, boxSizing: 'border-box' as const },
@@ -182,7 +182,7 @@ export function ConvertidosPage() {
 
         {/* Stats bar */}
         {prospects.length > 0 && (
-          <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
             <div style={{ padding: '6px 14px', borderRadius: 6, backgroundColor: '#EF444415', border: '1px solid #EF444430', fontSize: 12, color: '#EF4444', fontWeight: 600 }}>
               {withoutChat} {t('noChat')}
             </div>
@@ -193,30 +193,30 @@ export function ConvertidosPage() {
         )}
 
         <div style={S.header}>
-          <div style={{ position: 'relative' }}>
-            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--crm-text-muted)' }} />
-            <input
-              style={S.input}
-              placeholder={t('searchPlaceholder')}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' as const }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--crm-text-muted)' }} />
+              <input
+                style={S.input}
+                placeholder={t('searchPlaceholder')}
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+
+            {isAdmin && (
+              <select value={filterSdr} onChange={e => setFilterSdr(e.target.value)} style={S.select}>
+                <option value="">{t('allSdrs')}</option>
+                {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+              </select>
+            )}
+
+            {(search || filterSdr) && (
+              <button onClick={() => { setSearch(''); setFilterSdr('') }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer', fontSize: 12 }}>
+                <X size={12} /> {tc('clearFilters')}
+              </button>
+            )}
           </div>
-
-          {isAdmin && (
-            <select value={filterSdr} onChange={e => setFilterSdr(e.target.value)} style={S.select}>
-              <option value="">{t('allSdrs')}</option>
-              {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
-            </select>
-          )}
-
-          {(search || filterSdr) && (
-            <button onClick={() => { setSearch(''); setFilterSdr('') }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer', fontSize: 12 }}>
-              <X size={12} /> {tc('clearFilters')}
-            </button>
-          )}
-
-          <div style={{ flex: 1 }} />
 
           <button onClick={fetchProspects} disabled={loading} style={{ padding: '7px 8px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
             <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
@@ -230,7 +230,7 @@ export function ConvertidosPage() {
         {!loading && prospects.length === 0 && <div style={{ textAlign: 'center', color: 'var(--crm-text-muted)', padding: 40 }}>{t('noData')}</div>}
 
         {!loading && prospects.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(340px, 100%), 1fr))', gap: 10 }}>
             {prospects.map(p => {
               const hasChat = p.chatCount > 0
               return (

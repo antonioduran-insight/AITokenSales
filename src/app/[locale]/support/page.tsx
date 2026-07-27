@@ -184,7 +184,7 @@ export default function SupportPage() {
 
   return (
     <div style={S.page}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 10, marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>Support</h1>
           <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
@@ -227,12 +227,14 @@ export default function SupportPage() {
 
       {/* Table header */}
       {filtered.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1fr 100px 100px 140px 80px' : '1fr 100px 100px 80px', gap: 12, padding: '8px 16px', marginBottom: 4 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Subject</span>
-          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Priority</span>
-          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</span>
-          {isAdmin && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Created by</span>}
-          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</span>
+        <div style={{ overflowX: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1fr 100px 100px 140px 80px' : '1fr 100px 100px 80px', gap: 12, padding: '8px 16px', marginBottom: 4, minWidth: isAdmin ? 620 : 480 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Subject</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Priority</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</span>
+            {isAdmin && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Created by</span>}
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</span>
+          </div>
         </div>
       )}
 
@@ -253,25 +255,27 @@ export default function SupportPage() {
         return (
           <div key={ticket.id} style={S.card}>
             {/* Row */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: isAdmin ? '1fr 100px 100px 140px 80px 20px' : '1fr 100px 100px 80px 20px',
-                gap: 12, alignItems: 'center', cursor: 'pointer',
-              }}
-              onClick={() => setExpandedId(isExpanded ? null : ticket.id)}
-            >
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--crm-text-primary)' }}>{ticket.subject}</div>
-                <div style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 2 }}>
-                  {ticket.messages.length} message{ticket.messages.length !== 1 ? 's' : ''}
+            <div style={{ overflowX: 'auto' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: isAdmin ? '1fr 100px 100px 140px 80px 20px' : '1fr 100px 100px 80px 20px',
+                  gap: 12, alignItems: 'center', cursor: 'pointer', minWidth: isAdmin ? 660 : 520,
+                }}
+                onClick={() => setExpandedId(isExpanded ? null : ticket.id)}
+              >
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--crm-text-primary)' }}>{ticket.subject}</div>
+                  <div style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 2 }}>
+                    {ticket.messages.length} message{ticket.messages.length !== 1 ? 's' : ''}
+                  </div>
                 </div>
+                <Badge label={ticket.priority} color={PRIORITY_COLORS[ticket.priority] ?? '#6B7280'} />
+                <Badge label={ticket.status.replace('_', ' ')} color={STATUS_COLORS[ticket.status] ?? 'var(--crm-text-muted)'} />
+                {isAdmin && <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{createdByName}</span>}
+                <span style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{new Date(ticket.created_at).toLocaleDateString()}</span>
+                {isExpanded ? <ChevronUp size={14} color="var(--crm-text-muted)" /> : <ChevronDown size={14} color="var(--crm-text-muted)" />}
               </div>
-              <Badge label={ticket.priority} color={PRIORITY_COLORS[ticket.priority] ?? '#6B7280'} />
-              <Badge label={ticket.status.replace('_', ' ')} color={STATUS_COLORS[ticket.status] ?? 'var(--crm-text-muted)'} />
-              {isAdmin && <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{createdByName}</span>}
-              <span style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{new Date(ticket.created_at).toLocaleDateString()}</span>
-              {isExpanded ? <ChevronUp size={14} color="var(--crm-text-muted)" /> : <ChevronDown size={14} color="var(--crm-text-muted)" />}
             </div>
 
             {/* Expanded thread */}

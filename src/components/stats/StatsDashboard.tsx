@@ -200,7 +200,7 @@ export function StatsDashboard() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr 1fr', gap: 14, marginBottom: 28 }}>
+        <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '200px 1fr 1fr', gap: 14, marginBottom: 28 }}>
 
           {/* Card 1 — Global */}
           <div style={{ ...S.bigCard, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
@@ -332,7 +332,7 @@ export function StatsDashboard() {
       </div>
 
       {/* ── SECTION 3: Pipeline Funnel + Temperature ───────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+      <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
         {/* Funnel by status */}
         <div style={S.card}>
           <div style={S.sectionTitle}>{t('pipelineFunnel')}</div>
@@ -399,7 +399,8 @@ export function StatsDashboard() {
         <PremiumFeature plan={orgPlan} requiredPlan="premium" featureName="SDR Performance is a Premium feature">
           <div style={S.card}>
             <div style={S.sectionTitle}>{t('sdrPerformance')}</div>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', minWidth: 480, borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   <th style={S.th}>{t('sdrName')}</th>
@@ -434,6 +435,7 @@ export function StatsDashboard() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </PremiumFeature>
       )}

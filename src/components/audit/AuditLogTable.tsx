@@ -156,7 +156,7 @@ export function AuditLogTable() {
     <PremiumFeature plan={orgPlan} requiredPlan="premium" featureName="Audit Log is available from Premium plan">
     <div style={S.page}>
       <div style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 8, marginBottom: 14 }}>
           <h1 style={{ fontSize: 20, fontWeight: 700 }}>{t('title')}</h1>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={fetchLogs} style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
@@ -192,7 +192,7 @@ export function AuditLogTable() {
 
         {/* Filters row 2: Time buttons + Limit dropdown */}
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', border: '1px solid var(--crm-border)', borderRadius: 7, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', border: '1px solid var(--crm-border)', borderRadius: 7, overflowX: 'auto' }}>
             {([
               { key: 'all', label: 'All time' },
               { key: 'today', label: 'Today' },
