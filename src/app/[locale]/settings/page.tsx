@@ -5,10 +5,9 @@ import { createClient } from '@/lib/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { useUser } from '@/contexts/UserContext'
-import { Plus, Trash2, X } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { OrgMarketsSettings } from '@/components/markets/OrgMarketsSettings'
-import type { Organization, PipelineStage, OrganizationAddon, ScraperComboMaster, User, SenderProfile } from '@/lib/types'
-import { OUTREACH_STATUSES } from '@/lib/types'
+import type { Organization, OrganizationAddon, ScraperComboMaster, User, SenderProfile } from '@/lib/types'
 
 const PLAN_COLORS: Record<string, string> = {
   basic: '#3B82F6',
@@ -221,118 +220,7 @@ function OrgTab() {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Tab 2 — Pipeline
-// ────────────────────────────────────────────────────────────────────────────
-function PipelineTab() {
-  const [stages, setStages] = useState<PipelineStage[]>([])
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [pendingChanges, setPendingChanges] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    fetch('/api/settings/pipeline-stages')
-      .then(r => r.json())
-      .then((d: PipelineStage[]) => {
-        // Always render in canonical funnel order — the stage's own
-        // `position` is a legacy column with no effect on the Kanban anymore
-        // (see FUNC-F8 in CLAUDE.md), so it's not used for display order.
-        const sorted = [...d].sort(
-          (a, b) => OUTREACH_STATUSES.indexOf(a.outreach_status) - OUTREACH_STATUSES.indexOf(b.outreach_status)
-        )
-        setStages(sorted)
-        setLoading(false)
-      })
-  }, [])
-
-  async function saveChanges() {
-    setSaving(true); setPendingChanges(false)
-    const payload = stages.map(s => ({ id: s.id, name: s.name, color: s.color }))
-    const res = await fetch('/api/settings/pipeline-stages', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ stages: payload }),
-    })
-    if (res.ok) {
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    } else {
-      const d = await res.json()
-      setError(d.error)
-    }
-    setSaving(false)
-  }
-
-  function updateStage(id: string, field: 'name' | 'color', value: string) {
-    setStages(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s))
-    setPendingChanges(true)
-  }
-
-  if (loading) return <div style={{ color: 'var(--crm-text-muted)', padding: 40, textAlign: 'center' }}>Loading…</div>
-
-  return (
-    <div>
-      <div style={S.card}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <p style={{ ...S.sectionTitle, marginBottom: 0 }}>Pipeline Stages</p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {saving && <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>Saving…</span>}
-            {saved && !saving && <span style={{ fontSize: 11, color: '#22C55E' }}>✓ Saved</span>}
-            <button
-              onClick={saveChanges}
-              disabled={saving || !pendingChanges}
-              style={{ ...S.btn, padding: '6px 16px', fontSize: 12, opacity: pendingChanges ? 1 : 0.4, cursor: pendingChanges ? 'pointer' : 'default' }}
-            >
-              Save Changes
-            </button>
-          </div>
-        </div>
-        <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginBottom: 16 }}>
-          Rename and recolor each stage. Order follows the sales funnel and isn&apos;t editable — every org always has exactly one stage per status, so a lead never ends up ambiguous about which Kanban column it belongs to.
-        </p>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {stages.map(stage => (
-            <div
-              key={stage.id}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 12px',
-                backgroundColor: 'var(--crm-surface-raised)',
-                border: '1px solid var(--crm-border)', borderRadius: 8,
-              }}
-            >
-              <input
-                type="color"
-                value={stage.color}
-                onChange={e => updateStage(stage.id, 'color', e.target.value)}
-                style={{ width: 28, height: 28, border: 'none', borderRadius: 4, cursor: 'pointer', padding: 0, backgroundColor: 'transparent' }}
-                title="Stage color"
-              />
-              <input
-                value={stage.name}
-                onChange={e => updateStage(stage.id, 'name', e.target.value)}
-                style={{ flex: 1, backgroundColor: 'transparent', border: 'none', color: 'var(--crm-text-primary)', fontSize: 13, outline: 'none' }}
-              />
-              <span style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontFamily: 'monospace' }}>{stage.outreach_status}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {error && (
-        <div style={{ color: '#EF4444', fontSize: 13, backgroundColor: '#3A1A1A', border: '1px solid #EF444430', borderRadius: 7, padding: '10px 14px', display: 'flex', justifyContent: 'space-between' }}>
-          {error}
-          <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444' }}><X size={13} /></button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Tab 3 — Plan & Usage
+// Tab 2 — Plan & Usage
 // ────────────────────────────────────────────────────────────────────────────
 interface PlanData {
   org: Organization & { custom_price?: number | null }
@@ -821,7 +709,6 @@ function ScraperTab() {
 // ────────────────────────────────────────────────────────────────────────────
 const TABS = [
   { key: 'organization', label: 'Organization' },
-  { key: 'pipeline',     label: 'Pipeline' },
   { key: 'plan',         label: 'Plan & Usage' },
   { key: 'scraper',      label: 'Scraper' },
 ]
@@ -876,7 +763,6 @@ function SettingsContent() {
       </div>
 
       {tab === 'organization' && <OrgTab />}
-      {tab === 'pipeline'     && <PipelineTab />}
       {tab === 'plan'         && <PlanTab />}
       {tab === 'scraper'      && <ScraperTab />}
     </div>

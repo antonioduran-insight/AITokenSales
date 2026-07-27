@@ -179,7 +179,7 @@ The Kanban board shows all prospects as cards organized by outreach status.
 | Closed | Deal won |
 | Nurture | Long-term drip |
 
-Pipeline stage names and colors can be customized per org in **Settings → Pipeline**.
+Stage names and colors are set per org directly in the database — there is no in-app editor for this anymore.
 
 ---
 
@@ -401,17 +401,6 @@ Below the General card, the **Markets** section lists every country the platform
 - Click **Save Markets** (this section has its own save button)
 
 These markets are what appear when starting a scraper run or building a Bridge seed list. **If you don't select any, New Run and Bridge will show "No markets configured" with a link back here.**
-
-### Pipeline Tab
-
-Customize the Kanban stage names and colors:
-- Drag stages to reorder
-- Edit the name inline
-- Click the color chip to change the color
-- Click **+ Add Stage** to create a new column
-- Click the trash icon (🗑️, shown on **every** stage) to delete it
-
-Deleting a stage is blocked while prospects are still in it — you'll see an error telling you how many need moving first. This is checked both in the browser and on the server.
 
 ### Plan & Usage Tab
 

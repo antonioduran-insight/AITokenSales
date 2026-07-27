@@ -97,9 +97,11 @@ Moving a lead to **Closed** — by dragging it in Kanban, or via the status drop
 
 `GET /api/conversations/counts` (which both drive) is now session-authenticated and org-scoped through `prospects`, not `conversations.organization_id` directly (that column isn't guaranteed populated on every row) — it previously had no auth check at all.
 
-### Kanban ↔ Leads pipeline stages, fixed mapping (FUNC-F8)
+### Kanban ↔ Leads pipeline stages, fixed mapping (FUNC-F8) — then the editor was removed entirely
 
-`pipeline_stages` used to map to `outreach_status` purely by array position, and the write path (drag-reorder) and read path (Kanban's column lookup) disagreed on whether that position was 0- or 1-indexed — so every org's Kanban column labels were silently shifted by one from what was actually configured, and nothing stopped an admin renaming two different columns to the same label or leaving one unlabeled. Fixed with an explicit `pipeline_stages.outreach_status` column, unique per org: every org now always has exactly one stage per status, `name`/`color` stay freely editable in Settings → Pipeline, but there's no more add/delete/reorder — those were exactly the operations that let the mapping drift. See `supabase/migrations/20260726_pipeline_stage_status_mapping.sql` (**run by hand, in two steps** — it backfills the new column by rank rather than assuming the old broken position data, since custom labels may already be attached to the wrong status).
+`pipeline_stages` used to map to `outreach_status` purely by array position, and the write path (drag-reorder) and read path (Kanban's column lookup) disagreed on whether that position was 0- or 1-indexed — so every org's Kanban column labels were silently shifted by one from what was actually configured, and nothing stopped an admin renaming two different columns to the same label or leaving one unlabeled. Fixed with an explicit `pipeline_stages.outreach_status` column, unique per org: every org now always has exactly one stage per status. See `supabase/migrations/20260726_pipeline_stage_status_mapping.sql` (**run by hand, in two steps** — it backfills the new column by rank rather than assuming the old broken position data, since custom labels may already be attached to the wrong status).
+
+Once that fix landed, the Settings → Pipeline editor (rename/recolor stages) was judged no longer worth keeping — the 7 fixed Kanban columns already cover everything needed — and was **removed entirely**: the Settings tab, the `PipelineTab` component, and `/api/settings/pipeline-stages` (both GET and PATCH) are gone. `pipeline_stages` the **table** stays — Kanban still reads `name`/`color`/`outreach_status` from it directly via the browser Supabase client to render whatever labels/colors an org already had configured — there's just no UI left to change them anymore. A future rename would need a direct DB edit.
 
 ### Route-level SDR gating for admin-only pages (FUNC-F12)
 
@@ -136,7 +138,7 @@ Moving a lead to **Closed** — by dragging it in Kanban, or via the status drop
 ## Features
 
 ### CRM
-- **Kanban Board** — drag-and-drop pipeline, area filter tabs, custom stage labels/colors per org
+- **Kanban Board** — drag-and-drop pipeline, area filter tabs, per-SDR filter (admin), per-org stage labels/colors (read-only — set once via direct DB edit, no in-app editor)
 - **Prospects Table** — full-text search, area/SDR/status/temperature filters, pagination, bulk delete, bulk SDR reassign, per-prospect drawer
 - **Prospect Drawer** — edit status, temperature, ICP score, notes, LinkedIn/email/company info, custom messages with copy button, flag for next-day follow-up
 - **Closed Deals** — dedicated view for `closed` prospects with conversation upload and chat count tracking
@@ -145,7 +147,7 @@ Moving a lead to **Closed** — by dragging it in Kanban, or via the status drop
 - **Audit Log** — immutable trail of all actions
 - **User Management** — create/deactivate/reactivate/unassign/delete SDRs (admin only)
 - **CSV Import Wizard** — 5-step flow: upload → area → column mapping → duplicate review → results
-- **Settings** — org name/language/logo/company context/blacklist, pipeline stage editor, plan & usage, scraper credentials & sender profiles, support tickets
+- **Settings** — org name/language/logo/company context/blacklist, plan & usage, scraper credentials & sender profiles, support tickets
 
 ### LinkedIn Scraper (admin only)
 - **New Run** — 3 phases: config (market, search strategies, lead count, one SDR) → animated progress → result with HOT/WARM/COLD breakdown, CSV download and detail link
@@ -348,7 +350,7 @@ prospects            -- Core lead: status, temperature, ICP score, messages, ass
 notes                -- Per-prospect timestamped notes
 conversations        -- Full chat logs per closed deal
 audit_log            -- Immutable action trail
-pipeline_stages      -- Customizable kanban columns per org
+pipeline_stages      -- Kanban column name/color per org, one row per outreach_status (read-only from the UI)
 organization_addons  -- Feature add-ons per org (incl. 'bridge')
 support_tickets      -- Support requests from org admins
 support_ticket_messages -- Thread messages per ticket
@@ -463,7 +465,6 @@ npm run lint         # ESLint
 | GET | `/api/organizations/[id]/markets` | own org | Markets this org activated |
 | PUT | `/api/organizations/[id]/markets` | admin (own org) | Sync the org's market selection |
 | GET | `/api/settings/addons` | any | Active add-on types for the caller's org |
-| GET/PATCH | `/api/settings/pipeline-stages` | admin | Rename/recolor the org's 7 fixed stages (one per `outreach_status`, no add/delete) |
 | GET/POST | `/api/support/tickets` | admin/sdr | Support tickets |
 
 ### Scraper

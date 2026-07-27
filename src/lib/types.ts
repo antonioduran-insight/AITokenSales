@@ -301,23 +301,6 @@ export interface RunSdrAssignment {
   user?: { full_name: string }
 }
 
-export interface PipelineStage {
-  id: string
-  organization_id: string
-  name: string
-  color: string
-  position: number
-  /**
-   * Fixed 1:1 mapping to the funnel status this stage represents — unique
-   * per org, not editable via the UI. `name`/`color` are the only editable
-   * fields; there is always exactly one stage row per `OutreachStatus`
-   * (see FUNC-F8 in CLAUDE.md for why this replaced positional inference).
-   */
-  outreach_status: OutreachStatus
-  is_default: boolean
-  created_at: string
-}
-
 export interface OrganizationAddon {
   id: string
   organization_id: string

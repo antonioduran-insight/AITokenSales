@@ -280,14 +280,7 @@ For each feature, verify behavior for all applicable roles:
 - [ ] Logo upload: select image file → uploads → preview shows new logo → URL auto-filled
 - [ ] Domain blacklist: domains blocked from CSV import and manual creation
 
-**Pipeline tab — CRITICAL (FUNC-F8 fix)**:
-- [ ] Exactly 7 stages shown, one per `outreach_status`, in fixed funnel order (New → Connection Sent → Connected → Replied → Demo Scheduled → Closed → Nurture) — no add button, no delete button, no drag handle
-- [ ] Each row shows its `outreach_status` key (read-only) next to the editable name/color
-- [ ] Rename a stage → Kanban column shows the new label for the **correct** status (not a neighboring one)
-- [ ] Recolor a stage → Kanban column border/accent updates to match
-- [ ] Renaming two different stages to the same label is allowed (it's just a display string) but each still drives its own distinct Kanban column — dragging a lead only ever changes `outreach_status`, never depends on the label
-- [ ] `PATCH /api/settings/pipeline-stages` with a stage id from another org → 404, no rows touched
-- [ ] Kanban never shows two columns for the same status, and never shows zero columns for a status — there are always exactly 7, because there's no operation left that can create or delete a stage row
+**Pipeline tab removed** — Settings no longer has a "Pipeline" tab at all (confirm it's absent from the tab bar). `/api/settings/pipeline-stages` no longer exists (`GET`/`PATCH` both 404). Kanban still shows each org's previously-configured stage names/colors, read from `pipeline_stages` directly — confirm those still render correctly (the 7 columns, in fixed funnel order, still show whatever custom label/color an org had set before the editor was removed) even with no way left in the UI to change them.
 
 **Plan & Usage tab**:
 - [ ] Shows correct plan name
@@ -445,10 +438,7 @@ For each feature, verify behavior for all applicable roles:
 
 - [ ] **Company Context** textarea saves with the existing Save Changes button and survives reload
 - [ ] Anthropic base URL ending in `/v1` is stored **without** the `/v1` (check the DB)
-- [ ] Pipeline: every stage has a delete button
-- [ ] Deleting a stage with prospects in it is blocked with a count message (test with the API directly too, not just the UI)
-- [ ] Deleting an empty stage works after confirmation
-- [ ] No duplicate stages render
+- [ ] No "Pipeline" tab in Settings anymore (removed entirely — see the "Pipeline tab removed" checklist above)
 - [ ] Logo upload succeeds (bucket `logos` must exist)
 
 ### User Management
