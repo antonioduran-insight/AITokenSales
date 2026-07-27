@@ -27,7 +27,11 @@ export async function GET(
     .eq('id', user.id)
     .single()
 
-  if (!userData?.organization_id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Scraper is admin-only (SDRs have no access at all) — org-membership
+  // alone let any org-mate poll a run's full details by id (QA-F35 audit).
+  if (!userData?.organization_id || (userData.role !== 'admin' && userData.role !== 'admin_global')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
   const { id } = await params
   const admin = adminClient()
@@ -79,7 +83,9 @@ export async function DELETE(
     .eq('id', user.id)
     .single()
 
-  if (!userData?.organization_id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!userData?.organization_id || (userData.role !== 'admin' && userData.role !== 'admin_global')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
   const { id } = await params
   const admin = adminClient()

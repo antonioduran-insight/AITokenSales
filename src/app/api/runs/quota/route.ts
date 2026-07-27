@@ -20,12 +20,14 @@ export async function GET() {
 
     const { data: userData } = await supabase
       .from('users')
-      .select('organization_id')
+      .select('organization_id, role')
       .eq('id', user.id)
       .single()
 
-    if (!userData?.organization_id) {
-      return NextResponse.json({ error: 'No organization' }, { status: 400 })
+    // Scraper is admin-only (SDRs have no access at all) — only caller is
+    // New Run, an admin-only page (QA-F35 audit).
+    if (!userData?.organization_id || (userData.role !== 'admin' && userData.role !== 'admin_global')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const admin = adminClient()

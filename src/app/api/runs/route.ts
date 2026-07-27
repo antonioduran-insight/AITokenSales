@@ -249,9 +249,17 @@ export async function GET() {
 
     const { data: userData } = await supabase
       .from('users')
-      .select('organization_id')
+      .select('organization_id, role')
       .eq('id', user.id)
       .single()
+
+    // QA-F35: this GET was missing the same role check POST/DELETE already
+    // have — a logged-in SDR could hit it directly and read the org's full
+    // scraper run history (executor, SDR assignments, lead counts, markets/
+    // combos used), bypassing the sidebar's cosmetic-only hiding of Scraper.
+    if (userData?.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const { data, error } = await supabase
       .from('runs')

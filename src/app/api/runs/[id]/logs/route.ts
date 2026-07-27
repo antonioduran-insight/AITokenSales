@@ -23,7 +23,11 @@ export async function GET(
     .eq('id', user.id)
     .single()
 
-  if (!userData?.organization_id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Scraper is admin-only (SDRs have no access at all) — org-membership
+  // alone let any org-mate read a run's live logs by id (QA-F35 audit).
+  if (!userData?.organization_id || (userData.role !== 'admin' && userData.role !== 'admin_global')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
   const { id: runId } = await params
   const admin = adminClient()
