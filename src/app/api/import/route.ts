@@ -121,13 +121,27 @@ export async function PUT(req: NextRequest) {
 
   const orgId = caller.organization_id ?? null
 
-  for (let i = 0; i < records.length; i += 100) {
-    const batch = records.slice(i, i + 100).map((r: Record<string, unknown>) => ({ ...r, organization_id: orgId }))
+  // Batches of 25 (not 100): when a batch hits a 23505 (a duplicate
+  // anywhere in it), every record in that batch falls back to an
+  // individual insert below — a smaller batch caps how much fallback work
+  // one conflict can trigger.
+  const BATCH_SIZE = 25
+  for (let i = 0; i < records.length; i += BATCH_SIZE) {
+    const batch = records.slice(i, i + BATCH_SIZE).map((r: Record<string, unknown>) => ({ ...r, organization_id: orgId }))
     const { error, data } = await admin.from('prospects').insert(batch).select('id')
     if (error) {
       if (error.code === '23505') {
-        for (const record of batch) {
-          const { error: e, data: d } = await admin.from('prospects').insert({ ...record, organization_id: orgId }).select('id')
+        // Insert this batch one row at a time so the non-conflicting rows
+        // still land — in parallel, not sequentially. A fully sequential
+        // fallback (one Supabase round trip after another, up to 100 of
+        // them) is what pushed a real import past the serverless function's
+        // time limit: the response got cut off mid-stream, the client saw
+        // "Unexpected end of JSON input", and the insert had already
+        // succeeded server-side by then.
+        const results = await Promise.all(
+          batch.map((record: Record<string, unknown>) => admin.from('prospects').insert(record).select('id'))
+        )
+        for (const { error: e, data: d } of results) {
           if (!e) {
             imported += d?.length ?? 0
           } else if (e.code === '23505') {

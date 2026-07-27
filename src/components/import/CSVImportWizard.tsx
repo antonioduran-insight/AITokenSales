@@ -145,6 +145,10 @@ export function CSVImportWizard() {
   const [importing, setImporting] = useState(false)
   const [results, setResults] = useState<{ imported: number; skipped: number; forced: number; errors: number; totalRows: number; skippedConstraint: number; blacklisted: number } | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
+  // True when the PUT request reached the server and got a response, but the
+  // body couldn't be read — we genuinely don't know how many records made it
+  // in, so `results` below must not be trusted/displayed as a normal outcome.
+  const [importUnknown, setImportUnknown] = useState(false)
 
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -290,6 +294,7 @@ export function CSVImportWizard() {
   async function runImportWithRows(targetRows: ParsedRow[]) {
     setImporting(true)
     let imported = 0, skipped = 0, forced = 0, skippedConstraint = 0
+    let statusUnknown = false
 
     const blacklistedRows = targetRows.filter(r => r.status === 'blacklisted')
     const toInsert = targetRows.filter(r => r.status !== 'error' && r.status !== 'blacklisted' && !r.skip)
@@ -326,24 +331,45 @@ export function CSVImportWizard() {
     })
 
     if (records.length > 0) {
+      let res: Response | null = null
       try {
-        const res = await fetch('/api/import', {
+        res = await fetch('/api/import', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ records }),
         })
-        const data = await res.json()
-        if (res.ok) {
-          imported = data.imported ?? 0
-          skippedConstraint = data.skippedConstraint ?? 0
-          if (data.errors?.length) setImportError(data.errors.join(', '))
-        } else {
-          setImportError(data.error ?? `HTTP ${res.status}`)
-          skipped += records.length
-        }
       } catch (e) {
+        // The request never got a response at all — safe to assume nothing
+        // was inserted server-side.
         setImportError(e instanceof Error ? e.message : 'Error de red')
         skipped += records.length
+      }
+
+      if (res) {
+        let data: { imported?: number; skippedConstraint?: number; errors?: string[]; error?: string } | null = null
+        try {
+          data = await res.json()
+        } catch {
+          // We got a response but couldn't read its body. The insert may
+          // already have completed server-side before the response got cut
+          // off (this is exactly what happened in a real incident: 4 leads
+          // were inserted, the client saw this same parse failure, and a
+          // blind retry with the same CSV made them look like a dedup bug
+          // the next time around). Never guess at counts here.
+          statusUnknown = true
+          setImportError('Import status unknown — check Leads before retrying.')
+        }
+
+        if (!statusUnknown && data) {
+          if (res.ok) {
+            imported = data.imported ?? 0
+            skippedConstraint = data.skippedConstraint ?? 0
+            if (data.errors?.length) setImportError(data.errors.join(', '))
+          } else {
+            setImportError(data.error ?? `HTTP ${res.status}`)
+            skipped += records.length
+          }
+        }
       }
     }
 
@@ -352,9 +378,11 @@ export function CSVImportWizard() {
       metadata: {
         imported, skipped, forced, errors: errorRows.length, total: targetRows.length, area: selectedArea,
         assigned_sdr: sdrs.find(s => s.id === selectedSdrId)?.full_name ?? null,
+        status_unknown: statusUnknown,
       },
     })
 
+    setImportUnknown(statusUnknown)
     setResults({ imported, skipped, forced, errors: errorRows.length, totalRows: targetRows.length, skippedConstraint, blacklisted: blacklistedRows.length })
     setImporting(false)
     setStep(5)
@@ -378,6 +406,7 @@ export function CSVImportWizard() {
     setRows([])
     setResults(null)
     setImportError(null)
+    setImportUnknown(false)
   }
 
   const newCount = rows.filter(r => r.status === 'new').length
@@ -723,8 +752,25 @@ export function CSVImportWizard() {
         </div>
       )}
 
-      {/* STEP 5: Results */}
-      {step === 5 && results && (
+      {/* STEP 5a: Results — unknown outcome (response body unreadable, insert
+          may already have happened server-side). Deliberately does NOT show
+          the normal imported/skipped counters below — those would read as
+          "0 imported", actively contradicting the fact that we don't know. */}
+      {step === 5 && results && importUnknown && (
+        <div style={{ ...S.card, textAlign: 'center' }}>
+          <AlertTriangle size={52} color="#F59E0B" style={{ margin: '0 auto 16px' }} />
+          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Import status unknown</h2>
+          <div style={{ padding: '12px 16px', backgroundColor: '#F59E0B15', border: '1px solid #F59E0B40', borderRadius: 8, marginBottom: 20, fontSize: 13, color: 'var(--crm-text-secondary)', textAlign: 'left', lineHeight: 1.6 }}>
+            {importError} The request reached the server but the response didn&apos;t come back properly, so we can&apos;t confirm whether these {results.totalRows} rows were saved — please check Leads before re-uploading this CSV.
+          </div>
+          <Button onClick={resetWizard} style={{ backgroundColor: 'var(--crm-accent)', color: '#FFF' }}>
+            {t('importAnother')}
+          </Button>
+        </div>
+      )}
+
+      {/* STEP 5b: Results — normal outcome */}
+      {step === 5 && results && !importUnknown && (
         <div style={{ ...S.card, textAlign: 'center' }}>
           <CheckCircle size={52} color={results.imported > 0 ? '#22C55E' : 'var(--crm-text-muted)'} style={{ margin: '0 auto 16px' }} />
           <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>{t('importComplete')}</h2>
