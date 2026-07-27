@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { cleanScrapedName } from './clean-name'
+import { normalizeAreaName, inferAreaFromCountry, buildMarketAreaMap } from './area-inference'
 
 /**
  * Core "push a run's scraper leads onto an SDR's kanban board" logic, shared
@@ -47,7 +48,7 @@ export async function assignRunLeads({
   // Verify run belongs to org
   const { data: run } = await admin
     .from('runs')
-    .select('id, organization_id')
+    .select('id, organization_id, region')
     .eq('id', runId)
     .single()
 
@@ -84,7 +85,33 @@ export async function assignRunLeads({
   if (!sdrRow) {
     return { ok: false, status: 400, error: 'SDR not found in this organization' }
   }
-  const sdrAreaId: string | null = sdrRow.area_id ?? null
+
+  // QA-F25: a multi-region SDR's board is picked by the run's actual
+  // market, not the SDR's static primary area — `sdrRow.area_id` used to be
+  // used directly here, which silently misfiled every run for any SDR
+  // covering more than one region. `runs.region` is the region explicitly
+  // chosen in New Run's Phase 1 (the authoritative source — every market in
+  // `assignedMarkets` was picked FROM that one region), so prefer it; fall
+  // back to inferring from the first assigned market (via the same
+  // market→area map New Run itself uses) only for older runs that predate
+  // the `region` column, then to the SDR's own area as a last resort so a
+  // lead is never left with no area at all.
+  let resolvedAreaName = normalizeAreaName(run.region)
+  if (!resolvedAreaName && assignedMarkets.length > 0) {
+    const { data: marketRows } = await admin.from('markets').select('id, name, region')
+    const marketAreaMap = buildMarketAreaMap(marketRows ?? [])
+    resolvedAreaName = inferAreaFromCountry(assignedMarkets[0], marketAreaMap)
+  }
+
+  let sdrAreaId: string | null = sdrRow.area_id ?? null
+  if (resolvedAreaName) {
+    const { data: areaRow } = await admin
+      .from('areas')
+      .select('id')
+      .eq('name', resolvedAreaName)
+      .maybeSingle()
+    if (areaRow) sdrAreaId = areaRow.id
+  }
 
   const leadUrls = [...new Set(leads.map(l => l.linkedin_url).filter(Boolean))] as string[]
   const existingKeys = new Set<string>()
