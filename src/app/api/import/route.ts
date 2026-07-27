@@ -105,6 +105,20 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const caller = await getCallerProfile()
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Defense in depth (QA-F4) — impersonation is a client-side-only URL
+  // convention (?impersonate_org_id=...), never a server-side session flag,
+  // so a client-supplied impersonate_org_id can't be trusted as the check.
+  // What's actually verifiable server-side: only org-scoped roles (admin,
+  // sdr) have a real organization_id; admin_global/support always have
+  // organization_id = null, whether or not they're currently impersonating.
+  // Without this, a caller with a null org_id (e.g. an admin_global mid-
+  // impersonation, since the wizard never used to block this) would insert
+  // prospects with organization_id: null — orphaned rows invisible to
+  // every org's RLS-scoped queries. This blocks that at the source instead
+  // of trying to detect "impersonating" specifically.
+  if (!caller.organization_id) {
+    return NextResponse.json({ error: 'Import is not available for this account.' }, { status: 403 })
+  }
 
   const { records } = await req.json()
   if (!Array.isArray(records) || records.length === 0) {

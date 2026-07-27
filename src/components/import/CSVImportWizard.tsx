@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
 import { useUser } from '@/contexts/UserContext'
+import { useOrgId } from '@/lib/hooks/useOrgId'
 import { Button } from '@/components/ui/button'
 import { UploadCloud, CheckCircle, ChevronRight, ChevronLeft, SkipForward, AlertTriangle } from 'lucide-react'
 import Papa from 'papaparse'
@@ -90,6 +91,7 @@ const S: Record<string, React.CSSProperties> = {
 
 export function CSVImportWizard() {
   const { user, isAdmin } = useUser()
+  const { isImpersonating } = useOrgId()
   const t = useTranslations('import')
   const tc = useTranslations('common')
 
@@ -189,6 +191,9 @@ export function CSVImportWizard() {
   }
 
   function handleFile(file: File) {
+    // Belt-and-suspenders with the disabled dropzone below — never let a
+    // drag-and-drop bypass the disabled file input (QA-F4).
+    if (isImpersonating) return
     if (!file.name.endsWith('.csv')) return
     if (file.size > 5 * 1024 * 1024) return
     setUploadError(null)
@@ -445,6 +450,12 @@ export function CSVImportWizard() {
         <h1 style={{ fontSize: 22, fontWeight: 700 }}>{t('title')}</h1>
       </div>
 
+      {isImpersonating && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, backgroundColor: '#1C1410', border: '1px solid #F59E0B', borderRadius: 10, padding: '10px 16px', marginBottom: 20, fontSize: 13, color: '#FCD34D' }}>
+          👁 Import is disabled while viewing in read-only mode.
+        </div>
+      )}
+
       {/* Step indicator — scrolls horizontally instead of wrapping so the
           connected step/line look survives narrow phones */}
       <div style={{ overflowX: 'auto', marginBottom: 28 }}>
@@ -490,17 +501,18 @@ export function CSVImportWizard() {
               border: `2px dashed ${dragOver ? 'var(--crm-accent)' : 'var(--crm-border)'}`,
               backgroundColor: dragOver ? '#6C63FF08' : 'var(--crm-surface)',
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              minHeight: 240, cursor: 'pointer', transition: 'all 0.2s',
+              minHeight: 240, cursor: isImpersonating ? 'not-allowed' : 'pointer', transition: 'all 0.2s',
+              opacity: isImpersonating ? 0.5 : 1,
             }}
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+            onClick={() => { if (!isImpersonating) fileInputRef.current?.click() }}
+            onDragOver={e => { e.preventDefault(); if (!isImpersonating) setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
-            onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
+            onDrop={e => { e.preventDefault(); setDragOver(false); if (isImpersonating) return; const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
           >
             <UploadCloud size={44} color={dragOver ? 'var(--crm-accent)' : 'var(--crm-text-muted)'} />
             <p style={{ marginTop: 14, fontSize: 16, color: 'var(--crm-text-primary)', fontWeight: 500 }}>{t('dropzone')}</p>
             <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 6 }}>{t('csvOnly')} · {t('maxSize')}</p>
-            <input ref={fileInputRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+            <input ref={fileInputRef} type="file" accept=".csv" disabled={isImpersonating} style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
           </div>
         </>
       )}

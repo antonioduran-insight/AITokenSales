@@ -69,7 +69,7 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
   const navItems = [
     { href: '/kanban', label: t('kanban'), icon: LayoutGrid, always: true },
     { href: '/prospects', label: t('prospects'), icon: Users2, always: true },
-    { href: '/import', label: 'Import', icon: UploadCloud, always: true },
+    { href: '/import', label: 'Import', icon: UploadCloud, always: true, hideWhenImpersonating: true },
     { href: '/convertidos', label: t('convertidos'), icon: Trophy, always: true },
     { href: '/support', label: 'Support', icon: Headphones, always: true },
     { href: '/audit', label: t('audit'), icon: ClipboardList, adminOnly: true },
@@ -164,6 +164,7 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
       <nav style={{ flex: 1, padding: isIconOnly ? '12px 4px' : '12px 10px', overflowY: 'auto', overflowX: 'hidden' }}>
         {navItems.map(item => {
           if (item.adminOnly && !showAdmin) return null
+          if ('hideWhenImpersonating' in item && item.hideWhenImpersonating && isImpersonating) return null
           const fullHref = `/${locale}${item.href}`
           const isActive = pathname === fullHref || pathname.startsWith(fullHref + '/')
           const Icon = item.icon
