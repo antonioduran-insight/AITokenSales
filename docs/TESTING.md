@@ -179,6 +179,16 @@ For each feature, verify behavior for all applicable roles:
 
 - [ ] Reviewed only, no code changes needed — the card is already `width: '100%', maxWidth: 360` inside a centered flex column with no fixed-pixel siblings, and the language switcher sits in an absolutely-positioned corner that doesn't compete for layout space
 
+### Global Admin (mobile + tablet) — Block 4
+
+- [ ] Navbar (logo / Organizations·Revenue·Vendors links / language toggle / theme toggle / logout) wraps onto multiple lines on narrow phones instead of overflowing — it had zero responsive treatment before this pass (no hamburger drawer like the main CRM shell; a wrapping top nav was judged sufficient for this internal-only, admin_global-only tool)
+- [ ] Organizations list: header (title + New Organization button) wraps; the 10-column table scrolls horizontally instead of overflowing (it previously used `overflow: hidden`, which silently clipped instead of scrolling)
+- [ ] Organization detail page: the two-column layout (Org Info/API Keys/Notes vs. Usage/Add-ons/Danger Zone) stacks to one column on phone width; each card's internal two-column field grids also stack; header (back link/org name/plan badge/active toggle) wraps; Usage row (SDRs/Leads stat blocks) wraps
+- [ ] New Organization page: the two-column Org Info + Admin Account row and the Scraper Keys + Add-ons row both stack to one column; Create/Cancel buttons wrap; the post-creation success screen's Copy/Go-to-Organizations buttons wrap instead of overflowing the narrow success card
+- [ ] Vendors page: header wraps; the 5-column table (with a 3-button Actions column) scrolls horizontally instead of overflowing
+- [ ] Revenue overview: the two-column Quarter Breakdown and Costs grids stack to one column; the MRR-by-org and Revenue-by-vendor tables scroll horizontally instead of overflowing (previously `overflow: hidden`)
+- [ ] Revenue Reports: confirm no regression — this page was already well-protected (table already scrolled, summary cards already wrapped); only fix was replacing a bare `flex:1` spacer in the selectors row with a proper `justify-content: space-between` split (same lesson as Kanban/Convertidos)
+
 ### Settings (mobile + tablet) — Block 3
 
 - [ ] Tab strip (Organization / Plan & Usage / Scraper) scrolls horizontally on narrow phones instead of wrapping — the connected underline strip look is preserved, no tab clips off-screen

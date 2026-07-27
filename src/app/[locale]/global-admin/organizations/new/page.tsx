@@ -185,7 +185,7 @@ export default function NewOrganizationPage() {
               <span style={{ color: colors.textPrimary, fontWeight: 600, fontFamily: 'monospace' }}>{success.password}</span>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
               onClick={() => { navigator.clipboard.writeText(`Email: ${success.email}\nPassword: ${success.password}`); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
               style={{ backgroundColor: colors.accent, color: '#fff', border: 'none', borderRadius: 6, padding: '10px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
@@ -216,7 +216,7 @@ export default function NewOrganizationPage() {
 
       <form onSubmit={handleSubmit} autoComplete="off">
         {/* Row 1: Org Info + Admin Account */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+        <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
           {/* Left: Org info */}
           <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 14 }}>
             <h2 style={{ fontSize: 13, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>Organization Info</h2>
@@ -334,7 +334,7 @@ export default function NewOrganizationPage() {
         </div>
 
         {/* Row 2: Scraper Keys + Add-ons */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+        <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
           {/* Scraper API Keys — REQUIRED */}
           <div style={{ ...cardStyle, border: `1px solid ${colors.accent}44` }}>
             <h2 style={{ fontSize: 13, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
@@ -401,7 +401,7 @@ export default function NewOrganizationPage() {
           />
         </div>
 
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button
             type="submit"
             disabled={loading}

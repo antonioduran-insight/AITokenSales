@@ -118,7 +118,7 @@ export default function VendorsPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', rowGap: 10, marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: colors.textPrimary, margin: 0 }}>{t('vendors')}</h1>
         <button
           onClick={() => { setShowForm(!showForm); setError(null) }}
@@ -165,8 +165,8 @@ export default function VendorsPage() {
       )}
 
       {!loading && vendors.length > 0 && (
-        <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: 'auto' }}>
+          <table style={{ width: '100%', minWidth: 560, borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 {[t('name'), t('email'), t('commissionPct'), t('status'), t('actions')].map(col => (

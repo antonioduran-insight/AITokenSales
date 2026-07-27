@@ -87,7 +87,7 @@ export default function OrganizationsPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 10, marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: colors.textPrimary, margin: 0 }}>{t('organizations')}</h1>
         <a
           href={`/${locale}/global-admin/organizations/new`}
@@ -126,8 +126,8 @@ export default function OrganizationsPage() {
       )}
 
       {!loading && filtered.length > 0 && (
-        <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: 'auto' }}>
+          <table style={{ width: '100%', minWidth: 900, borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 {[t('name'), t('plan'), t('seats'), t('leadsPerMonth'), t('adminEmail'), t('vendor'), t('mrr'), t('created'), t('status'), t('actions')].map(col => (

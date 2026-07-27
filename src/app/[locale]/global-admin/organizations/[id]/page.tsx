@@ -241,7 +241,7 @@ export default function OrgDetailPage() {
   return (
     <div style={{ padding: '0 4px' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', rowGap: 10, gap: 16, marginBottom: 20 }}>
         <button
           onClick={() => router.push(`/${locale}/global-admin/organizations`)}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textSecondary, display: 'flex', alignItems: 'center', gap: 4, fontSize: 13 }}
@@ -273,7 +273,7 @@ export default function OrgDetailPage() {
       </div>
 
       {/* Main grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+      <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
         {/* LEFT column */}
         <div>
           {/* Org Info */}
@@ -297,7 +297,7 @@ export default function OrgDetailPage() {
               </label>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div>
                 <label style={labelStyle}>{t('name')}</label>
                 <input value={name} onChange={e => handleNameChange(e.target.value)} style={inputStyle} />
@@ -307,7 +307,7 @@ export default function OrgDetailPage() {
                 <input value={slug} onChange={e => setSlug(e.target.value)} style={inputStyle} />
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div>
                 <label style={labelStyle}>{t('vendor')}</label>
                 <input value={vendor} onChange={e => setVendor(e.target.value)} style={inputStyle} placeholder="Partner Name" />
@@ -345,7 +345,7 @@ export default function OrgDetailPage() {
                 </span>
               )}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div>
                 <label style={labelStyle}>Apify Token</label>
                 <input type="password" value={apifyToken} onChange={e => setApifyToken(e.target.value)} placeholder="apify_api_…" style={inputStyle} />
@@ -392,7 +392,7 @@ export default function OrgDetailPage() {
           {/* Usage */}
           <div style={card}>
             <h2 style={sectionTitle}>Usage</h2>
-            <div style={{ display: 'flex', gap: 28 }}>
+            <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>SDRs</div>
                 <div style={{ fontSize: 22, fontWeight: 700, color: colors.textPrimary }}>

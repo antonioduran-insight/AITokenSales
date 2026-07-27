@@ -201,7 +201,7 @@ export default function RevenuePage() {
 
       {/* Q selector + breakdown */}
       <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: '20px 24px', marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 10, marginBottom: 20 }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 700, color: colors.textPrimary }}>Quarter Breakdown</div>
             <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{q.label} · Payment: {q.payment}</div>
@@ -219,7 +219,7 @@ export default function RevenuePage() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           {/* Q Revenue */}
           <div style={{ backgroundColor: colors.surfaceRaised, borderRadius: 8, padding: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>{selectedQ} Revenue</div>
@@ -279,7 +279,7 @@ export default function RevenuePage() {
           <div style={{ fontSize: 16, fontWeight: 700, color: colors.textPrimary }}>Costos Mensuales</div>
           <span style={{ fontSize: 12, color: colors.textMuted }}>Total: <strong style={{ color: colors.textSecondary }}>{formatUSD(monthlyTotal)}/mo</strong> · {selectedQ}: <strong style={{ color: colors.danger }}>{formatUSD(qCosts)}</strong></span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           {/* Infrastructure */}
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Infraestructura</div>
@@ -370,10 +370,10 @@ export default function RevenuePage() {
       </div>
 
       {/* Tables: MRR by org + Setup fees + Vendor */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-        <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: 'hidden' }}>
+      <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+        <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: 'auto' }}>
           <div style={{ padding: '14px 18px', borderBottom: `1px solid ${colors.border}`, fontSize: 14, fontWeight: 600, color: colors.textPrimary }}>MRR por Organización</div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table style={{ width: '100%', minWidth: 460, borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 {['Org', 'Plan', 'MRR', 'Q Rev', 'Vendor'].map(col => <th key={col} style={thStyle}>{col}</th>)}
@@ -430,9 +430,9 @@ export default function RevenuePage() {
           </div>
 
           {/* Vendor breakdown */}
-          <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: 'hidden' }}>
+          <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: 'auto' }}>
             <div style={{ padding: '14px 18px', borderBottom: `1px solid ${colors.border}`, fontSize: 14, fontWeight: 600, color: colors.textPrimary }}>Revenue by Vendor</div>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table style={{ width: '100%', minWidth: 440, borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   {['Vendor', 'Orgs', 'MRR', 'Q Rev', 'Commission', 'Cut'].map(col => <th key={col} style={{ ...thStyle, padding: '8px 10px', fontSize: 10 }}>{col}</th>)}

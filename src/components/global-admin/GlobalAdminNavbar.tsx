@@ -28,7 +28,8 @@ export function GlobalAdminNavbar() {
   return (
     <nav style={{
       backgroundColor: colors.surface, borderBottom: `1px solid ${colors.border}`,
-      display: 'flex', alignItems: 'center', padding: '0 24px', height: 56,
+      display: 'flex', alignItems: 'center', flexWrap: 'wrap', rowGap: 8,
+      padding: '10px 24px', minHeight: 56,
       gap: 8, position: 'sticky', top: 0, zIndex: 100,
       transition: 'background-color 0.2s',
     }}>
@@ -41,7 +42,7 @@ export function GlobalAdminNavbar() {
           fontWeight: 400, letterSpacing: '0.05em' }}>GLOBAL ADMIN</span>
       </Link>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', flex: 1 }}>
         {navItems.map(item => {
           const fullHref = `/${locale}${item.href}`
           const isActive = pathname === fullHref || pathname.startsWith(fullHref + '/')
@@ -60,7 +61,7 @@ export function GlobalAdminNavbar() {
         })}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden',
           border: `1px solid ${colors.border}` }}>
           {(['zh', 'en'] as const).map(l => (

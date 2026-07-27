@@ -241,17 +241,18 @@ export default function ReportsPage() {
       </div>
 
       {/* Selectors */}
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
-        {mode === 'vendor' && (
-          <select value={vendorName} onChange={e => setVendorName(e.target.value)} style={selectStyle}>
-            <option value="">Select vendor…</option>
-            {activeVendors.map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          {mode === 'vendor' && (
+            <select value={vendorName} onChange={e => setVendorName(e.target.value)} style={selectStyle}>
+              <option value="">Select vendor…</option>
+              {activeVendors.map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
+            </select>
+          )}
+          <select value={quarterKey} onChange={e => setQuarterKey(e.target.value)} style={selectStyle}>
+            {QUARTER_OPTIONS.map(q => <option key={q.key} value={q.key}>{`Q${q.fq} ${q.year}`}</option>)}
           </select>
-        )}
-        <select value={quarterKey} onChange={e => setQuarterKey(e.target.value)} style={selectStyle}>
-          {QUARTER_OPTIONS.map(q => <option key={q.key} value={q.key}>{`Q${q.fq} ${q.year}`}</option>)}
-        </select>
-        <div style={{ flex: 1 }} />
+        </div>
         <button onClick={exportPdf} disabled={rows.length === 0 || (mode === 'vendor' && !vendorName)}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, backgroundColor: colors.accent, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: rows.length === 0 ? 'default' : 'pointer', opacity: rows.length === 0 || (mode === 'vendor' && !vendorName) ? 0.4 : 1 }}>
           <Download size={14} /> Export PDF
