@@ -742,27 +742,35 @@ function SettingsContent() {
       <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 24 }}>Settings</h1>
 
       {/* Tab nav — scrolls horizontally instead of wrapping (wrapping would
-          break the connected underline strip look) if it doesn't fit */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: 28, borderBottom: '1px solid var(--crm-border)', paddingBottom: 0, overflowX: 'auto' }}>
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              padding: '8px 18px',
-              fontSize: 13, fontWeight: tab === t.key ? 600 : 400,
-              color: tab === t.key ? 'var(--crm-text-primary)' : 'var(--crm-text-muted)',
-              borderBottom: tab === t.key ? '2px solid var(--crm-accent)' : '2px solid transparent',
-              marginBottom: -1,
-              transition: 'color 0.15s',
-              flexShrink: 0,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
+          break the connected underline strip look) if it doesn't fit.
+          QA-F23: the scroll container and the border used to be the same
+          box, so the browser's horizontal scrollbar rendered flush against
+          (visually merged into) the tab-bar's own border-bottom instead of
+          at the edge of an actual scroll region. Splitting the border onto
+          an outer wrapper and the overflow onto an inner one gives the
+          scrollbar its own space below the tab labels, clear of the
+          border-bottom line. */}
+      <div style={{ marginBottom: 28, borderBottom: '1px solid var(--crm-border)' }}>
+        <div style={{ display: 'flex', gap: 2, overflowX: 'auto', paddingBottom: 4 }}>
+          {TABS.map(t => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: '8px 18px',
+                fontSize: 13, fontWeight: tab === t.key ? 600 : 400,
+                color: tab === t.key ? 'var(--crm-text-primary)' : 'var(--crm-text-muted)',
+                borderBottom: tab === t.key ? '2px solid var(--crm-accent)' : '2px solid transparent',
+                transition: 'color 0.15s',
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {tab === 'organization' && <OrgTab />}

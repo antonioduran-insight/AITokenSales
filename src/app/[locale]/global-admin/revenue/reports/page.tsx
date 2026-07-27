@@ -21,7 +21,30 @@ const QUARTER_OPTIONS: { key: string; fq: FiscalQuarter; year: number }[] = [
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-function fmt(n: number) { return `$${Math.round(n).toLocaleString()}` }
+// `Math.round()` can return -0 for a tiny negative float (e.g. a rounding
+// artifact just under zero) — `|| 0` normalizes that to a clean positive
+// zero so it never renders as "$-0".
+function fmt(n: number) { return `$${(Math.round(n) || 0).toLocaleString()}` }
+
+// For a line item always shown as a subtraction ("− Infrastructure Costs").
+// Hardcoding a literal "-" prefix around fmt() showed "-$0" whenever the
+// cost was actually zero — only prefix it when there's really something
+// being subtracted.
+function fmtNeg(n: number) { return n > 0 ? `-${fmt(n)}` : fmt(0) }
+
+// Each partner/vendor share is rounded independently for display, but the
+// sum of independently-rounded shares can land $1 off from the rounded
+// total ("Net to distribute") — the classic apportionment rounding problem.
+// Rounds every share normally except the last, which absorbs whatever
+// difference is left so the displayed shares always sum to the displayed
+// total exactly.
+function roundShares(shares: number[], total: number): number[] {
+  if (shares.length === 0) return []
+  const rounded = shares.map(s => Math.round(s) || 0)
+  const sumRounded = rounded.reduce((a, b) => a + b, 0)
+  rounded[rounded.length - 1] += (Math.round(total) || 0) - sumRounded
+  return rounded
+}
 
 function planMonthly(org: Organization): number {
   if (org.plan === 'enterprise') return org.custom_price ?? 0
@@ -139,6 +162,25 @@ export default function ReportsPage() {
   const nicoFinal = split.nicoGross - infraQuarter / 2
   const vendorFinal = (name: string) => split.vendorTotals.get(name) ?? 0
 
+  // Display-only rounding, adjusted so Frank + Nicolás + every vendor's
+  // rounded share always sums to exactly the rounded Net Revenue shown
+  // above them — same render order (Frank, Nicolás, vendors) in both the
+  // on-screen summary and the PDF export, so the last vendor (or Nicolás,
+  // if there are no vendors this quarter) is the one that absorbs a $1
+  // rounding difference.
+  const vendorNamesForSplit = [...split.vendorTotals.keys()]
+  const roundedShareValues = useMemo(
+    () => roundShares([frankFinal, nicoFinal, ...vendorNamesForSplit.map(n => split.vendorTotals.get(n) ?? 0)], net),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [frankFinal, nicoFinal, split.vendorTotals, net]
+  )
+  const frankRounded = roundedShareValues[0] ?? 0
+  const nicoRounded = roundedShareValues[1] ?? 0
+  const vendorRounded = (name: string) => {
+    const idx = vendorNamesForSplit.indexOf(name)
+    return idx === -1 ? Math.round(vendorFinal(name)) : (roundedShareValues[2 + idx] ?? 0)
+  }
+
   // Vendor-mode summary — clean commission on what they sold, no infra mention.
   const vendorSales = mode === 'vendor' ? rows.reduce((s, r) => s + r.total, 0) : 0
   const vendorPct = mode === 'vendor' && vendorName ? commissionOf(vendorName) : 0
@@ -174,18 +216,18 @@ export default function ReportsPage() {
           <tr><td>Commission (${vendorPct}%)</td><td class="r">${fmt(vendorCommission)}</td></tr>
         </table>`
     } else {
-      const vendorLines = [...split.vendorTotals.keys()]
-        .map(n => `<tr><td>${escapeHtml(n)} (${commissionOf(n)}%)</td><td class="r">${fmt(vendorFinal(n))}</td></tr>`).join('')
+      const vendorLines = vendorNamesForSplit
+        .map(n => `<tr><td>${escapeHtml(n)} (${commissionOf(n)}%)</td><td class="r">${fmt(vendorRounded(n))}</td></tr>`).join('')
       summary = `
         <table class="sum">
           <tr><td>Gross Revenue Total</td><td class="r">${fmt(gross)}</td></tr>
-          <tr><td>− Infrastructure Costs</td><td class="r">-${fmt(infraQuarter)}</td></tr>
+          <tr><td>− Infrastructure Costs</td><td class="r">${fmtNeg(infraQuarter)}</td></tr>
           <tr class="tot"><td>= Net Revenue</td><td class="r">${fmt(net)}</td></tr>
         </table>
         <h3>Split (infra 50/50 on partners, vendors clean)</h3>
         <table class="sum">
-          <tr><td>${PARTNERS.frank}</td><td class="r">${fmt(frankFinal)}</td></tr>
-          <tr><td>${PARTNERS.nicolas}</td><td class="r">${fmt(nicoFinal)}</td></tr>
+          <tr><td>${PARTNERS.frank}</td><td class="r">${fmt(frankRounded)}</td></tr>
+          <tr><td>${PARTNERS.nicolas}</td><td class="r">${fmt(nicoRounded)}</td></tr>
           ${vendorLines}
         </table>`
     }
@@ -307,17 +349,17 @@ export default function ReportsPage() {
                 <>
                   <div style={{ ...card, padding: '18px 22px', flex: 1, minWidth: 280 }}>
                     <SummaryRow label="Gross Revenue Total" value={fmt(gross)} colors={colors} bold />
-                    <SummaryRow label="− Infrastructure Costs" value={`-${fmt(infraQuarter)}`} colors={colors} color="#EF4444" />
+                    <SummaryRow label="− Infrastructure Costs" value={fmtNeg(infraQuarter)} colors={colors} color="#EF4444" />
                     <div style={{ borderTop: `1px solid ${colors.border}`, marginTop: 6, paddingTop: 6 }}>
                       <SummaryRow label="= Net Revenue" value={fmt(net)} colors={colors} color={colors.accent} bold />
                     </div>
                   </div>
                   <div style={{ ...card, padding: '18px 22px', flex: 1, minWidth: 280 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Split <span style={{ fontWeight: 400, textTransform: 'none' }}>· infra 50/50 on partners, vendors clean</span></div>
-                    <SummaryRow label={PARTNERS.frank} value={fmt(frankFinal)} colors={colors} />
-                    <SummaryRow label={PARTNERS.nicolas} value={fmt(nicoFinal)} colors={colors} />
-                    {[...split.vendorTotals.keys()].map(n => (
-                      <SummaryRow key={n} label={`${n} (${commissionOf(n)}%)`} value={fmt(vendorFinal(n))} colors={colors} color="#F59E0B" />
+                    <SummaryRow label={PARTNERS.frank} value={fmt(frankRounded)} colors={colors} />
+                    <SummaryRow label={PARTNERS.nicolas} value={fmt(nicoRounded)} colors={colors} />
+                    {vendorNamesForSplit.map(n => (
+                      <SummaryRow key={n} label={`${n} (${commissionOf(n)}%)`} value={fmt(vendorRounded(n))} colors={colors} color="#F59E0B" />
                     ))}
                   </div>
                 </>
