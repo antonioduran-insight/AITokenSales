@@ -85,7 +85,7 @@ export async function PATCH(
   const { id } = await params
   const fields = await req.json()
 
-  const allowed = ['name', 'slug', 'plan', 'max_seats', 'max_leads_per_month', 'billing_day', 'custom_price', 'vendor', 'is_active', 'internal_notes', 'logo_url', 'default_language', 'apify_token', 'anthropic_key', 'anthropic_base_url', 'anthropic_model']
+  const allowed = ['name', 'slug', 'plan', 'max_seats', 'max_leads_per_month', 'billing_day', 'custom_price', 'vendor', 'is_active', 'internal_notes', 'logo_url', 'apify_token', 'anthropic_key', 'anthropic_base_url', 'anthropic_model']
   const patch: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in fields) patch[key] = fields[key]

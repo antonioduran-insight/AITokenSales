@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   const {
     name, slug, plan, logo_url, admin_name, admin_email, admin_password,
     max_seats, max_leads_per_month, custom_price, vendor,
-    default_language, markets, internal_notes, addons,
+    markets, internal_notes, addons,
     apify_token, anthropic_key, anthropic_base_url, anthropic_model,
   } = body
 
@@ -69,7 +69,6 @@ export async function POST(req: NextRequest) {
       max_leads_per_month: max_leads_per_month ?? null,
       custom_price: custom_price ?? null,
       vendor: vendor ?? null,
-      default_language: default_language ?? 'zh',
       internal_notes: internal_notes ?? null,
       apify_token: apify_token ?? null,
       anthropic_key: anthropic_key ?? null,

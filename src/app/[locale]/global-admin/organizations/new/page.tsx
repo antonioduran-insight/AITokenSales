@@ -51,7 +51,6 @@ export default function NewOrganizationPage() {
   const [customPrice, setCustomPrice] = useState<number | null>(null)
   const [vendor, setVendor] = useState('direct')
   const [vendorCustom, setVendorCustom] = useState('')
-  const [defaultLanguage, setDefaultLanguage] = useState('zh')
   const [internalNotes, setInternalNotes] = useState('')
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set())
   const [apifyToken, setApifyToken] = useState('')
@@ -132,7 +131,6 @@ export default function NewOrganizationPage() {
         max_leads_per_month: maxLeads,
         custom_price: plan === 'enterprise' ? customPrice : null,
         vendor: effectiveVendor,
-        default_language: defaultLanguage,
         internal_notes: internalNotes || null,
         addons: Array.from(selectedAddons),
         apify_token: apifyToken,
@@ -319,16 +317,6 @@ export default function NewOrganizationPage() {
                   autoComplete="off"
                 />
               )}
-            </div>
-
-            <div>
-              <label style={labelStyle}>{t('defaultLanguage')}</label>
-              <select value={defaultLanguage} onChange={e => setDefaultLanguage(e.target.value)} style={inputStyle}>
-                <option value="zh">中文</option>
-                <option value="en">English</option>
-                <option value="vi">Tiếng Việt</option>
-                <option value="es">Español</option>
-              </select>
             </div>
           </div>
         </div>

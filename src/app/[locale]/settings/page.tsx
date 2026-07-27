@@ -53,7 +53,6 @@ function Bar({ value, max, color = 'var(--crm-accent)' }: { value: number; max: 
 function OrgTab() {
   const [org, setOrg] = useState<Organization | null>(null)
   const [name, setName] = useState('')
-  const [language, setLanguage] = useState('en')
   const [logoUrl, setLogoUrl] = useState('')
   const [blacklist, setBlacklist] = useState('')
   const [companyContext, setCompanyContext] = useState('')
@@ -71,7 +70,6 @@ function OrgTab() {
       .then((d: Organization) => {
         setOrg(d)
         setName(d.name ?? '')
-        setLanguage(d.default_language ?? 'en')
         setLogoUrl(d.logo_url ?? '')
         setBlacklist(d.domain_blacklist ?? '')
         setCompanyContext(d.company_context ?? '')
@@ -84,7 +82,7 @@ function OrgTab() {
     const res = await fetch('/api/settings/organization', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, default_language: language, logo_url: logoUrl || null, domain_blacklist: blacklist || null, company_context: companyContext, bridge_context: bridgeContext }),
+      body: JSON.stringify({ name, logo_url: logoUrl || null, domain_blacklist: blacklist || null, company_context: companyContext, bridge_context: bridgeContext }),
     })
     const data = await res.json()
     if (!res.ok) { setError(data.error); setSaving(false); return }
@@ -127,40 +125,29 @@ function OrgTab() {
           <input value={name} onChange={e => setName(e.target.value)} style={S.input} />
         </div>
 
-        <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-          <div>
-            <label style={S.label}>Default Language</label>
-            <select value={language} onChange={e => setLanguage(e.target.value)} style={S.select}>
-              <option value="en">English</option>
-              <option value="zh">Chinese (繁體)</option>
-              <option value="vi">Vietnamese</option>
-              <option value="id">Indonesian</option>
-            </select>
-          </div>
-          <div>
-            <label style={S.label}>Logo</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              {logoUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={logoUrl} alt="Logo" style={{ height: 44, maxWidth: 120, objectFit: 'contain', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)' }} />
-              )}
-              <div>
-                <input
-                  ref={logoInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp"
-                  style={{ display: 'none' }}
-                  onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f) }}
-                />
-                <button
-                  onClick={() => logoInputRef.current?.click()}
-                  disabled={uploadingLogo}
-                  style={{ ...S.btnGhost, fontSize: 12, padding: '6px 14px' }}
-                >
-                  {uploadingLogo ? 'Uploading…' : logoUrl ? 'Change Logo' : 'Upload Logo'}
-                </button>
-                {logoError && <p style={{ fontSize: 12, color: '#EF4444', margin: '4px 0 0' }}>{logoError}</p>}
-              </div>
+        <div style={{ marginBottom: 16 }}>
+          <label style={S.label}>Logo</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt="Logo" style={{ height: 44, maxWidth: 120, objectFit: 'contain', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)' }} />
+            )}
+            <div>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp"
+                style={{ display: 'none' }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f) }}
+              />
+              <button
+                onClick={() => logoInputRef.current?.click()}
+                disabled={uploadingLogo}
+                style={{ ...S.btnGhost, fontSize: 12, padding: '6px 14px' }}
+              >
+                {uploadingLogo ? 'Uploading…' : logoUrl ? 'Change Logo' : 'Upload Logo'}
+              </button>
+              {logoError && <p style={{ fontSize: 12, color: '#EF4444', margin: '4px 0 0' }}>{logoError}</p>}
             </div>
           </div>
         </div>

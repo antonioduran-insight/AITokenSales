@@ -50,7 +50,6 @@ export default function OrgDetailPage() {
   const [vendor, setVendor] = useState('direct')
   const [vendorCustom, setVendorCustom] = useState('')
   const [billingDay, setBillingDay] = useState<number>(10)
-  const [defaultLanguage, setDefaultLanguage] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
   const [logoPreview, setLogoPreview] = useState('')
   const [logoUploading, setLogoUploading] = useState(false)
@@ -98,7 +97,6 @@ export default function OrgDetailPage() {
       setMaxSeats(data.max_seats ?? 3)
       setMaxLeads(data.max_leads_per_month ?? 1000)
       setBillingDay(data.billing_day ?? 10)
-      setDefaultLanguage(data.default_language ?? 'zh')
       setLogoUrl(data.logo_url ?? '')
       setLogoPreview(data.logo_url ?? '')
       setInternalNotes(data.internal_notes ?? '')
@@ -171,7 +169,7 @@ export default function OrgDetailPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name, slug, vendor: effectiveVendor, billing_day: billingDay, default_language: defaultLanguage, logo_url: logoUrl || null,
+          name, slug, vendor: effectiveVendor, billing_day: billingDay, logo_url: logoUrl || null,
           plan, max_seats: maxSeats, max_leads_per_month: maxLeads,
           admin_email: adminEmail || undefined,
           admin_password: adminPassword || undefined,
@@ -382,16 +380,6 @@ export default function OrgDetailPage() {
                 <input type="number" min={1} max={28} value={billingDay} onChange={e => setBillingDay(Number(e.target.value))} style={inputStyle} />
               </div>
             </div>
-            <div style={{ marginBottom: 14 }}>
-              <label style={labelStyle}>{t('defaultLanguage')}</label>
-              <select value={defaultLanguage} onChange={e => setDefaultLanguage(e.target.value)} style={inputStyle}>
-                <option value="zh">中文</option>
-                <option value="en">English</option>
-                <option value="es">Español</option>
-                <option value="vi">Tiếng Việt</option>
-              </select>
-            </div>
-
             {/* QA-F3: plan/admin email/password used to require a direct DB edit */}
             <div style={{ marginBottom: 14 }}>
               <label style={labelStyle}>{t('plan')}</label>

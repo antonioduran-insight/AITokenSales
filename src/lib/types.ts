@@ -165,7 +165,6 @@ export interface Organization {
   max_leads_per_month: number | null
   custom_price: number | null
   vendor: string | null
-  default_language: string
   internal_notes: string | null
   domain_blacklist: string | null
   /** What the org sells and to whom — fed to the scraper so outreach messages
