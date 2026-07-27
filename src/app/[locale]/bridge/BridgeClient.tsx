@@ -355,7 +355,7 @@ export function BridgeClient() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {runs.map(r => (
                 <button key={r.id} onClick={() => openRun(r)} style={{
-                  display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 8,
+                  display: 'flex', alignItems: 'center', flexWrap: 'wrap', rowGap: 6, gap: 12, padding: '12px 14px', borderRadius: 8,
                   backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)',
                   cursor: 'pointer', textAlign: 'left', width: '100%',
                 }}>
@@ -401,7 +401,7 @@ export function BridgeClient() {
                   const crit = sl.criteria
                   const nCriteria = crit ? [crit.industry, crit.market, ...(crit.headcounts ?? [])].filter(Boolean).length : 0
                   return (
-                    <div key={sl.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 8, backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)' }}>
+                    <div key={sl.id} style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', rowGap: 6, gap: 12, padding: '11px 14px', borderRadius: 8, backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)' }}>
                       <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{sl.name}</span>
                       <span style={S.badge}>
                         {CHANNEL_FAMILIES.find(c => c.value === sl.channel_family)?.label ?? String(sl.channel_family)}
@@ -442,7 +442,7 @@ export function BridgeClient() {
 
                 <div style={{ marginBottom: 14 }}>
                   <label style={S.label}>Sources <span style={{ textTransform: 'none', fontWeight: 400 }}>(you can combine both)</span></label>
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button onClick={() => setUseCompanies(v => !v)} style={chip(useCompanies)}>Specific companies</button>
                     <button onClick={() => setUseCriteria(v => !v)} style={chip(useCriteria)}>Search criteria</button>
                   </div>
@@ -491,7 +491,7 @@ export function BridgeClient() {
                   </div>
                 )}
 
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button onClick={saveSeedList} disabled={!canSaveSeed || savingSeed} style={{
                     fontSize: 13, fontWeight: 700, color: '#FFF', border: 'none', borderRadius: 8, padding: '10px 20px',
                     backgroundColor: canSaveSeed && !savingSeed ? 'var(--crm-accent)' : 'var(--crm-border)',
@@ -648,7 +648,7 @@ export function BridgeClient() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
                   {groupedShown.map(group => (
                     <div key={group.key} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 6, borderBottom: '1px solid var(--crm-border)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', rowGap: 4, gap: 8, paddingBottom: 6, borderBottom: '1px solid var(--crm-border)' }}>
                         <Building2 size={14} color="var(--crm-text-muted)" />
                         <span style={{ fontSize: 13, fontWeight: 700 }}>{group.company}</span>
                         <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>

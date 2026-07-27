@@ -140,6 +140,18 @@ For each feature, verify behavior for all applicable roles:
 - [ ] Export: the "N leads a exportar" text + "Descargar CSV" button row wraps onto a second line on narrow phones instead of overflowing
 - [ ] Export: run-select dropdown and the leads preview table (horizontal scroll, ellipsis on Company/Title/Custom 1) are unaffected
 
+### Bridge / Partnerships (mobile + tablet) — Block 3
+
+- [ ] Past Searches list rows (date · seed list name · candidate count · status badge) wrap onto multiple lines on narrow phones instead of clipping
+- [ ] Seed Lists rows (name · channel badge · companies/criteria summary · delete icon) wrap instead of overflowing
+- [ ] New Seed List form: "Specific companies" / "Search criteria" source toggle chips wrap onto a second line on narrow phones instead of overflowing
+- [ ] New Seed List form: Save/Cancel buttons wrap instead of overflowing on the narrowest phones
+- [ ] Run Bridge Search: seed-list select + Search button already wrap (pre-existing) — confirm no regression
+- [ ] Candidate Review: batch action bar (selected count / Assign to SDR select / Confirm & Send / Clear) already wraps (pre-existing) — confirm no regression
+- [ ] Candidate group header (company icon/name/contact count/company-page link) wraps instead of overflowing on a long company name
+- [ ] Individual candidate cards (checkbox / name+badge+LinkedIn link / actions) already wrap (pre-existing) — confirm no regression
+- [ ] Delete-seed-list confirm modal fits within the viewport on phone width (already capped at `90vw`) — confirm no regression
+
 ### Settings (mobile + tablet) — Block 3
 
 - [ ] Tab strip (Organization / Plan & Usage / Scraper) scrolls horizontally on narrow phones instead of wrapping — the connected underline strip look is preserved, no tab clips off-screen
