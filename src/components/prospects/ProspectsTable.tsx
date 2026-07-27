@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
@@ -65,7 +65,10 @@ export function ProspectsTable() {
   const [areas, setAreas] = useState<Area[]>([])
   const [sdrs, setSdrs] = useState<User[]>([])
 
-  // Filters
+  // Filters — searchInput is what the input box shows (updates every
+  // keystroke); search is the debounced value that actually drives the
+  // query, so typing quickly doesn't fire a request per keystroke.
+  const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [filterArea, setFilterArea] = useState('')
   const [filterSdr, setFilterSdr] = useState('')
@@ -86,11 +89,13 @@ export function ProspectsTable() {
   const [sdrReassignLimit, setSdrReassignLimit] = useState('')
   const [sdrReassigning, setSdrReassigning] = useState(false)
   const [reassignToast, setReassignToast] = useState<string | null>(null)
+  const [sdrReassignError, setSdrReassignError] = useState<string | null>(null)
 
   // Reassign selected — takes exactly the checked leads, not an arbitrary count
   const [selectedReassignOpen, setSelectedReassignOpen] = useState(false)
   const [selectedReassignTo, setSelectedReassignTo] = useState('')
   const [selectedReassigning, setSelectedReassigning] = useState(false)
+  const [selectedReassignError, setSelectedReassignError] = useState<string | null>(null)
 
   // Drawer
   const [drawerProspect, setDrawerProspect] = useState<Prospect | null>(null)
@@ -111,7 +116,24 @@ export function ProspectsTable() {
     })
   }, [isAdmin])
 
+  // Debounce the search box into `search` (300ms) so typing fast doesn't
+  // fire a request per keystroke.
+  useEffect(() => {
+    const id = setTimeout(() => setSearch(searchInput), 300)
+    return () => clearTimeout(id)
+  }, [searchInput])
+
+  // QA-F8: debouncing alone doesn't guarantee correctness — two requests can
+  // still race (a fast connection on an early keystroke response arriving
+  // after a slower one for a later keystroke), which is what caused search
+  // to sometimes show "no data" for a company that exists, or silently
+  // revert to the full list. Every fetchProspects call gets a sequence
+  // number; a response only gets applied if it's still the most recent
+  // request in flight when it resolves, otherwise it's discarded.
+  const fetchSeq = useRef(0)
+
   const fetchProspects = useCallback(async () => {
+    const seq = ++fetchSeq.current
     setLoading(true)
     try {
       if (isImpersonating && impersonateOrgId) {
@@ -122,6 +144,7 @@ export function ProspectsTable() {
         })
         const res = await fetch(`/api/crm/prospects?${params}`)
         const json = await res.json()
+        if (seq !== fetchSeq.current) return // superseded by a newer request
         let rows = (json.data ?? []) as unknown as Prospect[]
 
         // Client-side filters
@@ -161,11 +184,12 @@ export function ProspectsTable() {
         }
 
         const { data, count } = await query
+        if (seq !== fetchSeq.current) return // superseded by a newer request
         if (data) setProspects(data as unknown as Prospect[])
         if (count !== null) setTotal(count)
       }
     } finally {
-      setLoading(false)
+      if (seq === fetchSeq.current) setLoading(false)
     }
   }, [page, pageSize, search, filterArea, filterSdr, filterStatus, filterTemp, isAdmin, user?.area_id, isImpersonating, impersonateOrgId])
 
@@ -214,6 +238,7 @@ export function ProspectsTable() {
   async function handleSdrReassign() {
     if (!sdrReassignFrom || !sdrReassignTo) return
     setSdrReassigning(true)
+    setSdrReassignError(null)
     try {
       const fromSdr = sdrs.find(s => s.id === sdrReassignFrom)
       const res = await fetch('/api/prospects', {
@@ -222,7 +247,13 @@ export function ProspectsTable() {
         body: JSON.stringify({ from_user_id: sdrReassignFrom, to_user_id: sdrReassignTo, limit: sdrReassignLimit ? Number(sdrReassignLimit) : undefined }),
       })
       const data = await res.json()
-      if (!res.ok) { setSdrReassigning(false); return }
+      if (!res.ok) {
+        // QA-F10: this used to fail silently — no feedback at all when two
+        // SDRs share a display name (e.g. "Nicolás Nicoli" vs "Nicolas
+        // Nicoli") made the wrong one look selected.
+        setSdrReassignError(data.error ?? `Reassign failed (HTTP ${res.status})`)
+        return
+      }
 
       await logAuditEvent({
         event_type: 'prospect_reassigned',
@@ -254,6 +285,7 @@ export function ProspectsTable() {
   async function handleReassignSelected() {
     if (selected.size === 0 || !selectedReassignTo) return
     setSelectedReassigning(true)
+    setSelectedReassignError(null)
     try {
       const ids = Array.from(selected)
       const selectedProspects = prospects.filter(p => ids.includes(p.id))
@@ -263,7 +295,10 @@ export function ProspectsTable() {
         body: JSON.stringify({ ids, assigned_to: selectedReassignTo }),
       })
       const data = await res.json()
-      if (!res.ok) return
+      if (!res.ok) {
+        setSelectedReassignError(data.error ?? `Reassign failed (HTTP ${res.status})`)
+        return
+      }
 
       // One audit entry per lead, named — every lead in `selected` should be
       // on the current page (it's how it got checked), so this covers them
@@ -313,6 +348,7 @@ export function ProspectsTable() {
   }
 
   function clearFilters() {
+    setSearchInput('')
     setSearch('')
     setFilterArea('')
     setFilterSdr('')
@@ -320,7 +356,7 @@ export function ProspectsTable() {
     setFilterTemp('')
   }
 
-  const hasFilters = search || filterArea || filterSdr || filterStatus || filterTemp
+  const hasFilters = searchInput || filterArea || filterSdr || filterStatus || filterTemp
   const totalPages = Math.ceil(total / pageSize)
   const allSelected = prospects.length > 0 && selected.size === prospects.length
 
@@ -344,8 +380,8 @@ export function ProspectsTable() {
             <input
               style={S.input}
               placeholder={t('common.search')}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
             />
           </div>
 
@@ -362,7 +398,7 @@ export function ProspectsTable() {
             <select value={filterSdr} onChange={e => setFilterSdr(e.target.value)} style={S.select}>
               <option value="">All SDRs</option>
               <option value="unassigned">Unassigned</option>
-              {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+              {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name} ({s.email})</option>)}
             </select>
           )}
 
@@ -396,7 +432,7 @@ export function ProspectsTable() {
 
           {isAdmin && !isImpersonating && (
             <button
-              onClick={() => setSdrReassignOpen(true)}
+              onClick={() => { setSdrReassignOpen(true); setSdrReassignError(null) }}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 6, border: '1px solid #6C63FF40', backgroundColor: '#6C63FF15', color: 'var(--crm-accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
             >
               <Users size={13} /> Reassign SDR
@@ -618,7 +654,7 @@ export function ProspectsTable() {
           <div style={{ width: 1, height: 20, backgroundColor: 'var(--crm-border)' }} />
 
           <button
-            onClick={() => setSelectedReassignOpen(true)}
+            onClick={() => { setSelectedReassignOpen(true); setSelectedReassignError(null) }}
             style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 14px', borderRadius: 5, border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)', color: 'var(--crm-text-secondary)', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
           >
             <ArrowRight size={12} /> Reassign selected ({selected.size})
@@ -678,7 +714,7 @@ export function ProspectsTable() {
                   style={{ ...S.select, width: '100%' }}
                 >
                   <option value="">Select SDR...</option>
-                  {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+                  {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name} ({s.email})</option>)}
                 </select>
               </div>
 
@@ -695,7 +731,7 @@ export function ProspectsTable() {
                   style={{ ...S.select, width: '100%', opacity: sdrReassignFrom ? 1 : 0.5 }}
                 >
                   <option value="">Select SDR...</option>
-                  {sdrsForReassignTo.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+                  {sdrsForReassignTo.map(s => <option key={s.id} value={s.id}>{s.full_name} ({s.email})</option>)}
                 </select>
               </div>
             </div>
@@ -737,9 +773,15 @@ export function ProspectsTable() {
               </div>
             )}
 
+            {sdrReassignError && (
+              <div style={{ padding: '10px 14px', backgroundColor: '#EF444415', border: '1px solid #EF444440', borderRadius: 8, marginBottom: 16, fontSize: 12, color: '#EF4444' }}>
+                {sdrReassignError}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 10 }}>
               <Button
-                onClick={() => { setSdrReassignOpen(false); setSdrReassignFrom(''); setSdrReassignTo(''); setSdrReassignCount(null); setSdrReassignLimit('') }}
+                onClick={() => { setSdrReassignOpen(false); setSdrReassignFrom(''); setSdrReassignTo(''); setSdrReassignCount(null); setSdrReassignLimit(''); setSdrReassignError(null) }}
                 style={{ flex: 1, backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}
               >
                 {t('common.cancel')}
@@ -760,7 +802,7 @@ export function ProspectsTable() {
       {selectedReassignOpen && (
         <div
           style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
-          onClick={e => { if (e.target === e.currentTarget) { setSelectedReassignOpen(false); setSelectedReassignTo('') } }}
+          onClick={e => { if (e.target === e.currentTarget) { setSelectedReassignOpen(false); setSelectedReassignTo(''); setSelectedReassignError(null) } }}
         >
           <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 28, width: 420, maxWidth: '90vw' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
@@ -780,13 +822,19 @@ export function ProspectsTable() {
                 style={{ ...S.select, width: '100%' }}
               >
                 <option value="">Select SDR...</option>
-                {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+                {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name} ({s.email})</option>)}
               </select>
             </div>
 
+            {selectedReassignError && (
+              <div style={{ padding: '10px 14px', backgroundColor: '#EF444415', border: '1px solid #EF444440', borderRadius: 8, marginBottom: 16, fontSize: 12, color: '#EF4444' }}>
+                {selectedReassignError}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 10 }}>
               <Button
-                onClick={() => { setSelectedReassignOpen(false); setSelectedReassignTo('') }}
+                onClick={() => { setSelectedReassignOpen(false); setSelectedReassignTo(''); setSelectedReassignError(null) }}
                 style={{ flex: 1, backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}
               >
                 {t('common.cancel')}
