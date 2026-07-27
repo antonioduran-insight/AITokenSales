@@ -20,6 +20,13 @@ const MIN_LEADS = 10
 const MAX_LEADS = 500
 const PRESETS = [100, 200, 300, 400, 500]
 const STORAGE_KEY = 'scraper_active_run'
+// A run that's genuinely still active never takes anywhere near this long
+// (Phase 2's own copy says "usually takes 2-5 minutes") — this is a generous
+// upper bound before a restored pointer is treated as stale, not a realistic
+// runtime estimate. Anything older is ignored outright, regardless of phase
+// (running, completed, or failed) — this is what stops New Run from
+// resurrecting a days-old run's state with zero explicit action from the user.
+const MAX_RESTORE_AGE_MS = 60 * 60 * 1000
 
 // The backend only ever reports 'pending' -> 'running' -> 'completed'/'failed'
 // (it never emits intermediate scraping/scoring/drafting states, despite the
@@ -200,11 +207,26 @@ function RunPageInner() {
   // ── Restore an in-progress run when returning to the page ──
   useEffect(() => {
     const fromQuery = searchParams.get('run')
-    let stored: { runId: string; markets?: string[]; sdrId: string | null } | null = null
+    let stored: { runId: string; markets?: string[]; sdrId: string | null; startedAt?: number } | null = null
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
       if (raw) stored = JSON.parse(raw)
     } catch { /* ignore */ }
+
+    // An explicit ?run= link (e.g. from History) always wins, no matter its
+    // age — the user asked to see that specific run. The localStorage
+    // pointer is an *implicit* restore, so it's the only one that needs a
+    // staleness check: with no age at all (older entries never had one) or
+    // older than MAX_RESTORE_AGE_MS, drop it and clean it up rather than
+    // resurrecting a run's status (running, completed, or failed) that the
+    // user never asked to see again.
+    if (!fromQuery && stored) {
+      const age = Date.now() - (stored.startedAt ?? 0)
+      if (!stored.startedAt || age > MAX_RESTORE_AGE_MS) {
+        try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
+        stored = null
+      }
+    }
 
     const id = fromQuery ?? stored?.runId ?? null
     if (!id) return
@@ -364,7 +386,7 @@ function RunPageInner() {
       }
       runMetaRef.current = { markets: selectedMarkets, sdrId: selectedSdrId }
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ runId: data.run_id, markets: selectedMarkets, sdrId: selectedSdrId }))
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ runId: data.run_id, markets: selectedMarkets, sdrId: selectedSdrId, startedAt: Date.now() }))
       } catch { /* ignore */ }
       assignFiredRef.current = false
       pollFailuresRef.current = 0

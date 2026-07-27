@@ -323,15 +323,21 @@ For each feature, verify behavior for all applicable roles:
 - [ ] `run_sdr_assignments.assigned_markets` holds the full country array — check both right after creation AND after the run completes (the auto-assign call used to collapse this to a single country on completion; confirm it still has all of them post-completion)
 
 **New Run — Phase 2 (progress)**
-- [ ] Ring animates; centre text matches the backend status mapping
-- [ ] 4-step dot bar advances (Scraping · Scoring · Messages · Done)
-- [ ] Navigating away and returning to New Run restores the in-progress run
-- [ ] Closing and reopening the tab restores it too (state comes from the DB)
+- [ ] Ring animates; centre text shows "Initializing…" then "Running…" (no fabricated Scraping/Scoring/Messages sub-steps — see FUNC-F2/PERF-F2 in CLAUDE.md)
+- [ ] Navigating away and returning to New Run **within an hour** restores the in-progress run
+- [ ] Closing and reopening the tab restores it too, within the same window (state comes from the DB, not just localStorage)
 - [ ] **Cancel run** sets the run to cancelled and shows the "Run cancelled" state
 - [ ] **Transient status-read failures never show the failure screen** — block `/api/runs/[id]` (DevTools → Network → block request, or throttle to offline) for a few polls: the ring keeps spinning and a "📡 Reconnecting…" banner appears instead of "This run failed". Unblock it and confirm polling picks the run back up without any user action.
 - [ ] While in the reconnecting state, `localStorage`'s `scraper_active_run` pointer is **not** cleared — reload the tab mid-block and the run still restores
 - [ ] A genuine 404 (bad run id) or 403 (wrong org) **does** stop polling and route to the failure screen — these are the only cases that should
 - [ ] **Recovery from a lost local pointer**: manually clear `localStorage.scraper_active_run`, then visit `/run?run=<a completed run's id>` — the leads should still get assigned (confirms the `run_sdr_assignments[0].sdr_id` server-side fallback in `runAssign()`)
+
+**New Run — stale run restore guard (F-stale-run) — CRITICAL**
+- [ ] Start a run, let it fail (or cancel it) so its pointer is kept in `localStorage.scraper_active_run` by design, then in DevTools console run `localStorage.setItem('scraper_active_run', JSON.stringify({...JSON.parse(localStorage.scraper_active_run), startedAt: Date.now() - 2*60*60*1000}))` (backdate it 2 hours) → reload `/run` → **Phase 1 config form shows, not the old failure/result screen** — confirm `localStorage.scraper_active_run` is now gone (not just ignored, actually cleared)
+- [ ] Do the same backdating trick on a **completed** run's pointer → reload `/run` → Phase 1 shows, not a resurrected "✅ Run Complete" screen for a run that finished hours ago
+- [ ] Manually set `localStorage.scraper_active_run` to a value **with no `startedAt` field at all** (simulating an entry written before this fix shipped) → reload `/run` → treated as stale, Phase 1 shows, key gets cleared — old pre-fix entries must not be trusted just because they lack the new field
+- [ ] A pointer **less than an hour old** still restores normally, in whichever phase it's actually in
+- [ ] Visiting `/run?run=<id>` for a real but old/completed run (e.g. via History's "View Details") **always shows that run's state**, regardless of age — the explicit query param is exempt from the staleness check, only the implicit localStorage restore is gated
 
 **Webhook: `POST /api/runs/[id]/complete` (primary auto-assign trigger) — CRITICAL**
 - [ ] No `X-Internal-Api-Key` header → 401
