@@ -9,6 +9,7 @@ import { AreaBadge } from '@/components/ui/AreaBadge'
 import { Plus, Eye, EyeOff, Trash2, UserMinus, ShieldAlert, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
 import type { User, Area } from '@/lib/types'
+import { MAX_INT } from '@/lib/types'
 
 interface UserWithArea extends User {
   area?: Area
@@ -72,10 +73,12 @@ export function UsersManagement() {
   // Confirm modals
   const [confirmUser, setConfirmUser] = useState<UserWithArea | null>(null)
   const [deactivating, setDeactivating] = useState(false)
+  const [deactivateError, setDeactivateError] = useState('')
   const [deleteUser, setDeleteUser] = useState<UserWithArea | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [unassignUser, setUnassignUser] = useState<UserWithArea | null>(null)
+  const [unassignCount, setUnassignCount] = useState<number | null>(null)
   const [unassigning, setUnassigning] = useState(false)
   const [unassignSuccess, setUnassignSuccess] = useState<string | null>(null)
 
@@ -163,13 +166,26 @@ export function UsersManagement() {
     } finally { setCreating(false) }
   }
 
+  // QA-F18: used to blanket-block toggling ANY admin regardless of whether
+  // they're actually the org's last one — the API now enforces the real
+  // rule (same isLastAdmin check DELETE already used), so this just calls
+  // it and surfaces whatever the API decides, for every role.
   async function handleToggleActive(u: UserWithArea) {
-    if (u.role === 'admin') return
     if (!u.is_active) {
       setDeactivating(true)
-      await fetch('/api/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: u.id, is_active: true }) })
-      fetchUsers(); setDeactivating(false); return
+      try {
+        const res = await fetch('/api/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: u.id, is_active: true }) })
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}))
+          setDeactivateError(json.error ?? 'Failed to reactivate')
+          setTimeout(() => setDeactivateError(''), 4000)
+          return
+        }
+        fetchUsers()
+      } finally { setDeactivating(false) }
+      return
     }
+    setDeactivateError('')
     setConfirmUser(u)
   }
 
@@ -177,10 +193,24 @@ export function UsersManagement() {
     if (!confirmUser) return
     setDeactivating(true)
     try {
-      await fetch('/api/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: confirmUser.id, is_active: false }) })
+      const res = await fetch('/api/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: confirmUser.id, is_active: false }) })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) { setDeactivateError(json.error ?? 'Failed to deactivate'); return }
       await logAuditEvent({ event_type: 'sdr_deactivated', metadata: { name: confirmUser.full_name } })
       setConfirmUser(null); fetchUsers()
     } finally { setDeactivating(false) }
+  }
+
+  // QA-F20: the "will become unassigned" warning used to show unconditionally,
+  // even for an SDR with zero leads. Check the real count before opening.
+  async function openUnassign(u: UserWithArea) {
+    setUnassignUser(u)
+    setUnassignCount(null)
+    const { count } = await createClient()
+      .from('prospects')
+      .select('id', { count: 'exact', head: true })
+      .eq('assigned_to', u.id)
+    setUnassignCount(count ?? 0)
   }
 
   async function confirmUnassign() {
@@ -193,6 +223,7 @@ export function UsersManagement() {
       await logAuditEvent({ event_type: 'prospect_reassigned', metadata: { from_sdr: unassignUser.full_name, to_sdr: 'Unassigned', action: 'bulk_unassign', count: json.count } })
       setUnassignSuccess(`${json.count ?? 0} leads unassigned from ${unassignUser.full_name}`)
       setUnassignUser(null)
+      setUnassignCount(null)
       setTimeout(() => setUnassignSuccess(null), 4000)
     } finally { setUnassigning(false) }
   }
@@ -223,7 +254,7 @@ export function UsersManagement() {
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 700 }}>{t('title')}</h1>
           <div style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 4 }}>
-            {activeSdrCount} / {maxSeats === 999 ? '∞' : maxSeats} seats used
+            {activeSdrCount} / {maxSeats >= MAX_INT ? '∞' : maxSeats} seats used
           </div>
         </div>
         <Button onClick={handleCreateClick} style={{ backgroundColor: activeSdrCount >= maxSeats ? 'var(--crm-border)' : 'var(--crm-accent)', color: '#FFF', height: 34, fontSize: 13, gap: 6, display: 'flex', alignItems: 'center' }}>
@@ -276,7 +307,7 @@ export function UsersManagement() {
                 {/* Toggles row */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Toggle checked={u.is_active} onChange={() => handleToggleActive(u)} disabled={isAdminUser || deactivating} />
+                    <Toggle checked={u.is_active} onChange={() => handleToggleActive(u)} disabled={deactivating} />
                     <span style={{ fontSize: 12, color: u.is_active ? '#22C55E' : 'var(--crm-text-muted)', fontWeight: 600 }}>
                       {u.is_active ? 'Active' : 'Inactive'}
                     </span>
@@ -290,7 +321,7 @@ export function UsersManagement() {
                 <div style={{ display: 'flex', gap: 6, borderTop: '1px solid var(--crm-surface-raised)', paddingTop: 12 }}>
                   {!isAdminUser && (
                     <button
-                      onClick={() => setUnassignUser(u)}
+                      onClick={() => openUnassign(u)}
                       style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 5, fontSize: 12, cursor: 'pointer', border: '1px solid #F59E0B40', backgroundColor: '#F59E0B10', color: '#F59E0B' }}
                     >
                       <UserMinus size={12} /> Unassign
@@ -324,7 +355,7 @@ export function UsersManagement() {
             </div>
             <h2 style={{ fontSize: 17, fontWeight: 700, color: '#F59E0B', marginBottom: 10 }}>Seat Limit Reached</h2>
             <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', lineHeight: 1.6, marginBottom: 20 }}>
-              Your plan allows <strong style={{ color: 'var(--crm-text-primary)' }}>{maxSeats}</strong> active SDR{maxSeats !== 1 ? 's' : ''}. Deactivate an existing SDR or upgrade your plan.
+              Your plan allows <strong style={{ color: 'var(--crm-text-primary)' }}>{maxSeats >= MAX_INT ? '∞' : maxSeats}</strong> active SDR{maxSeats !== 1 ? 's' : ''}. Deactivate an existing SDR or upgrade your plan.
             </p>
             <Button onClick={() => setShowSeatLimit(false)} style={{ backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)', width: '100%' }}>Close</Button>
           </div>
@@ -428,15 +459,23 @@ export function UsersManagement() {
 
       {/* Unassign modal */}
       {unassignUser && (
-        <div style={S.modal} onClick={e => { if (e.target === e.currentTarget) setUnassignUser(null) }}>
+        <div style={S.modal} onClick={e => { if (e.target === e.currentTarget) { setUnassignUser(null); setUnassignCount(null) } }}>
           <div style={{ ...S.modalCard, maxWidth: 380 }}>
             <h2 style={{ fontSize: 16, fontWeight: 700, color: '#F59E0B', marginBottom: 12 }}>Unassign leads</h2>
-            <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', lineHeight: 1.6, marginBottom: 20 }}>
-              All leads assigned to <strong style={{ color: 'var(--crm-text-primary)' }}>{unassignUser.full_name}</strong> will become <strong style={{ color: 'var(--crm-text-primary)' }}>unassigned</strong>. Leads are not deleted.
-            </p>
+            {unassignCount === null ? (
+              <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', marginBottom: 20 }}>Checking assigned leads…</p>
+            ) : unassignCount === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', lineHeight: 1.6, marginBottom: 20 }}>
+                <strong style={{ color: 'var(--crm-text-primary)' }}>{unassignUser.full_name}</strong> currently has no leads assigned — nothing to unassign.
+              </p>
+            ) : (
+              <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', lineHeight: 1.6, marginBottom: 20 }}>
+                <strong style={{ color: 'var(--crm-text-primary)' }}>{unassignCount}</strong> lead{unassignCount !== 1 ? 's' : ''} assigned to <strong style={{ color: 'var(--crm-text-primary)' }}>{unassignUser.full_name}</strong> will become <strong style={{ color: 'var(--crm-text-primary)' }}>unassigned</strong>. Leads are not deleted.
+              </p>
+            )}
             <div style={{ display: 'flex', gap: 10 }}>
-              <Button onClick={() => setUnassignUser(null)} style={{ flex: 1, backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}>{t('cancel')}</Button>
-              <Button onClick={confirmUnassign} disabled={unassigning} style={{ flex: 1, backgroundColor: '#F59E0B', color: '#000', fontWeight: 700 }}>
+              <Button onClick={() => { setUnassignUser(null); setUnassignCount(null) }} style={{ flex: 1, backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}>{t('cancel')}</Button>
+              <Button onClick={confirmUnassign} disabled={unassigning || !unassignCount} style={{ flex: 1, backgroundColor: '#F59E0B', color: '#000', fontWeight: 700 }}>
                 {unassigning ? 'Unassigning...' : 'Unassign'}
               </Button>
             </div>
@@ -474,8 +513,11 @@ export function UsersManagement() {
             <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', lineHeight: 1.5, marginBottom: 20 }}>
               {t('deactivateConfirm', { name: confirmUser.full_name })}
             </p>
+            {deactivateError && (
+              <div style={{ padding: '8px 12px', backgroundColor: '#3A1A1A', border: '1px solid #EF4444', borderRadius: 6, color: '#F87171', fontSize: 12, marginBottom: 14 }}>{deactivateError}</div>
+            )}
             <div style={{ display: 'flex', gap: 10 }}>
-              <Button onClick={() => setConfirmUser(null)} style={{ flex: 1, backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}>{t('cancel')}</Button>
+              <Button onClick={() => { setConfirmUser(null); setDeactivateError('') }} style={{ flex: 1, backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)' }}>{t('cancel')}</Button>
               <Button onClick={confirmDeactivate} disabled={deactivating} style={{ flex: 1, backgroundColor: '#EF4444', color: '#FFF' }}>
                 {deactivating ? t('deactivating') : t('deactivate')}
               </Button>
@@ -488,6 +530,15 @@ export function UsersManagement() {
       {unassignSuccess && (
         <div style={{ position: 'fixed', bottom: 24, right: 24, backgroundColor: '#1C2A1C', border: '1px solid #22C55E40', borderRadius: 8, padding: '12px 18px', color: '#22C55E', fontSize: 13, fontWeight: 500, zIndex: 100 }}>
           ✓ {unassignSuccess}
+        </div>
+      )}
+
+      {/* Reactivate failure — the deactivate-path error shows inline in its
+          own modal instead; this only fires for the direct toggle-to-active
+          path, which has no modal of its own. */}
+      {deactivateError && !confirmUser && (
+        <div style={{ position: 'fixed', bottom: 24, right: 24, backgroundColor: '#3A1A1A', border: '1px solid #EF444440', borderRadius: 8, padding: '12px 18px', color: '#F87171', fontSize: 13, fontWeight: 500, zIndex: 100 }}>
+          {deactivateError}
         </div>
       )}
     </div>

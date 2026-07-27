@@ -245,6 +245,20 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Missing is_active or action' }, { status: 400 })
   }
 
+  // QA-F18: the frontend used to blanket-block deactivating ANY admin,
+  // regardless of whether the org had other admins — inconsistent with
+  // DELETE and the role-change path above, both of which only block when
+  // the target is genuinely the last one. Same real check here instead.
+  if (is_active === false) {
+    const { data: target } = await adminClient.from('users').select('role, organization_id').eq('id', id).single()
+    if (target?.role === 'admin' && await isLastAdmin(adminClient, target.organization_id)) {
+      const { data: org } = await adminClient.from('organizations').select('name').eq('id', target.organization_id).single()
+      return NextResponse.json({
+        error: `Cannot deactivate — ${org?.name ?? 'this organization'} must have at least one active admin. Promote another admin first.`,
+      }, { status: 403 })
+    }
+  }
+
   const { error } = await adminClient.from('users').update({ is_active }).eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
