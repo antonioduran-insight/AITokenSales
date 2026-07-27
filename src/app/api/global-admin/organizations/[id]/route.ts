@@ -100,6 +100,49 @@ export async function PATCH(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
+  // QA-F3: admin_email/admin_password aren't organizations columns — they
+  // belong to the org's admin user (Supabase Auth + the mirrored email on
+  // public.users, same two-places-at-once pattern create-org uses when
+  // first creating that user). Resolved and updated separately from the
+  // organizations patch below.
+  if ('admin_email' in fields || 'admin_password' in fields) {
+    const { data: adminUser, error: adminLookupError } = await admin
+      .from('users')
+      .select('id, email')
+      .eq('organization_id', id)
+      .eq('role', 'admin')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (adminLookupError || !adminUser) {
+      return NextResponse.json({ error: 'This organization has no active admin to update.' }, { status: 400 })
+    }
+
+    const authUpdate: { email?: string; password?: string } = {}
+    if (fields.admin_email && fields.admin_email !== adminUser.email) authUpdate.email = fields.admin_email
+    if (fields.admin_password) authUpdate.password = fields.admin_password
+
+    if (Object.keys(authUpdate).length > 0) {
+      const { error: authError } = await admin.auth.admin.updateUserById(adminUser.id, authUpdate)
+      if (authError) return NextResponse.json({ error: authError.message }, { status: 400 })
+
+      if (authUpdate.email) {
+        const { error: emailSyncError } = await admin.from('users').update({ email: authUpdate.email }).eq('id', adminUser.id)
+        if (emailSyncError) return NextResponse.json({ error: emailSyncError.message }, { status: 400 })
+      }
+    }
+  }
+
+  // A request updating only admin_email/admin_password has nothing left for
+  // the organizations table — skip the update rather than sending an empty
+  // SET clause.
+  if (Object.keys(patch).length === 0) {
+    const { data, error } = await admin.from('organizations').select('*').eq('id', id).single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json(data)
+  }
+
   const { data, error } = await admin
     .from('organizations')
     .update(patch)

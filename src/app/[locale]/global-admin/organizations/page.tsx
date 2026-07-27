@@ -42,6 +42,7 @@ export default function OrganizationsPage() {
   const [orgs, setOrgs] = useState<EnrichedOrg[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
   const [filterPlan, setFilterPlan] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterVendor, setFilterVendor] = useState('all')
@@ -57,6 +58,9 @@ export default function OrganizationsPage() {
   const vendors = Array.from(new Set(orgs.map(o => o.vendor).filter(Boolean))) as string[]
 
   const filtered = orgs.filter(o => {
+    // QA-F2: there was no name search at all — filtering by plan/status/
+    // vendor worked, but typing a name did nothing because nothing read it.
+    if (search.trim() && !o.name.toLowerCase().includes(search.trim().toLowerCase())) return false
     if (filterPlan !== 'all' && o.plan !== filterPlan) return false
     if (filterStatus === 'active' && !o.is_active) return false
     if (filterStatus === 'inactive' && o.is_active) return false
@@ -98,6 +102,13 @@ export default function OrganizationsPage() {
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by name..."
+          style={{ ...selectStyle, cursor: 'text', minWidth: 200 }}
+        />
         <select value={filterPlan} onChange={e => setFilterPlan(e.target.value)} style={selectStyle}>
           <option value="all">{t('allPlans')}</option>
           <option value="basic">Basic</option>

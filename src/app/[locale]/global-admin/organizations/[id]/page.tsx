@@ -7,7 +7,7 @@ import { ArrowLeft } from 'lucide-react'
 import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
 import { createClient } from '@/lib/supabase/client'
 import type { Organization, OrganizationAddon } from '@/lib/types'
-import { ADDON_LIST } from '@/lib/types'
+import { ADDON_LIST, PLAN_DEFAULTS } from '@/lib/types'
 
 const PLAN_COLORS: Record<string, string> = {
   basic: '#3B82F6', premium: '#8B5CF6', enterprise: '#F59E0B', ultra: '#EF4444',
@@ -43,6 +43,9 @@ export default function OrgDetailPage() {
 
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
+  const [plan, setPlan] = useState<'basic' | 'premium' | 'enterprise' | 'ultra'>('basic')
+  const [maxSeats, setMaxSeats] = useState<number>(3)
+  const [maxLeads, setMaxLeads] = useState<number>(1000)
   const [vendor, setVendor] = useState('')
   const [billingDay, setBillingDay] = useState<number>(10)
   const [defaultLanguage, setDefaultLanguage] = useState('')
@@ -50,8 +53,11 @@ export default function OrgDetailPage() {
   const [logoPreview, setLogoPreview] = useState('')
   const [logoUploading, setLogoUploading] = useState(false)
   const [internalNotes, setInternalNotes] = useState('')
+  const [adminEmail, setAdminEmail] = useState('')
+  const [adminPassword, setAdminPassword] = useState('')
   const [savingInfo, setSavingInfo] = useState(false)
   const [savedInfo, setSavedInfo] = useState(false)
+  const [saveInfoError, setSaveInfoError] = useState('')
 
   const [activeAddons, setActiveAddons] = useState<Set<string>>(new Set())
   const [togglingAddon, setTogglingAddon] = useState<string | null>(null)
@@ -80,12 +86,16 @@ export default function OrgDetailPage() {
       setOrg(data)
       setName(data.name)
       setSlug(data.slug)
+      setPlan(data.plan ?? 'basic')
+      setMaxSeats(data.max_seats ?? 3)
+      setMaxLeads(data.max_leads_per_month ?? 1000)
       setVendor(data.vendor ?? '')
       setBillingDay(data.billing_day ?? 10)
       setDefaultLanguage(data.default_language ?? 'zh')
       setLogoUrl(data.logo_url ?? '')
       setLogoPreview(data.logo_url ?? '')
       setInternalNotes(data.internal_notes ?? '')
+      setAdminEmail(data.admin_email ?? '')
       setApifyToken(data.apify_token ?? '')
       setAnthropicKey(data.anthropic_key ?? '')
       setAnthropicBaseUrl(data.anthropic_base_url ?? 'https://api.aitokenking.com.tw/api/v1')
@@ -103,6 +113,14 @@ export default function OrgDetailPage() {
   function handleNameChange(newName: string) {
     setName(newName)
     setSlug(generateSlug(newName))
+  }
+
+  // QA-F3: mirrors New Organization's own handlePlanChange — changing plan
+  // here should auto-fill seats/leads the same way it does at creation time.
+  function handlePlanChange(newPlan: typeof plan) {
+    setPlan(newPlan)
+    const defaults = PLAN_DEFAULTS[newPlan]
+    if (defaults) { setMaxSeats(defaults.max_seats); setMaxLeads(defaults.max_leads_per_month) }
   }
 
   async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -127,14 +145,25 @@ export default function OrgDetailPage() {
 
   async function saveInfo() {
     setSavingInfo(true)
+    setSaveInfoError('')
     try {
       const res = await fetch(`/api/global-admin/organizations/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, slug, vendor: vendor || null, billing_day: billingDay, default_language: defaultLanguage, logo_url: logoUrl || null }),
+        body: JSON.stringify({
+          name, slug, vendor: vendor || null, billing_day: billingDay, default_language: defaultLanguage, logo_url: logoUrl || null,
+          plan, max_seats: maxSeats, max_leads_per_month: maxLeads,
+          admin_email: adminEmail || undefined,
+          admin_password: adminPassword || undefined,
+        }),
       })
-      if (res.ok) { setSavedInfo(true); setTimeout(() => setSavedInfo(false), 2000) }
-    } catch { /* network error */ } finally { setSavingInfo(false) }
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setSaveInfoError(data.error ?? 'Failed to save'); return }
+      setAdminPassword('') // never keep a typed password around longer than needed
+      setSavedInfo(true); setTimeout(() => setSavedInfo(false), 2000)
+    } catch (e) {
+      setSaveInfoError(e instanceof Error ? e.message : 'Network error')
+    } finally { setSavingInfo(false) }
   }
 
   async function saveApiKeys() {
@@ -326,6 +355,40 @@ export default function OrgDetailPage() {
                 <option value="vi">Tiếng Việt</option>
               </select>
             </div>
+
+            {/* QA-F3: plan/admin email/password used to require a direct DB edit */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>{t('plan')}</label>
+              <select value={plan} onChange={e => handlePlanChange(e.target.value as typeof plan)} style={inputStyle}>
+                <option value="basic">Basic</option>
+                <option value="premium">Premium</option>
+                <option value="enterprise">Enterprise</option>
+                <option value="ultra">Ultra</option>
+              </select>
+            </div>
+            <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div>
+                <label style={labelStyle}>Max Seats</label>
+                <input type="number" min={1} value={maxSeats} onChange={e => setMaxSeats(Number(e.target.value))} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Max Leads / Month</label>
+                <input type="number" min={1} value={maxLeads} onChange={e => setMaxLeads(Number(e.target.value))} style={inputStyle} />
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Admin Email</label>
+              <input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} style={inputStyle} placeholder="admin@company.com" />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Admin Password</label>
+              <input type="password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} style={inputStyle} placeholder="Leave blank to keep current password" autoComplete="new-password" />
+            </div>
+
+            {saveInfoError && (
+              <div style={{ padding: '8px 12px', backgroundColor: '#3A1A1A', border: '1px solid #EF4444', borderRadius: 6, color: '#F87171', fontSize: 12, marginBottom: 14 }}>{saveInfoError}</div>
+            )}
+
             <button
               onClick={saveInfo}
               disabled={savingInfo}
