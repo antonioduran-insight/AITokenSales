@@ -372,7 +372,7 @@ export default function RevenuePage() {
       {/* Tables: MRR by org + Setup fees + Vendor */}
       <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
         <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: 'auto' }}>
-          <div style={{ padding: '14px 18px', borderBottom: `1px solid ${colors.border}`, fontSize: 14, fontWeight: 600, color: colors.textPrimary }}>MRR por Organización</div>
+          <div style={{ padding: '14px 18px', borderBottom: `1px solid ${colors.border}`, fontSize: 14, fontWeight: 600, color: colors.textPrimary }}>{t('mrrByOrg')}</div>
           <table style={{ width: '100%', minWidth: 460, borderCollapse: 'collapse' }}>
             <thead>
               <tr>

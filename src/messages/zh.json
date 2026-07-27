@@ -325,8 +325,27 @@
     "unassigned": "未分配",
     "reassign": "重新分配",
     "reassigning": "重新分配中...",
+    "reassignedTo": "潛在客戶已重新分配給 {name}",
+    "noActiveSdrsInArea": "此地區沒有活躍的銷售代表",
     "selected": "已選 {count} 個",
     "leadsCount": "{count} 個線索",
     "flagTomorrow": "已標記明天跟進"
+  },
+  "export": {
+    "title": "匯出 CSV",
+    "selectRunLabel": "選擇 Run",
+    "selectRunPlaceholder": "選擇一個 run...",
+    "counting": "計算中...",
+    "leadsToExport": "個線索待匯出",
+    "downloadCsv": "下載 CSV",
+    "preview": "預覽",
+    "tableName": "姓名",
+    "tableCompany": "公司",
+    "tableTitle": "職稱",
+    "tableIcp": "ICP",
+    "tableTemp": "溫度",
+    "tableCustom1": "自訂 1",
+    "moreInCsv": "...以及 CSV 中另外 {count} 筆",
+    "csvColumns": "CSV 欄位"
   }
 }

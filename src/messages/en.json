@@ -325,8 +325,27 @@
     "unassigned": "Unassigned",
     "reassign": "Reassign",
     "reassigning": "Reassigning...",
+    "reassignedTo": "Lead reassigned to {name}",
+    "noActiveSdrsInArea": "No active SDRs in this area",
     "selected": "{count} selected",
     "leadsCount": "{count} leads",
     "flagTomorrow": "Flagged for Tomorrow"
+  },
+  "export": {
+    "title": "Export CSV",
+    "selectRunLabel": "Select run",
+    "selectRunPlaceholder": "Select a run...",
+    "counting": "Counting...",
+    "leadsToExport": "leads to export",
+    "downloadCsv": "Download CSV",
+    "preview": "Preview",
+    "tableName": "Name",
+    "tableCompany": "Company",
+    "tableTitle": "Title",
+    "tableIcp": "ICP",
+    "tableTemp": "Temp",
+    "tableCustom1": "Custom 1",
+    "moreInCsv": "... and {count} more in the CSV",
+    "csvColumns": "CSV Columns"
   }
 }

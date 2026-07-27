@@ -135,7 +135,7 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
   async function handleReassign(newSdrId: string) {
     if (!newSdrId || newSdrId === prospect.assigned_to) return
     setReassigning(true)
-    const fromName = (prospect.assigned_user as User | undefined)?.full_name ?? 'Sin asignar'
+    const fromName = (prospect.assigned_user as User | undefined)?.full_name ?? t('common.unassigned')
     try {
       const res = await fetch('/api/prospects', {
         method: 'PATCH',
@@ -154,7 +154,7 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
         prospect_name: prospect.name,
         metadata: { from_sdr: fromName, to_sdr: data.sdr_name },
       })
-      showToast(`Lead reasignado a ${data.sdr_name}`)
+      showToast(t('common.reassignedTo', { name: data.sdr_name }))
     } finally { setReassigning(false) }
   }
 
@@ -496,13 +496,13 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
                         disabled={reassigning || sdrsForArea.length === 0}
                         style={{ ...selectStyle, opacity: reassigning ? 0.6 : 1 }}
                       >
-                        <option value="">Sin asignar</option>
+                        <option value="">{t('common.unassigned')}</option>
                         {sdrsForArea.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
                       </select>
                       <ChevronDown size={12} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--crm-text-muted)', pointerEvents: 'none' }} />
                     </div>
                     {sdrsForArea.length === 0 && (
-                      <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 4 }}>No hay SDRs activos en esta área</p>
+                      <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 4 }}>{t('common.noActiveSdrsInArea')}</p>
                     )}
                   </div>
                 ) : prospect.assigned_user ? (

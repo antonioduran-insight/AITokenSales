@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { createClient } from '@/lib/supabase/client';
 import { TemperatureBadge } from '@/components/scraper/TemperatureBadge';
 import { ICPScore } from '@/components/scraper/ICPScore';
@@ -24,6 +25,8 @@ function leadsToCSV(leads: Lead[]): string {
 }
 
 function ExportContent() {
+  const t = useTranslations('export');
+  const tc = useTranslations('common');
   const searchParams = useSearchParams();
   const runIdParam = searchParams.get('run_id');
 
@@ -70,14 +73,14 @@ function ExportContent() {
 
   return (
     <div style={{ padding: '24px', color: 'var(--crm-text-primary)', maxWidth: 900 }}>
-      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>Exportar CSV</h1>
+      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>{t('title')}</h1>
 
       {/* Config */}
       <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: '20px 24px', marginBottom: 20 }}>
-        <label style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 8 }}>Seleccionar run</label>
+        <label style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 8 }}>{t('selectRunLabel')}</label>
         <select value={selectedRunId} onChange={e => setSelectedRunId(e.target.value)}
           style={{ width: '100%', padding: '8px 12px', borderRadius: 8, backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', color: 'var(--crm-text-primary)', fontSize: 13, outline: 'none', marginBottom: 16 }}>
-          <option value="">Seleccioná un run...</option>
+          <option value="">{t('selectRunPlaceholder')}</option>
           {runs.map(r => (
             <option key={r.id} value={r.id}>
               {(r.markets?.length ? r.markets : [r.market]).join(' + ')} — {new Date(r.created_at).toLocaleDateString()}
@@ -86,15 +89,15 @@ function ExportContent() {
         </select>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 10, borderTop: '1px solid var(--crm-border)', paddingTop: 16 }}>
           <div style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>
-            {loading ? 'Contando...' : (
+            {loading ? t('counting') : (
               <span>
-                <span style={{ color: 'var(--crm-text-primary)', fontWeight: 700, fontFamily: 'monospace' }}>{leads.length}</span> leads a exportar
+                <span style={{ color: 'var(--crm-text-primary)', fontWeight: 700, fontFamily: 'monospace' }}>{leads.length}</span> {t('leadsToExport')}
               </span>
             )}
           </div>
           <button onClick={handleDownload} disabled={!selectedRunId || leads.length === 0 || loading}
             style={{ display: 'flex', alignItems: 'center', gap: 8, backgroundColor: !selectedRunId || leads.length === 0 || loading ? 'var(--crm-border)' : 'var(--crm-accent)', color: '#FFF', padding: '9px 18px', borderRadius: 8, border: 'none', cursor: !selectedRunId || leads.length === 0 || loading ? 'default' : 'pointer', fontSize: 13, fontWeight: 600 }}>
-            <Download size={15} />Descargar CSV
+            <Download size={15} />{t('downloadCsv')}
           </button>
         </div>
       </div>
@@ -102,12 +105,12 @@ function ExportContent() {
       {/* Preview */}
       {leads.length > 0 && (
         <div>
-          <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Preview — {leads.length} leads</p>
+          <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>{t('preview')} — {tc('leadsCount', { count: leads.length })}</p>
           <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 10, overflow: 'auto', marginBottom: 20 }}>
             <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--crm-border)' }}>
-                  {['Nombre', 'Empresa', 'Título', 'ICP', 'Temp', 'Custom 1'].map(h => (
+                  {[t('tableName'), t('tableCompany'), t('tableTitle'), t('tableIcp'), t('tableTemp'), t('tableCustom1')].map(h => (
                     <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 10, color: 'var(--crm-text-muted)', fontWeight: 600 }}>{h}</th>
                   ))}
                 </tr>
@@ -123,7 +126,7 @@ function ExportContent() {
                     <td style={{ padding: '7px 14px', color: 'var(--crm-text-muted)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>{lead.custom1 || '—'}</td>
                   </tr>
                 ))}
-                {leads.length > 30 && <tr><td colSpan={6} style={{ padding: '6px 14px', textAlign: 'center', fontSize: 11, color: 'var(--crm-text-muted)', borderTop: '1px solid var(--crm-border)' }}>... y {leads.length - 30} más en el CSV</td></tr>}
+                {leads.length > 30 && <tr><td colSpan={6} style={{ padding: '6px 14px', textAlign: 'center', fontSize: 11, color: 'var(--crm-text-muted)', borderTop: '1px solid var(--crm-border)' }}>{t('moreInCsv', { count: leads.length - 30 })}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -132,7 +135,7 @@ function ExportContent() {
 
       {/* Columns */}
       <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 10, padding: '16px 20px' }}>
-        <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Columnas del CSV</p>
+        <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>{t('csvColumns')}</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {CSV_COLUMNS.map(col => (
             <span key={col} style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--crm-accent)', backgroundColor: '#6C63FF15', border: '1px solid #6C63FF20', padding: '2px 8px', borderRadius: 5 }}>{col}</span>
@@ -144,8 +147,9 @@ function ExportContent() {
 }
 
 export function ExportClient() {
+  const tc = useTranslations('common');
   return (
-    <Suspense fallback={<p style={{ color: 'var(--crm-text-muted)', padding: 40 }}>Cargando...</p>}>
+    <Suspense fallback={<p style={{ color: 'var(--crm-text-muted)', padding: 40 }}>{tc('loading')}</p>}>
       <ExportContent />
     </Suspense>
   );

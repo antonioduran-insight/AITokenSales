@@ -325,8 +325,27 @@
     "unassigned": "Chưa phân công",
     "reassign": "Phân công lại",
     "reassigning": "Đang phân công lại...",
+    "reassignedTo": "Lead đã được phân công lại cho {name}",
+    "noActiveSdrsInArea": "Không có SDR nào đang hoạt động trong khu vực này",
     "selected": "Đã chọn {count}",
     "leadsCount": "{count} khách hàng",
     "flagTomorrow": "Đã đánh dấu cho ngày mai"
+  },
+  "export": {
+    "title": "Xuất CSV",
+    "selectRunLabel": "Chọn run",
+    "selectRunPlaceholder": "Chọn một run...",
+    "counting": "Đang đếm...",
+    "leadsToExport": "khách hàng để xuất",
+    "downloadCsv": "Tải xuống CSV",
+    "preview": "Xem trước",
+    "tableName": "Tên",
+    "tableCompany": "Công ty",
+    "tableTitle": "Chức danh",
+    "tableIcp": "ICP",
+    "tableTemp": "Temp",
+    "tableCustom1": "Custom 1",
+    "moreInCsv": "... và {count} nữa trong CSV",
+    "csvColumns": "Cột CSV"
   }
 }
