@@ -10,7 +10,11 @@ interface Props {
   onSaved?: () => void
 }
 
+// '' is the UI's stand-in for "unset" (sent to the API as null) — a
+// dedicated option rather than silently defaulting to English, so the form
+// can't manufacture an explicit "en" the SDR never actually chose.
 const LANGUAGES = [
+  { value: '', label: 'Automatic (match market)' },
   { value: 'en', label: 'English' },
   { value: 'zh', label: 'Chinese (繁體)' },
   { value: 'es', label: 'Spanish' },
@@ -39,7 +43,7 @@ export function SenderProfileModal({ userId, onClose, onSaved }: Props) {
   const [styleHint, setStyleHint] = useState('')
   const [icpFocusInput, setIcpFocusInput] = useState('')
   const [icpFocus, setIcpFocus] = useState<string[]>([])
-  const [language, setLanguage] = useState('en')
+  const [language, setLanguage] = useState('')
   const [isDefault, setIsDefault] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -55,7 +59,7 @@ export function SenderProfileModal({ userId, onClose, onSaved }: Props) {
   function openNew() {
     setIsNew(true); setEditing(null)
     setDisplayName(''); setTitle(''); setCompany(''); setStyleHint('')
-    setIcpFocus([]); setIcpFocusInput(''); setLanguage('en'); setIsDefault(false)
+    setIcpFocus([]); setIcpFocusInput(''); setLanguage(''); setIsDefault(false)
     setError(null)
   }
 
@@ -63,7 +67,7 @@ export function SenderProfileModal({ userId, onClose, onSaved }: Props) {
     setIsNew(false); setEditing(profile)
     setDisplayName(profile.display_name); setTitle(profile.title)
     setCompany(profile.company); setStyleHint(profile.style_hint)
-    setIcpFocus(profile.icp_focus ?? []); setIcpFocusInput(''); setLanguage(profile.language)
+    setIcpFocus(profile.icp_focus ?? []); setIcpFocusInput(''); setLanguage(profile.language ?? '')
     setIsDefault(profile.is_default); setError(null)
   }
 
@@ -78,7 +82,7 @@ export function SenderProfileModal({ userId, onClose, onSaved }: Props) {
   async function handleSave() {
     if (!displayName || !title || !company) { setError('Display name, title and company are required'); return }
     setSaving(true); setError(null)
-    const payload = { display_name: displayName, title, company, style_hint: styleHint, icp_focus: icpFocus, language, is_default: isDefault }
+    const payload = { display_name: displayName, title, company, style_hint: styleHint, icp_focus: icpFocus, language: language || null, is_default: isDefault }
 
     const url = editing ? `/api/sender-profiles/${editing.id}` : '/api/sender-profiles'
     const method = editing ? 'PATCH' : 'POST'

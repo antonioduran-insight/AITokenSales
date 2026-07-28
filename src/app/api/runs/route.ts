@@ -88,7 +88,9 @@ export async function POST(req: NextRequest) {
         company: string
         style_hint: string | null
         icp_focus: string[]
-        language: string
+        // null = SDR never set a language; the backend then defers to the
+        // market's own language rather than defaulting to English.
+        language: string | null
         years_experience: number | null
         seniority: string | null
         expertise_area: string | null
@@ -121,7 +123,11 @@ export async function POST(req: NextRequest) {
         company: profile.company,
         style_hint: profile.style_hint ?? null,
         icp_focus: profile.icp_focus ?? [],
-        language: profile.language ?? 'en',
+        // Was `?? 'en'` — that coalesced a genuinely-unset language back
+        // into an explicit "en" right before it reached the backend,
+        // silently undoing the NULL-means-unset distinction the DB column
+        // and message_generator now rely on (QA-P1).
+        language: profile.language ?? null,
         years_experience: sdrCtx?.years_experience ?? null,
         seniority: sdrCtx?.seniority ?? null,
         expertise_area: sdrCtx?.expertise_area ?? null,

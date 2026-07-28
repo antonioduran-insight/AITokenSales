@@ -78,7 +78,10 @@ export async function POST(req: NextRequest) {
       company,
       style_hint: style_hint ?? '',
       icp_focus: icp_focus ?? [],
-      language: language ?? 'en',
+      // Falsy (undefined/null/'') means the admin never touched the language
+      // selector — stored as NULL, not 'en', so the backend can tell "unset"
+      // apart from an actual English choice and defer to the market instead.
+      language: language || null,
       is_default: is_default ?? false,
       is_active: true,
     })

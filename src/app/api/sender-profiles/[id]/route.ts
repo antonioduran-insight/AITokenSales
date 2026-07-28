@@ -26,6 +26,9 @@ export async function PATCH(
   for (const key of allowed) {
     if (key in body) patch[key] = body[key]
   }
+  // Same "falsy means unset" normalization as POST — otherwise the "Automatic"
+  // option (sent as '') would persist as an empty string instead of NULL.
+  if ('language' in patch) patch.language = patch.language || null
 
   const writer = isAdmin ? createAdminClient() : supabase
 

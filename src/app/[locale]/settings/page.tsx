@@ -405,7 +405,7 @@ function ScraperTab() {
   const [sdrs, setSdrs] = useState<User[]>([])
   const [profilesBySdr, setProfilesBySdr] = useState<Record<string, SenderProfile[]>>({})
   const [openFormFor, setOpenFormFor] = useState<string | null>(null)
-  const [formFields, setFormFields] = useState({ display_name: '', title: '', company: '', style_hint: '', language: 'en', is_default: true })
+  const [formFields, setFormFields] = useState({ display_name: '', title: '', company: '', style_hint: '', language: '', is_default: true })
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
 
@@ -458,7 +458,7 @@ function ScraperTab() {
         return { ...prev, [sdrId]: [...updated, data] }
       })
       setOpenFormFor(null)
-      setFormFields({ display_name: '', title: '', company: '', style_hint: '', language: 'en', is_default: true })
+      setFormFields({ display_name: '', title: '', company: '', style_hint: '', language: '', is_default: true })
     } catch { setProfileError('Network error') } finally { setSavingProfile(false) }
   }
 
@@ -530,7 +530,7 @@ function ScraperTab() {
                       )}
                     </div>
                     <button
-                      onClick={() => { setOpenFormFor(isOpen ? null : sdr.id); setProfileError(null); setFormFields({ display_name: '', title: '', company: '', style_hint: '', language: 'en', is_default: true }) }}
+                      onClick={() => { setOpenFormFor(isOpen ? null : sdr.id); setProfileError(null); setFormFields({ display_name: '', title: '', company: '', style_hint: '', language: '', is_default: true }) }}
                       style={{ ...S.btn, padding: '5px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}
                     >
                       <Plus size={12} /> Add profile
@@ -589,6 +589,7 @@ function ScraperTab() {
                         <div>
                           <label style={S.label}>Language</label>
                           <select value={formFields.language} onChange={e => setFormFields(p => ({ ...p, language: e.target.value }))} style={S.select}>
+                            <option value="">Automatic (match market)</option>
                             <option value="en">English</option>
                             <option value="zh">中文</option>
                             <option value="es">Español</option>

@@ -214,7 +214,9 @@ export interface SenderProfile {
   company: string
   style_hint: string
   icp_focus: string[]
-  language: string
+  /** null = the SDR never touched the language selector; the backend then
+   * defers to the market's own language instead of forcing English. */
+  language: string | null
   is_default: boolean
   is_active: boolean
   created_at: string
