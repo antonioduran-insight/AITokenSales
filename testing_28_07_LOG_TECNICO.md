@@ -38,6 +38,40 @@ BE:  message_generator.py:52  → _language_instruction() → texto del prompt
 
 **La lógica es correcta.** El fix de código está bien hecho y bien comentado.
 
+> # 🔄 ACTUALIZACIÓN 29/07 — dos hipótesis más caídas, y qué queda
+>
+> **1. El modelo NUNCA cambió.** Frank confirmó que `claude-sonnet-5` siempre estuvo
+> configurado en Global Admin; el commit `bfce308` solo alineó el default del repo con
+> lo que la base ya tenía. **Se cae la correlación de "el modelo cambió 54 minutos
+> antes de los runs malos"** — no hubo cambio de modelo. Era un artefacto de leer el
+> git en vez de la configuración real, el mismo error de método que ya me pasó dos
+> veces en esta sesión.
+>
+> **2. No pude reproducir el bug.** Corrí 2 runs de Taiwán (`1ccf7754` y `8c6a07e2`,
+> más `IT Manager/CIO`): **4 leads, los 4 en tradicional correcto, cero caracteres
+> simplificados** (medido sobre el texto de los mensajes, filtrando los nombres de
+> empresa para no contaminar la cuenta). No reproducido ≠ arreglado.
+>
+> **Limitación del experimento, importante:** la **deduplicación** impide repetir la
+> misma configuración — el segundo run de Taiwán + CTO/VP Engineering devolvió **0
+> leads** porque esos ya estaban vistos. Hay que variar el combo para obtener muestras
+> nuevas, y eso agota los combos disponibles por mercado rápido.
+>
+> **Estado del descarte:** `markets` ✅ correcto · perfiles en NULL ✅ · Railway con el
+> fix ✅ · prompt (para Taiwán ya era prosa completa) ✅ · **modelo sin cambios** ✅ ·
+> company context en inglés ✅ · style hints en inglés ✅.
+>
+> **Queda una sola explicación en pie: no-determinismo del modelo o de la proxy**, sin
+> ningún cambio de configuración que lo dispare. Encaja con la evidencia: dos runs de
+> Taiwán minutos aparte con prompt idéntico dieron scripts distintos, y ahora 4 muestras
+> seguidas salieron bien. No pasa siempre; pasa a veces.
+>
+> **Sin testear todavía:** el caso **USA/Canadá en español**, que era el más
+> contundente (todos los leads de un SDR en español, no un caso borde). Solo re-testeé
+> Taiwán. Frank lo prueba por su lado.
+>
+> ---
+
 > # ⛔ VEREDICTO FINAL DEL P1 (28/07, verificado en producción con datos de hoy)
 >
 > **El P1 NO está resuelto, y el fix que se shipeó ataca la capa equivocada.**
