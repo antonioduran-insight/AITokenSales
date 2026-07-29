@@ -51,12 +51,42 @@
     "Hot": "Caliente"
   },
   "searchCombo": {
-    "A": "Combo A",
-    "B": "Combo B",
-    "C": "Combo C",
-    "D": "Combo D",
-    "E": "Combo E",
-    "F": "Combo F"
+    "combo_A": {
+      "name": "Gerente de IT / CIO",
+      "description": "Decisores de IT en empresas medianas"
+    },
+    "combo_B": {
+      "name": "Director de Marketing",
+      "description": "Líderes de marketing y profesionales de growth"
+    },
+    "combo_C": {
+      "name": "Transformación Digital / CDO",
+      "description": "Líderes de transformación digital e innovación"
+    },
+    "combo_D": {
+      "name": "CTO / VP de Ingeniería",
+      "description": "Liderazgo técnico en empresas de tecnología"
+    },
+    "combo_E": {
+      "name": "E-commerce / Operaciones",
+      "description": "Gerentes de operaciones y e-commerce"
+    },
+    "combo_G": {
+      "name": "Product / Eng Manager",
+      "description": "Gerentes de producto e ingeniería"
+    },
+    "combo_H": {
+      "name": "Ventas / Desarrollo de Negocio",
+      "description": "Líderes de ventas y desarrollo de negocio"
+    },
+    "combo_I": {
+      "name": "RR.HH. / Talento",
+      "description": "Líderes de recursos humanos y adquisición de talento"
+    },
+    "combo_J": {
+      "name": "Finanzas / CFO",
+      "description": "Líderes de finanzas y contabilidad"
+    }
   },
   "auth": {
     "login": "Iniciar Sesión",
@@ -623,5 +653,45 @@
     },
     "companyContextPlaceholder": "Describí qué hace tu empresa, a quién le vendés y cualquier producto o foco específico que quieras que mencionen tus mensajes de contacto. Ejemplo: vendemos software de CRM con IA a equipos de ventas B2B en Asia. Ahora estamos empujando nuestra nueva función de automatización — mencionala cuando venga al caso.",
     "bridgeContextPlaceholder": "Describí qué tipo de partnerships buscás a través de Bridge — qué ofrecés como partner, qué buscás a cambio y cualquier tipo de acuerdo específico que quieras priorizar ahora. Ejemplo: buscamos partners revendedores del rubro SaaS que atiendan empresas mid-market. Ofrecemos 20% de comisión y soporte completo de onboarding."
+  },
+  "run": {
+    "title": "Nueva Búsqueda",
+    "newRun": "Nueva Búsqueda",
+    "quotaUnlimited": "Leads ilimitados disponibles este mes",
+    "quotaAvailable": "{count} leads disponibles este mes",
+    "quotaBillingPeriod": "{count} leads disponibles en este período de facturación",
+    "overLimit": "Solo quedan {count} leads en este período de facturación — bajá el total para continuar.",
+    "sectionMarket": "Mercado",
+    "sectionSearchStrategy": "Estrategia de Búsqueda",
+    "noCombos": "No hay estrategias de búsqueda activas. Activalas en Configuración → Scraper.",
+    "sectionTotalLeads": "Total de Leads",
+    "sectionAssignSdr": "Asignar a SDR",
+    "noSdrsForRegion": "No hay SDRs asignados a {region}. Asigná un área a un SDR en Configuración → Usuarios.",
+    "assignSummary": "{count} leads → {name}",
+    "submitErrorTitle": "No se pudo iniciar la búsqueda",
+    "starting": "Iniciando…",
+    "limitReached": "Límite mensual alcanzado",
+    "runScraping": "Iniciar Búsqueda",
+    "statusPending": "Inicializando…",
+    "statusRunning": "En ejecución…",
+    "statusWorking": "Procesando…",
+    "distributing": "Distribuyendo leads al SDR…",
+    "reconnecting": "Reconectando…",
+    "reconnectingDetail": "Hay problemas para llegar al servidor — suele pasar durante un redespliegue breve del backend. Seguimos verificando cada pocos segundos; la búsqueda continúa procesándose en segundo plano de todas formas.",
+    "progressHint": "Esto suele tardar 2–5 minutos. No cerrés esta pestaña — pero si la cerrás, seguimos trabajando en segundo plano.",
+    "leadsSoFar": "{count} / {total} leads hasta ahora",
+    "cancelling": "Cancelando…",
+    "cancelRun": "Cancelar búsqueda",
+    "cancelledTitle": "Búsqueda cancelada",
+    "cancelledDetail": "Esta búsqueda se detuvo antes de terminar.",
+    "completeTitle": "Búsqueda Completada",
+    "completeSubtitle": "{count} leads generados en {markets}",
+    "assignedTo": "Asignado a",
+    "viewDetailed": "Ver Detalle",
+    "failedTitle": "La búsqueda falló",
+    "errorLabel": "Error",
+    "errorSupportHint": "Si esto sigue pasando, enviá este mensaje a soporte.",
+    "noErrorDetails": "No se reportaron detalles del error. Contactá a soporte.",
+    "statusRequestFailed": "Falló la consulta de estado ({status})"
   }
 }

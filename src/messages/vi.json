@@ -51,12 +51,42 @@
     "Hot": "Nóng"
   },
   "searchCombo": {
-    "A": "Combo A",
-    "B": "Combo B",
-    "C": "Combo C",
-    "D": "Combo D",
-    "E": "Combo E",
-    "F": "Combo F"
+    "combo_A": {
+      "name": "Trưởng phòng IT / CIO",
+      "description": "Người ra quyết định IT tại doanh nghiệp tầm trung"
+    },
+    "combo_B": {
+      "name": "Giám đốc Marketing",
+      "description": "Lãnh đạo marketing và chuyên gia tăng trưởng"
+    },
+    "combo_C": {
+      "name": "Chuyển đổi số / CDO",
+      "description": "Lãnh đạo chuyển đổi số và đổi mới"
+    },
+    "combo_D": {
+      "name": "CTO / Phó Chủ tịch Kỹ thuật",
+      "description": "Lãnh đạo kỹ thuật tại công ty công nghệ"
+    },
+    "combo_E": {
+      "name": "Thương mại điện tử / Vận hành",
+      "description": "Quản lý vận hành và thương mại điện tử"
+    },
+    "combo_G": {
+      "name": "Quản lý Sản phẩm / Kỹ thuật",
+      "description": "Quản lý sản phẩm và kỹ thuật"
+    },
+    "combo_H": {
+      "name": "Bán hàng / Phát triển Kinh doanh",
+      "description": "Lãnh đạo bán hàng và phát triển kinh doanh"
+    },
+    "combo_I": {
+      "name": "Nhân sự / Tuyển dụng",
+      "description": "Lãnh đạo nhân sự và tuyển dụng nhân tài"
+    },
+    "combo_J": {
+      "name": "Tài chính / CFO",
+      "description": "Lãnh đạo tài chính và kế toán"
+    }
   },
   "auth": {
     "login": "Đăng Nhập",
@@ -623,5 +653,45 @@
     },
     "companyContextPlaceholder": "Mô tả công ty bạn làm gì, bán cho ai, và bất kỳ sản phẩm hay trọng tâm cụ thể nào bạn muốn tin nhắn tiếp cận đề cập. Ví dụ: Chúng tôi bán phần mềm CRM ứng dụng AI cho các đội bán hàng B2B tại châu Á. Hiện chúng tôi đang đẩy mạnh tính năng tự động hóa mới — hãy đề cập khi phù hợp.",
     "bridgeContextPlaceholder": "Mô tả loại quan hệ hợp tác bạn đang tìm kiếm qua Bridge — bạn mang lại gì với vai trò đối tác, bạn muốn nhận lại gì, và loại thỏa thuận cụ thể nào bạn muốn ưu tiên ngay bây giờ. Ví dụ: Chúng tôi đang tìm các đối tác phân phối trong lĩnh vực SaaS phục vụ doanh nghiệp tầm trung. Chúng tôi trả 20% hoa hồng và hỗ trợ triển khai đầy đủ."
+  },
+  "run": {
+    "title": "Lượt Thu Thập Mới",
+    "newRun": "Lượt Thu Thập Mới",
+    "quotaUnlimited": "Không giới hạn khách hàng trong tháng này",
+    "quotaAvailable": "Còn {count} khách hàng trong tháng này",
+    "quotaBillingPeriod": "Còn {count} khách hàng trong kỳ thanh toán này",
+    "overLimit": "Chỉ còn {count} khách hàng trong kỳ thanh toán này — hãy giảm tổng số để tiếp tục.",
+    "sectionMarket": "Thị Trường",
+    "sectionSearchStrategy": "Chiến Lược Tìm Kiếm",
+    "noCombos": "Không có chiến lược tìm kiếm nào đang hoạt động. Hãy bật trong Cài đặt → Thu thập.",
+    "sectionTotalLeads": "Tổng Số Khách Hàng",
+    "sectionAssignSdr": "Phân Công Cho SDR",
+    "noSdrsForRegion": "Chưa có SDR nào được phân công cho {region}. Hãy gán khu vực cho một SDR trong Cài đặt → Quản lý người dùng.",
+    "assignSummary": "{count} khách hàng → {name}",
+    "submitErrorTitle": "Không thể bắt đầu lượt thu thập",
+    "starting": "Đang bắt đầu…",
+    "limitReached": "Đã đạt giới hạn tháng",
+    "runScraping": "Bắt Đầu Thu Thập",
+    "statusPending": "Đang khởi tạo…",
+    "statusRunning": "Đang chạy…",
+    "statusWorking": "Đang xử lý…",
+    "distributing": "Đang phân phối khách hàng cho SDR…",
+    "reconnecting": "Đang kết nối lại…",
+    "reconnectingDetail": "Đang gặp sự cố khi kết nối tới máy chủ — điều này thường xảy ra khi backend triển khai lại trong thời gian ngắn. Chúng tôi vẫn kiểm tra sau mỗi vài giây; dù sao lượt thu thập vẫn tiếp tục xử lý ở chế độ nền.",
+    "progressHint": "Việc này thường mất 2–5 phút. Đừng đóng tab này — nhưng nếu bạn đóng, chúng tôi vẫn tiếp tục xử lý ở chế độ nền.",
+    "leadsSoFar": "{count} / {total} khách hàng đến hiện tại",
+    "cancelling": "Đang hủy…",
+    "cancelRun": "Hủy lượt thu thập",
+    "cancelledTitle": "Đã hủy lượt thu thập",
+    "cancelledDetail": "Lượt thu thập này đã bị dừng trước khi hoàn tất.",
+    "completeTitle": "Hoàn Tất Thu Thập",
+    "completeSubtitle": "Đã tạo {count} khách hàng tại {markets}",
+    "assignedTo": "Đã phân công cho",
+    "viewDetailed": "Xem Chi Tiết",
+    "failedTitle": "Lượt thu thập này đã thất bại",
+    "errorLabel": "Lỗi",
+    "errorSupportHint": "Nếu tình trạng này tiếp diễn, hãy gửi thông báo này cho bộ phận hỗ trợ.",
+    "noErrorDetails": "Không có chi tiết lỗi nào được báo cáo. Hãy liên hệ bộ phận hỗ trợ.",
+    "statusRequestFailed": "Yêu cầu trạng thái thất bại ({status})"
   }
 }

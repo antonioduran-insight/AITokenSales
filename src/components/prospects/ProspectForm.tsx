@@ -363,12 +363,13 @@ export function ProspectForm({ open, onClose, onCreated, defaultAreaId }: Props)
           {/* Row 8: search_combo + scrape_date */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <FormField label={t('prospect.searchCombo')}>
-              {/* Resolved through useComboLabels(), not the static i18n list: the
-                  canonical value is scraper_combos_master.code (`combo_D`), and the
-                  `searchCombo.*` message namespace is keyed by bare letter, so
-                  t(`searchCombo.combo_D`) would render the key name itself. This
-                  also means a combo deactivated org-wide stops being offered here,
-                  which is the same behaviour ProspectDrawer/ProspectsTable have. */}
+              {/* Resolved through useComboLabels(): the stored value is the
+                  canonical `scraper_combos_master.code` (`combo_D`) while the
+                  visible label comes from the `searchCombo.<code>` messages, so it
+                  follows the user's locale — the DB only holds English names.
+                  Listing from the hook (not from a static array) also means a
+                  combo deactivated org-wide stops being offered here, matching
+                  ProspectDrawer/ProspectsTable. */}
               <select value={form.search_combo} onChange={e => set('search_combo', e.target.value)} style={SELECT_STYLE}>
                 <option value="">{t('common.none')}</option>
                 {Object.entries(comboLabels).map(([code, name]) => (

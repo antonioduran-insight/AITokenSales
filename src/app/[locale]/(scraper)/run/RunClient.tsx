@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { Minus, Plus, AlertCircle, XCircle, Loader2 } from 'lucide-react'
 import type { User, ScraperComboMaster, AreaName } from '@/lib/types'
 import { areaLabel } from '@/lib/utils/area-inference'
 import { useOrgMarkets } from '@/lib/hooks/useOrgMarkets'
+import { useComboMeta } from '@/lib/hooks/useComboLabels'
 import { RegionMarketSelect } from '@/components/markets/RegionMarketSelect'
 
 // An SDR row plus the flattened set of area names it covers (primary area_id +
@@ -34,10 +35,12 @@ const MAX_RESTORE_AGE_MS = 60 * 60 * 1000
 // single "in progress" state, not fabricated sub-steps.
 const ACTIVE = new Set(['pending', 'running'])
 
-// Backend status → simple centered label for Phase 2
-const STATUS_LABEL: Record<string, string> = {
-  pending: 'Initializing…',
-  running: 'Running…',
+// Backend status → the `run` message key for Phase 2's centered label. The keys
+// are resolved at render time (not baked in as English strings) so the label
+// follows the user's locale.
+const STATUS_KEY: Record<string, string> = {
+  pending: 'statusPending',
+  running: 'statusRunning',
 }
 
 const CSV_COLUMNS = ['full_name', 'company', 'title', 'linkedin_url', 'location', 'icp_score', 'temperature', 'search_combo', 'market', 'custom1', 'custom2'] as const
@@ -97,6 +100,12 @@ function RunPageInner() {
   const router = useRouter()
   const locale = useLocale()
   const searchParams = useSearchParams()
+  const t = useTranslations('run')
+  // Reused rather than duplicated into `run`: generic verbs live in `common`,
+  // the HOT/WARM/COLD labels in `temperature`, "Download CSV" in `export`.
+  const tCommon = useTranslations('common')
+  const tTemp = useTranslations('temperature')
+  const tExport = useTranslations('export')
 
   // ── Phase state ──
   const [runId, setRunId] = useState<string | null>(null)
@@ -129,6 +138,11 @@ function RunPageInner() {
   const autoAppliedRegionRef = useRef<AreaName | null>(null)
   const [activeCombos, setActiveCombos] = useState<ScraperComboMaster[]>([])
   const [combosLoading, setCombosLoading] = useState(true)
+  // Translated combo name/description, keyed by code. The hook is the source of
+  // the DISPLAY COPY only — it deliberately doesn't carry `org_active`, so the
+  // fetch above stays the source of truth for WHICH combos this org may pick
+  // and in what catalogue order.
+  const combosMeta = useComboMeta()
   const [selectedCombos, setSelectedCombos] = useState<string[]>([])
   const [totalLeads, setTotalLeads] = useState(100)
   const [available, setAvailable] = useState(MAX_INT)
@@ -148,6 +162,19 @@ function RunPageInner() {
 
   const canRun = !!region && selectedMarkets.length > 0 && selectedCombos.length > 0 &&
     totalLeads >= MIN_LEADS && !!selectedSdrId && !overLimit
+
+  // The pickable combo cards: org-activated combos in catalogue order (from the
+  // fetch), each with its localized name/description (from `useComboMeta`).
+  // `code` is what the picker toggles and what POST /api/runs receives — the
+  // translated name is never sent to the backend.
+  const comboCards = useMemo(() => {
+    const meta = new Map(combosMeta.map(m => [m.code, m]))
+    return activeCombos.map(c => ({
+      code: c.code,
+      name: meta.get(c.code)?.name ?? c.name,
+      description: meta.get(c.code)?.description ?? c.description ?? '',
+    }))
+  }, [activeCombos, combosMeta])
 
   // ── Load combos + quota ──
   useEffect(() => {
@@ -281,7 +308,11 @@ function RunPageInner() {
       const res = await fetch(`/api/runs/${id}`)
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        const msg = typeof body?.error === 'string' ? body.error : `Status request failed (${res.status})`
+        // A backend-supplied `error` is surfaced verbatim (it's a diagnostic
+        // string, not UI copy); only our own fallback wording is localized.
+        const msg = typeof body?.error === 'string'
+          ? body.error
+          : t('statusRequestFailed', { status: String(res.status) })
         if (res.status === 404 || res.status === 403) {
           // Authoritative: the run doesn't exist or we lost access. Nothing to
           // wait out — stop for real and show the failure screen.
@@ -330,7 +361,7 @@ function RunPageInner() {
         }
       }
     } catch { /* transient */ }
-  }, [runAssign])
+  }, [runAssign, t])
 
   useEffect(() => {
     if (!runId) return
@@ -459,15 +490,15 @@ function RunPageInner() {
       {isConfig && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ marginBottom: 4 }}>
-            <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>New Run</h1>
+            <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>{t('title')}</h1>
             <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: '6px 0 0' }}>
-              {unlimited ? 'Unlimited leads available this month' : `${available.toLocaleString()} leads available this month`}
+              {unlimited ? t('quotaUnlimited') : t('quotaAvailable', { count: available })}
             </p>
           </div>
 
           {/* Market — pick a region, then which of its activated countries to include */}
           <div style={S.card}>
-            <span style={S.label}>Market</span>
+            <span style={S.label}>{t('sectionMarket')}</span>
             <RegionMarketSelect
               markets={orgMarkets}
               loading={marketsLoading}
@@ -481,16 +512,16 @@ function RunPageInner() {
 
           {/* Combos */}
           <div style={S.card}>
-            <span style={S.label}>Search Strategy</span>
+            <span style={S.label}>{t('sectionSearchStrategy')}</span>
             {combosLoading ? (
-              <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>Loading…</p>
-            ) : activeCombos.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>{tCommon('loading')}</p>
+            ) : comboCards.length === 0 ? (
               <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
-                No active search strategies. Enable them in Settings → Scraper.
+                {t('noCombos')}
               </p>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-                {activeCombos.map(c => {
+                {comboCards.map(c => {
                   const active = selectedCombos.includes(c.code)
                   return (
                     <button key={c.code} onClick={() => toggleCombo(c.code)} style={{
@@ -512,7 +543,7 @@ function RunPageInner() {
 
           {/* Total leads */}
           <div style={S.card}>
-            <span style={S.label}>Total Leads</span>
+            <span style={S.label}>{t('sectionTotalLeads')}</span>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
               {PRESETS.map(p => (
                 <button key={p} onClick={() => setLeads(p)}
@@ -542,8 +573,8 @@ function RunPageInner() {
             {!unlimited && (
               <p style={{ fontSize: 12, color: overLimit ? '#EF4444' : 'var(--crm-text-muted)', margin: '12px 0 0' }}>
                 {overLimit
-                  ? `Only ${available.toLocaleString()} leads left this billing period — lower the total to continue.`
-                  : <>{available.toLocaleString()} leads available this billing period</>}
+                  ? t('overLimit', { count: available })
+                  : t('quotaBillingPeriod', { count: available })}
               </p>
             )}
           </div>
@@ -551,10 +582,11 @@ function RunPageInner() {
           {/* SDR — a single recipient; every lead this run generates goes to them */}
           {region && (
             <div style={S.card}>
-              <span style={S.label}>Assign to SDR</span>
+              <span style={S.label}>{t('sectionAssignSdr')}</span>
               {visibleSdrs.length === 0 ? (
                 <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
-                  No SDRs are assigned to {areaLabel(region)}. Assign an area to an SDR in Settings → Users.
+                  {/* The region name itself stays untranslated — it comes from `areas`/`markets`. */}
+                  {t('noSdrsForRegion', { region: areaLabel(region) })}
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -577,7 +609,10 @@ function RunPageInner() {
               )}
               {selectedSdrId && (
                 <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: '12px 0 0' }}>
-                  {totalLeads} leads → {sdrs.find(s => s.id === selectedSdrId)?.full_name ?? '?'}
+                  {t('assignSummary', {
+                    count: totalLeads,
+                    name: sdrs.find(s => s.id === selectedSdrId)?.full_name ?? '?',
+                  })}
                 </p>
               )}
             </div>
@@ -587,7 +622,7 @@ function RunPageInner() {
             <div style={{ display: 'flex', gap: 12, padding: '14px 16px', borderRadius: 10, backgroundColor: '#EF444410', border: '1px solid #EF444430' }}>
               <AlertCircle size={16} color="#EF4444" style={{ flexShrink: 0, marginTop: 2 }} />
               <div>
-                <p style={{ fontSize: 13, color: '#EF4444', fontWeight: 600, margin: '0 0 4px' }}>Could not start the run</p>
+                <p style={{ fontSize: 13, color: '#EF4444', fontWeight: 600, margin: '0 0 4px' }}>{t('submitErrorTitle')}</p>
                 <p style={{ fontSize: 12, color: 'var(--crm-text-secondary)', margin: 0, fontFamily: 'monospace', wordBreak: 'break-word' as const }}>{submitError}</p>
               </div>
             </div>
@@ -596,7 +631,7 @@ function RunPageInner() {
           <button onClick={handleRun} disabled={!canRun || submitting}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px', borderRadius: 10, border: 'none', fontSize: 15, fontWeight: 700, backgroundColor: canRun && !submitting ? 'var(--crm-accent)' : 'var(--crm-border)', color: '#FFF', cursor: canRun && !submitting ? 'pointer' : 'not-allowed', transition: 'all .15s' }}>
             {submitting && <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />}
-            {submitting ? 'Starting…' : overLimit ? 'Monthly limit reached' : 'Run Scraping'}
+            {submitting ? t('starting') : overLimit ? t('limitReached') : t('runScraping')}
           </button>
         </div>
       )}
@@ -611,7 +646,11 @@ function RunPageInner() {
                 strokeDasharray="300" style={{ animation: 'scraper-ring 1.6s ease-in-out infinite' }} />
             </svg>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: 15, fontWeight: 700, padding: 20 }}>
-              {reconnecting ? '📡 Reconnecting…' : assignState === 'assigning' ? 'Distributing leads to SDRs…' : (STATUS_LABEL[status] ?? 'Working…')}
+              {reconnecting
+                ? `📡 ${t('reconnecting')}`
+                : assignState === 'assigning'
+                  ? t('distributing')
+                  : t(STATUS_KEY[status] ?? 'statusWorking')}
             </div>
           </div>
 
@@ -619,24 +658,24 @@ function RunPageInner() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 9, backgroundColor: '#F59E0B15', border: '1px solid #F59E0B40', marginBottom: 20, maxWidth: 420 }}>
               <AlertCircle size={14} color="#F59E0B" style={{ flexShrink: 0 }} />
               <span style={{ fontSize: 12, color: 'var(--crm-text-secondary)', lineHeight: 1.5 }}>
-                Having trouble reaching the server — this often happens during a brief backend redeploy. Still checking every few seconds; the run keeps processing in the background either way.
+                {t('reconnectingDetail')}
               </span>
             </div>
           )}
 
           <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', textAlign: 'center', maxWidth: 420, lineHeight: 1.6, marginBottom: 0 }}>
-            This usually takes 2–5 minutes. Do not close this tab — but if you do, we&apos;ll keep working in the background.
+            {t('progressHint')}
           </p>
           {summary && summary.leads_generated > 0 && (
             <p style={{ fontSize: 12, color: 'var(--crm-text-secondary)', marginTop: 10 }}>
-              {summary.leads_generated} / {summary.total_leads_requested} leads so far
+              {t('leadsSoFar', { count: summary.leads_generated, total: summary.total_leads_requested })}
             </p>
           )}
 
           {assignState !== 'assigning' && (
             <button onClick={handleCancel} disabled={cancelling}
               style={{ marginTop: 24, display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#EF4444', background: 'transparent', border: '1px solid #EF444440', borderRadius: 8, padding: '9px 18px', cursor: cancelling ? 'default' : 'pointer', opacity: cancelling ? 0.5 : 1 }}>
-              <XCircle size={14} /> {cancelling ? 'Cancelling…' : 'Cancel run'}
+              <XCircle size={14} /> {cancelling ? t('cancelling') : t('cancelRun')}
             </button>
           )}
         </div>
@@ -648,11 +687,11 @@ function RunPageInner() {
           <div style={{ width: 88, height: 88, borderRadius: '50%', backgroundColor: 'var(--crm-surface-raised)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
             <XCircle size={44} color="var(--crm-text-muted)" />
           </div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>Run cancelled</h2>
-          <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0, textAlign: 'center' }}>This run was stopped before it finished.</p>
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>{t('cancelledTitle')}</h2>
+          <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0, textAlign: 'center' }}>{t('cancelledDetail')}</p>
           <button onClick={resetToConfig}
             style={{ marginTop: 20, fontSize: 13, fontWeight: 700, color: '#FFF', backgroundColor: 'var(--crm-accent)', padding: '11px 22px', borderRadius: 9, border: 'none', cursor: 'pointer' }}>
-            New Run
+            {t('newRun')}
           </button>
         </div>
       )}
@@ -666,18 +705,22 @@ function RunPageInner() {
             </svg>
           </div>
           <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px', textAlign: 'center' }}>
-            ✅ Run Complete
+            ✅ {t('completeTitle')}
           </h2>
           <p style={{ fontSize: 14, color: 'var(--crm-text-secondary)', margin: '0 0 28px', textAlign: 'center' }}>
-            {summary.leads_generated} leads generated across {(summary.markets?.length ? summary.markets : [summary.market]).join(', ')}
+            {/* Country names come from `markets` — interpolated as-is, never translated. */}
+            {t('completeSubtitle', {
+              count: summary.leads_generated,
+              markets: (summary.markets?.length ? summary.markets : [summary.market]).join(', '),
+            })}
           </p>
 
           {/* Temperature cards */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 28, width: '100%', maxWidth: 420 }}>
             {[
-              { key: 'HOT', emoji: '🔥', label: 'Hot', color: '#F87171', n: summary.temperature.HOT },
-              { key: 'WARM', emoji: '🌡️', label: 'Warm', color: '#FBBF24', n: summary.temperature.WARM },
-              { key: 'COLD', emoji: '❄️', label: 'Cold', color: '#60A5FA', n: summary.temperature.COLD },
+              { key: 'HOT', emoji: '🔥', label: tTemp('Hot'), color: '#F87171', n: summary.temperature.HOT },
+              { key: 'WARM', emoji: '🌡️', label: tTemp('Warm'), color: '#FBBF24', n: summary.temperature.WARM },
+              { key: 'COLD', emoji: '❄️', label: tTemp('Cold'), color: '#60A5FA', n: summary.temperature.COLD },
             ].map(t => (
               <div key={t.key} style={{ flex: 1, ...S.card, padding: '16px 12px', textAlign: 'center' }}>
                 <div style={{ fontSize: 22, marginBottom: 4 }}>{t.emoji}</div>
@@ -696,10 +739,10 @@ function RunPageInner() {
             if (!name) return null
             return (
               <div style={{ ...S.card, width: '100%', maxWidth: 420, marginBottom: 28, textAlign: 'center' }}>
-                <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Assigned to</div>
+                <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('assignedTo')}</div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--crm-text-primary)' }}>{name}</div>
                 <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)', marginTop: 4 }}>
-                  {a?.leads_assigned ?? summary.leads_generated} leads
+                  {tCommon('leadsCount', { count: a?.leads_assigned ?? summary.leads_generated })}
                 </div>
               </div>
             )
@@ -709,15 +752,15 @@ function RunPageInner() {
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
             <button onClick={() => router.push(`/${locale}/history?run=${runId}`)}
               style={{ fontSize: 13, fontWeight: 700, color: '#FFF', backgroundColor: 'var(--crm-accent)', padding: '11px 20px', borderRadius: 9, border: 'none', cursor: 'pointer' }}>
-              View Detailed
+              {t('viewDetailed')}
             </button>
             <button onClick={() => runId && downloadRunCsv(runId)}
               style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-secondary)', backgroundColor: 'transparent', padding: '11px 20px', borderRadius: 9, border: '1px solid var(--crm-border)', cursor: 'pointer' }}>
-              Download CSV
+              {tExport('downloadCsv')}
             </button>
             <button onClick={resetToConfig}
               style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-muted)', background: 'none', padding: '11px 16px', borderRadius: 9, border: 'none', cursor: 'pointer' }}>
-              New Run
+              {t('newRun')}
             </button>
           </div>
         </div>
@@ -731,29 +774,30 @@ function RunPageInner() {
               <circle cx="12" cy="12" r="10" /><path d="M15 9l-6 6M9 9l6 6" />
             </svg>
           </div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px', textAlign: 'center' }}>This run failed</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px', textAlign: 'center' }}>{t('failedTitle')}</h2>
 
           {failureDetail ? (
             <div style={{ width: '100%', maxWidth: 520, marginTop: 4 }}>
               <div style={{ backgroundColor: '#EF444410', border: '1px solid #EF444430', borderRadius: 10, padding: '12px 14px' }}>
-                <p style={{ fontSize: 11, color: '#EF4444', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 6px' }}>Error</p>
+                <p style={{ fontSize: 11, color: '#EF4444', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 6px' }}>{t('errorLabel')}</p>
+                {/* `failureDetail` is the backend's own message — shown verbatim, never translated. */}
                 <p style={{ fontSize: 12.5, color: 'var(--crm-text-secondary)', margin: 0, fontFamily: 'monospace', lineHeight: 1.6, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
                   {failureDetail}
                 </p>
               </div>
               <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: '10px 0 0', textAlign: 'center' }}>
-                If this keeps happening, send this message to support.
+                {t('errorSupportHint')}
               </p>
             </div>
           ) : (
             <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0, textAlign: 'center' }}>
-              No error details were reported. Contact support.
+              {t('noErrorDetails')}
             </p>
           )}
 
           <button onClick={resetToConfig}
             style={{ marginTop: 20, fontSize: 13, fontWeight: 700, color: '#FFF', backgroundColor: 'var(--crm-accent)', padding: '11px 22px', borderRadius: 9, border: 'none', cursor: 'pointer' }}>
-            Try Again
+            {tCommon('retry')}
           </button>
         </div>
       )}
@@ -762,8 +806,9 @@ function RunPageInner() {
 }
 
 export function RunClient() {
+  const tCommon = useTranslations('common')
   return (
-    <Suspense fallback={<p style={{ color: 'var(--crm-text-muted)', padding: 40 }}>Loading…</p>}>
+    <Suspense fallback={<p style={{ color: 'var(--crm-text-muted)', padding: 40 }}>{tCommon('loading')}</p>}>
       <RunPageInner />
     </Suspense>
   )

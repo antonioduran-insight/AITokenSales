@@ -51,12 +51,42 @@
     "Hot": "Hot"
   },
   "searchCombo": {
-    "A": "Combo A",
-    "B": "Combo B",
-    "C": "Combo C",
-    "D": "Combo D",
-    "E": "Combo E",
-    "F": "Combo F"
+    "combo_A": {
+      "name": "IT Manager / CIO",
+      "description": "IT decision makers in mid-size companies"
+    },
+    "combo_B": {
+      "name": "Marketing Director",
+      "description": "Marketing leaders and growth professionals"
+    },
+    "combo_C": {
+      "name": "Digital Transform / CDO",
+      "description": "Digital transformation and innovation leaders"
+    },
+    "combo_D": {
+      "name": "CTO / VP Engineering",
+      "description": "Technical leadership in technology companies"
+    },
+    "combo_E": {
+      "name": "E-commerce / Ops",
+      "description": "Operations and e-commerce managers"
+    },
+    "combo_G": {
+      "name": "Product / Eng Manager",
+      "description": "Product and engineering managers"
+    },
+    "combo_H": {
+      "name": "Sales / Business Development",
+      "description": "Sales and business development leaders"
+    },
+    "combo_I": {
+      "name": "HR / Talent",
+      "description": "Human resources and talent acquisition leaders"
+    },
+    "combo_J": {
+      "name": "Finance / CFO",
+      "description": "Finance and accounting leaders"
+    }
   },
   "auth": {
     "login": "Sign In",
@@ -623,5 +653,45 @@
     },
     "companyContextPlaceholder": "Describe what your company does, who you sell to, and any specific products or focus you want your outreach messages to mention. Example: We sell AI-powered CRM software to B2B sales teams in Asia. Right now we're pushing our new automation feature — mention it when relevant.",
     "bridgeContextPlaceholder": "Describe what kind of partnerships you're looking for through Bridge — what you offer as a partner, what you're looking for in return, and any specific type of deal you want to prioritize right now. Example: We're looking for reseller partners in the SaaS space who serve mid-market companies. We offer 20% commission and full onboarding support."
+  },
+  "run": {
+    "title": "New Run",
+    "newRun": "New Run",
+    "quotaUnlimited": "Unlimited leads available this month",
+    "quotaAvailable": "{count} leads available this month",
+    "quotaBillingPeriod": "{count} leads available this billing period",
+    "overLimit": "Only {count} leads left this billing period — lower the total to continue.",
+    "sectionMarket": "Market",
+    "sectionSearchStrategy": "Search Strategy",
+    "noCombos": "No active search strategies. Enable them in Settings → Scraper.",
+    "sectionTotalLeads": "Total Leads",
+    "sectionAssignSdr": "Assign to SDR",
+    "noSdrsForRegion": "No SDRs are assigned to {region}. Assign an area to an SDR in Settings → Users.",
+    "assignSummary": "{count} leads → {name}",
+    "submitErrorTitle": "Could not start the run",
+    "starting": "Starting…",
+    "limitReached": "Monthly limit reached",
+    "runScraping": "Run Scraping",
+    "statusPending": "Initializing…",
+    "statusRunning": "Running…",
+    "statusWorking": "Working…",
+    "distributing": "Distributing leads to the SDR…",
+    "reconnecting": "Reconnecting…",
+    "reconnectingDetail": "Having trouble reaching the server — this often happens during a brief backend redeploy. Still checking every few seconds; the run keeps processing in the background either way.",
+    "progressHint": "This usually takes 2–5 minutes. Do not close this tab — but if you do, we'll keep working in the background.",
+    "leadsSoFar": "{count} / {total} leads so far",
+    "cancelling": "Cancelling…",
+    "cancelRun": "Cancel run",
+    "cancelledTitle": "Run cancelled",
+    "cancelledDetail": "This run was stopped before it finished.",
+    "completeTitle": "Run Complete",
+    "completeSubtitle": "{count} leads generated across {markets}",
+    "assignedTo": "Assigned to",
+    "viewDetailed": "View Detailed",
+    "failedTitle": "This run failed",
+    "errorLabel": "Error",
+    "errorSupportHint": "If this keeps happening, send this message to support.",
+    "noErrorDetails": "No error details were reported. Contact support.",
+    "statusRequestFailed": "Status request failed ({status})"
   }
 }
