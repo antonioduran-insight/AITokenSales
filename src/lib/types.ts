@@ -9,7 +9,15 @@ export type OutreachStatus =
 
 export type LeadTemperature = 'Cold' | 'Warm' | 'Hot'
 
-export type SearchCombo = 'A' | 'B' | 'C' | 'D' | 'E' | 'F'
+/**
+ * The opaque combo code stored in `prospects.search_combo`. The DB CHECK is
+ * `search_combo = ANY (ARRAY['combo_A','combo_B','combo_C','combo_D','combo_E','combo_F'])`
+ * (verified with `pg_get_constraintdef`), so these are the literal codes —
+ * never the bare letters, which the DB rejects. Same vocabulary as
+ * `scraper_combos_master.code` and `runs.combos`; resolve to a human label
+ * with `useComboLabels()` rather than rendering the code.
+ */
+export type SearchCombo = 'combo_A' | 'combo_B' | 'combo_C' | 'combo_D' | 'combo_E' | 'combo_F'
 
 export type UserRole = 'admin_global' | 'admin' | 'sdr' | 'support'
 
@@ -150,7 +158,45 @@ export const OUTREACH_STATUSES: OutreachStatus[] = [
 ]
 
 export const LEAD_TEMPERATURES: LeadTemperature[] = ['Cold', 'Warm', 'Hot']
-export const SEARCH_COMBOS: SearchCombo[] = ['A', 'B', 'C', 'D', 'E', 'F']
+export const SEARCH_COMBOS: SearchCombo[] = ['combo_A', 'combo_B', 'combo_C', 'combo_D', 'combo_E', 'combo_F']
+
+/**
+ * Tolerant parser for a `search_combo` coming from a CSV or a human: accepts
+ * `combo_D`, `combo_d`, `Combo D`, `COMBO-D`, `D` and `d`, all normalising to
+ * `combo_D`. Anything unrecognised returns `null` (the column is nullable)
+ * instead of being passed through to fail the DB CHECK — a single bad value
+ * used to take a whole insert batch down with it.
+ *
+ * Lives here next to the constant, not in the wizard, because the CSV wizard
+ * (client) and `PUT /api/import` (server) must agree on it exactly, and a
+ * route handler must not import from a `'use client'` component.
+ */
+export function normalizeSearchCombo(value: unknown): SearchCombo | null {
+  if (typeof value !== 'string') return null
+  const letter = value.trim().toUpperCase().replace(/^COMBO[\s_-]*/, '')
+  if (!/^[A-F]$/.test(letter)) return null
+  return `combo_${letter}` as SearchCombo
+}
+
+/** `prospects.icp_score` has a DB CHECK of `icp_score >= 0 AND icp_score <= 100`. */
+export const ICP_SCORE_MIN = 0
+export const ICP_SCORE_MAX = 100
+
+/**
+ * Parses an imported ICP score, returning `null` for anything that isn't a
+ * finite number inside 0-100. Deliberately **discards** rather than clamps: a
+ * `150` in a CSV means a mis-mapped column or a different scale, and silently
+ * rewriting it to `100` would invent a perfect-fit lead. Shared by the wizard
+ * and `PUT /api/import` for the same reason as `normalizeSearchCombo`.
+ */
+export function normalizeIcpScore(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const n = typeof value === 'number' ? value : parseFloat(String(value).trim())
+  if (!Number.isFinite(n)) return null
+  if (n < ICP_SCORE_MIN || n > ICP_SCORE_MAX) return null
+  return n
+}
+
 /** Canonical display order for regions, used by both area and market UIs. */
 export const AREA_NAMES: AreaName[] = ['asia', 'latin_america', 'europe', 'usa']
 

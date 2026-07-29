@@ -13,7 +13,8 @@ import { Button } from '@/components/ui/button'
 import { useUser } from '@/contexts/UserContext'
 import { AlertTriangle, CheckCircle } from 'lucide-react'
 import type { Area, User, OutreachStatus, LeadTemperature, SearchCombo } from '@/lib/types'
-import { OUTREACH_STATUSES, LEAD_TEMPERATURES, SEARCH_COMBOS } from '@/lib/types'
+import { OUTREACH_STATUSES, LEAD_TEMPERATURES } from '@/lib/types'
+import { useComboLabels } from '@/lib/hooks/useComboLabels'
 
 interface Props {
   open: boolean
@@ -50,6 +51,7 @@ function FormField({ label, children, warn }: { label: string; children: React.R
 export function ProspectForm({ open, onClose, onCreated, defaultAreaId }: Props) {
   const t = useTranslations()
   const { user, isAdmin } = useUser()
+  const comboLabels = useComboLabels()
 
   const [areas, setAreas] = useState<Area[]>([])
   const [sdrs, setSdrs] = useState<User[]>([])
@@ -361,10 +363,16 @@ export function ProspectForm({ open, onClose, onCreated, defaultAreaId }: Props)
           {/* Row 8: search_combo + scrape_date */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <FormField label={t('prospect.searchCombo')}>
+              {/* Resolved through useComboLabels(), not the static i18n list: the
+                  canonical value is scraper_combos_master.code (`combo_D`), and the
+                  `searchCombo.*` message namespace is keyed by bare letter, so
+                  t(`searchCombo.combo_D`) would render the key name itself. This
+                  also means a combo deactivated org-wide stops being offered here,
+                  which is the same behaviour ProspectDrawer/ProspectsTable have. */}
               <select value={form.search_combo} onChange={e => set('search_combo', e.target.value)} style={SELECT_STYLE}>
                 <option value="">{t('common.none')}</option>
-                {SEARCH_COMBOS.map(c => (
-                  <option key={c} value={c}>{t(`searchCombo.${c}`)}</option>
+                {Object.entries(comboLabels).map(([code, name]) => (
+                  <option key={code} value={code}>{name}</option>
                 ))}
               </select>
             </FormField>

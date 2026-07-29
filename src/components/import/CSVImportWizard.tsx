@@ -12,7 +12,7 @@ import Papa from 'papaparse'
 import type { AreaName } from '@/lib/types'
 import { AREA_NAMES } from '@/lib/types'
 import { AREA_LABELS } from '@/lib/utils/area-inference'
-import { SEARCH_COMBOS, LEAD_TEMPERATURES, MAX_IMPORT_ROWS } from '@/lib/types'
+import { LEAD_TEMPERATURES, MAX_IMPORT_ROWS, normalizeIcpScore, normalizeSearchCombo } from '@/lib/types'
 
 interface SdrOption {
   id: string
@@ -29,9 +29,12 @@ const PROSPECT_FIELDS = [
   { key: 'title', label: 'Job Title', required: false },
   { key: 'industry', label: 'Industry', required: false },
   { key: 'company_size', label: 'Company Size', required: false },
-  { key: 'icp_score', label: 'ICP Score', required: false },
+  { key: 'icp_score', label: 'ICP Score (0-100)', required: false },
   { key: 'lead_temperature', label: 'Temperature (Cold/Warm/Hot)', required: false },
-  { key: 'search_combo', label: 'Search Combo (A-F)', required: false },
+  // The stored value is the combo *code* (combo_A … combo_F), which is what the
+  // DB CHECK accepts. A bare letter in the CSV is still understood — see
+  // normalizeSearchCombo — but the label must not advertise "A-F" as the format.
+  { key: 'search_combo', label: 'Search Combo (combo_A – combo_F)', required: false },
   { key: 'scrape_date', label: 'Scrape Date', required: false },
   { key: 'market', label: 'Market / Country', required: false },
   { key: 'custom1', label: 'Custom 1 (msg1)', required: false },
@@ -98,7 +101,13 @@ const S: Record<string, React.CSSProperties> = {
 
 export function CSVImportWizard() {
   const { user, isAdmin } = useUser()
-  const { isImpersonating } = useOrgId()
+  // `isReadOnly`, never `isImpersonating` — importing is a pure write, and
+  // `admin_global` reaching this page without `?impersonate_org_id=` has
+  // `isImpersonating === false`, which used to leave the whole wizard fully
+  // enabled and let it insert prospects into whichever org it was looking at.
+  // Nothing in this file routes reads through `/api/crm/[table]`, so there is
+  // no remaining use for `isImpersonating` here at all.
+  const { isReadOnly } = useOrgId()
   const t = useTranslations('import')
   const tc = useTranslations('common')
 
@@ -151,8 +160,29 @@ export function CSVImportWizard() {
   const [checking, setChecking] = useState(false)
 
   // Step 5: import
+  //
+  // The counters are deliberately separate — they used to be conflated, so a
+  // request-level failure of 4 brand-new leads was reported as "4 Duplicates
+  // skipped", which is a different problem with a different fix for the user:
+  //   skipped     — duplicates the user themselves chose to skip (client-side)
+  //   duplicates  — rejected by the DB's unique key, 23505 (already exists)
+  //   rejected    — rejected by validation / a CHECK constraint (bad values)
+  //   failed      — never reached the DB at all (network / request error)
+  //   errors      — rows the wizard itself refused (no name / invalid URL)
   const [importing, setImporting] = useState(false)
-  const [results, setResults] = useState<{ imported: number; skipped: number; forced: number; errors: number; totalRows: number; skippedConstraint: number; blacklisted: number } | null>(null)
+  const [results, setResults] = useState<{
+    imported: number
+    skipped: number
+    forced: number
+    errors: number
+    totalRows: number
+    duplicates: number
+    rejected: number
+    failed: number
+    blacklisted: number
+    icpDropped: number
+    comboDropped: number
+  } | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
   // True when the PUT request reached the server and got a response, but the
   // body couldn't be read — we genuinely don't know how many records made it
@@ -200,7 +230,7 @@ export function CSVImportWizard() {
   function handleFile(file: File) {
     // Belt-and-suspenders with the disabled dropzone below — never let a
     // drag-and-drop bypass the disabled file input (QA-F4).
-    if (isImpersonating) return
+    if (isReadOnly) return
     if (!file.name.endsWith('.csv')) return
     if (file.size > 5 * 1024 * 1024) return
     setUploadError(null)
@@ -317,7 +347,9 @@ export function CSVImportWizard() {
 
   async function runImportWithRows(targetRows: ParsedRow[]) {
     setImporting(true)
-    let imported = 0, skipped = 0, forced = 0, skippedConstraint = 0
+    let imported = 0, skipped = 0, forced = 0
+    let duplicates = 0, rejected = 0, failed = 0
+    let icpDropped = 0, comboDropped = 0
     let statusUnknown = false
 
     const blacklistedRows = targetRows.filter(r => r.status === 'blacklisted')
@@ -328,6 +360,22 @@ export function CSVImportWizard() {
     const records = toInsert.map(r => {
       if (r.status === 'duplicate') forced++
       const m = r.mapped
+
+      // Both of these must survive a value the DB would reject: an out-of-range
+      // ICP score (the CHECK is 0-100) or an unknown combo used to fail the
+      // insert. Dropped rather than clamped/guessed — see the helpers in
+      // types.ts — and counted so the final screen can say so out loud.
+      const icpRaw = m.icp_score?.trim() ?? ''
+      const icpScore = normalizeIcpScore(icpRaw)
+      if (icpRaw && icpScore === null) icpDropped++
+
+      const comboRaw = m.search_combo?.trim() ?? ''
+      const searchCombo = normalizeSearchCombo(comboRaw)
+      if (comboRaw && searchCombo === null) comboDropped++
+
+      // Only the allow-listed, user-supplied columns plus assigned_to. Anything
+      // else (organization_id, area_id, created_by, source, outreach_status) is
+      // derived server-side in PUT /api/import and would be ignored here.
       return {
         name: m.name?.trim(),
         linkedin_url: m.linkedin_url?.trim() || null,
@@ -336,19 +384,17 @@ export function CSVImportWizard() {
         title: m.title?.trim() || null,
         industry: m.industry?.trim() || null,
         company_size: m.company_size?.trim() || null,
-        icp_score: m.icp_score ? parseFloat(m.icp_score) : null,
+        icp_score: icpScore,
         lead_temperature: LEAD_TEMPERATURES.includes(m.lead_temperature as typeof LEAD_TEMPERATURES[number]) ? m.lead_temperature : null,
-        search_combo: SEARCH_COMBOS.includes(m.search_combo as typeof SEARCH_COMBOS[number]) ? m.search_combo : null,
+        search_combo: searchCombo,
         scrape_date: m.scrape_date?.trim() || null,
         custom1: m.custom1?.trim() || null,
         custom2: m.custom2?.trim() || null,
         market: m.market?.trim() || null,
-        outreach_status: 'new' as const,
-        area_id: selectedAreaId,
-        source: 'csv_import' as const,
-        created_by: user?.id ?? null,
         // Admins assign to the SDR picked in step 2; an SDR importing for
-        // themselves (no picker shown) still self-assigns as before.
+        // themselves (no picker shown) still self-assigns as before. The route
+        // re-verifies this is an active user of the caller's own org and
+        // derives area_id from that user.
         assigned_to: selectedSdrId || user?.id || null,
         flag_tomorrow: false,
       }
@@ -364,35 +410,49 @@ export function CSVImportWizard() {
         })
       } catch (e) {
         // The request never got a response at all — safe to assume nothing
-        // was inserted server-side.
+        // was inserted server-side. Counted as `failed`, NOT as `skipped`:
+        // these are brand-new leads that didn't make it, not duplicates.
+        console.error('[import] request failed', e)
         setImportError(e instanceof Error ? e.message : 'Error de red')
-        skipped += records.length
+        failed += records.length
       }
 
       if (res) {
-        let data: { imported?: number; skippedConstraint?: number; errors?: string[]; error?: string } | null = null
-        try {
-          data = await res.json()
-        } catch {
-          // We got a response but couldn't read its body. The insert may
-          // already have completed server-side before the response got cut
-          // off (this is exactly what happened in a real incident: 4 leads
-          // were inserted, the client saw this same parse failure, and a
-          // blind retry with the same CSV made them look like a dedup bug
-          // the next time around). Never guess at counts here.
-          statusUnknown = true
-          setImportError('Import status unknown — check Leads before retrying.')
+        // Read the body as text and parse it ourselves. `await res.json()`
+        // throwing was being treated as "we have no idea what happened", but
+        // that's only true when the body genuinely can't be read — a 200 with
+        // valid JSON must always report as a normal outcome. The incident this
+        // unknown state was built for was really a post-insert crash returning
+        // an HTML 500 page, which json() also chokes on; that crash is fixed
+        // in the route, and this branch no longer mislabels a clean import.
+        const rawBody = await res.text().catch(() => null)
+        let data: {
+          imported?: number; duplicates?: number; rejected?: number; notAttempted?: number
+          errors?: string[]; error?: string
+        } | null = null
+        if (rawBody && rawBody.trim()) {
+          try { data = JSON.parse(rawBody) } catch { data = null }
         }
 
-        if (!statusUnknown && data) {
-          if (res.ok) {
-            imported = data.imported ?? 0
-            skippedConstraint = data.skippedConstraint ?? 0
-            if (data.errors?.length) setImportError(data.errors.join(', '))
-          } else {
-            setImportError(data.error ?? `HTTP ${res.status}`)
-            skipped += records.length
-          }
+        if (data && typeof data.imported === 'number') {
+          imported = data.imported
+          duplicates = data.duplicates ?? 0
+          rejected = data.rejected ?? 0
+          failed += data.notAttempted ?? 0
+          // Already translated to plain language server-side; raw Postgres
+          // messages never leave the server log.
+          if (data.errors?.length) setImportError(data.errors.join(' · '))
+          else if (data.error) setImportError(data.error)
+        } else if (data?.error) {
+          // Structured error without counts — the route rejected the request
+          // before inserting anything (auth, shape, unknown assignee).
+          setImportError(data.error)
+          failed += records.length
+        } else {
+          // Truly unreadable: no body, or a body that isn't JSON at all.
+          statusUnknown = true
+          console.error('[import] unreadable response', res.status, rawBody?.slice(0, 500))
+          setImportError('Import status unknown — check Leads before retrying.')
         }
       }
     }
@@ -401,13 +461,17 @@ export function CSVImportWizard() {
       event_type: 'csv_import',
       metadata: {
         imported, skipped, forced, errors: errorRows.length, total: targetRows.length, area: selectedArea,
+        duplicates, rejected, failed, icp_dropped: icpDropped, combo_dropped: comboDropped,
         assigned_sdr: sdrs.find(s => s.id === selectedSdrId)?.full_name ?? null,
         status_unknown: statusUnknown,
       },
     })
 
     setImportUnknown(statusUnknown)
-    setResults({ imported, skipped, forced, errors: errorRows.length, totalRows: targetRows.length, skippedConstraint, blacklisted: blacklistedRows.length })
+    setResults({
+      imported, skipped, forced, errors: errorRows.length, totalRows: targetRows.length,
+      duplicates, rejected, failed, blacklisted: blacklistedRows.length, icpDropped, comboDropped,
+    })
     setImporting(false)
     setStep(5)
   }
@@ -462,7 +526,7 @@ export function CSVImportWizard() {
         <h1 style={{ fontSize: 22, fontWeight: 700 }}>{t('title')}</h1>
       </div>
 
-      {isImpersonating && (
+      {isReadOnly && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, backgroundColor: '#1C1410', border: '1px solid #F59E0B', borderRadius: 10, padding: '10px 16px', marginBottom: 20, fontSize: 13, color: '#FCD34D' }}>
           👁 Import is disabled while viewing in read-only mode.
         </div>
@@ -513,18 +577,18 @@ export function CSVImportWizard() {
               border: `2px dashed ${dragOver ? 'var(--crm-accent)' : 'var(--crm-border)'}`,
               backgroundColor: dragOver ? '#6C63FF08' : 'var(--crm-surface)',
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              minHeight: 240, cursor: isImpersonating ? 'not-allowed' : 'pointer', transition: 'all 0.2s',
-              opacity: isImpersonating ? 0.5 : 1,
+              minHeight: 240, cursor: isReadOnly ? 'not-allowed' : 'pointer', transition: 'all 0.2s',
+              opacity: isReadOnly ? 0.5 : 1,
             }}
-            onClick={() => { if (!isImpersonating) fileInputRef.current?.click() }}
-            onDragOver={e => { e.preventDefault(); if (!isImpersonating) setDragOver(true) }}
+            onClick={() => { if (!isReadOnly) fileInputRef.current?.click() }}
+            onDragOver={e => { e.preventDefault(); if (!isReadOnly) setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
-            onDrop={e => { e.preventDefault(); setDragOver(false); if (isImpersonating) return; const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
+            onDrop={e => { e.preventDefault(); setDragOver(false); if (isReadOnly) return; const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
           >
             <UploadCloud size={44} color={dragOver ? 'var(--crm-accent)' : 'var(--crm-text-muted)'} />
             <p style={{ marginTop: 14, fontSize: 16, color: 'var(--crm-text-primary)', fontWeight: 500 }}>{t('dropzone')}</p>
             <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 6 }}>{t('csvOnly')} · {t('maxSize')}</p>
-            <input ref={fileInputRef} type="file" accept=".csv" disabled={isImpersonating} style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+            <input ref={fileInputRef} type="file" accept=".csv" disabled={isReadOnly} style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
           </div>
         </>
       )}
@@ -815,9 +879,17 @@ export function CSVImportWizard() {
           <CheckCircle size={52} color={results.imported > 0 ? '#22C55E' : 'var(--crm-text-muted)'} style={{ margin: '0 auto 16px' }} />
           <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>{t('importComplete')}</h2>
 
+          {/* Amber "Note" rather than a red "Error" when rows did land — with
+              per-row fallback a partial import is a normal outcome, and these
+              messages are already plain-language (never raw Postgres). */}
           {importError && (
-            <div style={{ padding: '10px 14px', backgroundColor: '#EF444415', border: '1px solid #EF444440', borderRadius: 8, marginBottom: 16, fontSize: 12, color: '#EF4444', textAlign: 'left' }}>
-              <strong>Error:</strong> {importError}
+            <div style={{
+              padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: 12, textAlign: 'left',
+              backgroundColor: results.imported > 0 ? '#F59E0B15' : '#EF444415',
+              border: `1px solid ${results.imported > 0 ? '#F59E0B40' : '#EF444440'}`,
+              color: results.imported > 0 ? '#F59E0B' : '#EF4444',
+            }}>
+              <strong>{results.imported > 0 ? 'Note:' : 'Error:'}</strong> {importError}
             </div>
           )}
 
@@ -834,26 +906,40 @@ export function CSVImportWizard() {
               <div style={{ fontSize: 34, fontWeight: 700, color: '#22C55E' }}>{results.imported}</div>
               <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>{t('imported')}</div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 34, fontWeight: 700, color: '#F59E0B' }}>{results.skipped}</div>
-              <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>Duplicates skipped</div>
-            </div>
+            {results.skipped > 0 && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 34, fontWeight: 700, color: '#F59E0B' }}>{results.skipped}</div>
+                <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>Duplicates you skipped</div>
+              </div>
+            )}
             {results.blacklisted > 0 && (
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 34, fontWeight: 700, color: '#EF4444' }}>{results.blacklisted}</div>
                 <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>Blocked by blacklist</div>
               </div>
             )}
-            {results.skippedConstraint > 0 && (
+            {results.duplicates > 0 && (
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 34, fontWeight: 700, color: 'var(--crm-text-muted)' }}>{results.skippedConstraint}</div>
-                <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>Already existed (global)</div>
+                <div style={{ fontSize: 34, fontWeight: 700, color: 'var(--crm-text-muted)' }}>{results.duplicates}</div>
+                <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>Already existed</div>
+              </div>
+            )}
+            {results.rejected > 0 && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 34, fontWeight: 700, color: '#EF4444' }}>{results.rejected}</div>
+                <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>Rejected (invalid data)</div>
+              </div>
+            )}
+            {results.failed > 0 && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 34, fontWeight: 700, color: '#EF4444' }}>{results.failed}</div>
+                <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>Not saved (error)</div>
               </div>
             )}
             {results.errors > 0 && (
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 34, fontWeight: 700, color: '#EF4444' }}>{results.errors}</div>
-                <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>No name (error)</div>
+                <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>Invalid rows (no name / bad URL)</div>
               </div>
             )}
             {results.forced > 0 && (
@@ -863,6 +949,15 @@ export function CSVImportWizard() {
               </div>
             )}
           </div>
+
+          {/* Values the wizard dropped to keep the row importable — the lead
+              itself was saved, just without that one field. */}
+          {(results.icpDropped > 0 || results.comboDropped > 0) && (
+            <div style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginBottom: 18, lineHeight: 1.6 }}>
+              {results.icpDropped > 0 && <div>{results.icpDropped} row{results.icpDropped === 1 ? '' : 's'} had an ICP score outside 0-100 — imported without a score.</div>}
+              {results.comboDropped > 0 && <div>{results.comboDropped} row{results.comboDropped === 1 ? '' : 's'} had an unrecognised Search Combo — imported without one (expected combo_A – combo_F).</div>}
+            </div>
+          )}
 
           <Button onClick={resetWizard} style={{ backgroundColor: 'var(--crm-accent)', color: '#FFF' }}>
             {t('importAnother')}
