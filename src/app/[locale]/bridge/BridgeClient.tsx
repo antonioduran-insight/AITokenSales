@@ -92,6 +92,9 @@ export function BridgeClient() {
   const [batchSdrId, setBatchSdrId] = useState('')
   const [confirming, setConfirming] = useState(false)
   const [batchMsg, setBatchMsg] = useState<string | null>(null)
+  // Separate from `batchMsg` (green) and `error` (red): a partial handoff to
+  // `prospects` is neither a success nor a failure of the confirm itself.
+  const [batchWarn, setBatchWarn] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   // ── History ──
@@ -260,12 +263,36 @@ export function BridgeClient() {
   // personalised message per candidate and assigns them all to the chosen SDR.
   async function confirmBatch() {
     if (selectedIds.size === 0 || !batchSdrId || confirming) return
-    setConfirming(true); setError(null); setBatchMsg(null)
+    setConfirming(true); setError(null); setBatchMsg(null); setBatchWarn(null)
     const ids = [...selectedIds]
     try {
-      await bridgeApi.confirmBatch(ids, batchSdrId)
+      const res = await bridgeApi.confirmBatch(ids, batchSdrId)
       const name = sdrs.find(s => s.id === batchSdrId)?.full_name ?? 'the SDR'
-      setBatchMsg(`${ids.length} candidate${ids.length !== 1 ? 's' : ''} confirmed and assigned to ${name}.`)
+
+      // Report what actually landed on the SDR's board, never `ids.length`.
+      // Confirming and handing over to `prospects` are two separate steps: the
+      // backend can confirm all 9 and the CRM handoff can still add 0, which is
+      // exactly what happened before the handoff existed at all. A blind count
+      // made that indistinguishable from success.
+      const created = res.crm_prospects_created
+      if (created === undefined) {
+        // Older proxy without the handoff — say only what we can stand behind.
+        setBatchMsg(`${ids.length} candidate${ids.length !== 1 ? 's' : ''} confirmed for ${name}.`)
+      } else {
+        const parts = [`${created} of ${ids.length} added to ${name}'s board`]
+        if (res.crm_prospects_skipped_existing) parts.push(`${res.crm_prospects_skipped_existing} already there`)
+        if (res.crm_prospects_skipped_no_name) parts.push(`${res.crm_prospects_skipped_no_name} skipped (no name)`)
+        const summary = `${parts.join(' · ')}.`
+
+        // Amber, not green and not a hard error: the confirm itself succeeded
+        // and the messages were generated — only the CRM handoff fell short.
+        if (res.crm_prospects_error || created < ids.length - (res.crm_prospects_skipped_existing ?? 0) - (res.crm_prospects_skipped_no_name ?? 0)) {
+          setBatchWarn(res.crm_prospects_error ? `${summary} ${res.crm_prospects_error}` : summary)
+          setBatchMsg(null)
+        } else {
+          setBatchMsg(summary)
+        }
+      }
       setSelectedIds(new Set())
       // Re-read so the confirmed rows show their generated messages.
       if (runId) await loadCandidates(runId)
@@ -590,6 +617,9 @@ export function BridgeClient() {
 
               {batchMsg && (
                 <p style={{ fontSize: 13, color: '#22C55E', fontWeight: 600, margin: '0 0 12px' }}>✅ {batchMsg}</p>
+              )}
+              {batchWarn && (
+                <p style={{ fontSize: 13, color: '#FCD34D', fontWeight: 600, margin: '0 0 12px' }}>⚠️ {batchWarn}</p>
               )}
 
               {/* Batch action bar — appears once something is selected */}

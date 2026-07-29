@@ -141,7 +141,20 @@ export const bridgeApi = {
    * the SDR's sender profile are all injected server-side by the proxy.
    */
   confirmBatch: (candidateIds: string[], sdrId: string) =>
-    request<{ confirmed?: number; candidates?: BridgeCandidate[] }>('/candidates/confirm-batch', {
+    request<{
+      confirmed?: number
+      candidates?: BridgeCandidate[]
+      // Added by the proxy after it hands the confirmed candidates over to
+      // `prospects` (assignBridgeCandidates). Before this existed the UI
+      // reported `candidate_ids.length` blindly — which is how it announced
+      // "9 candidates confirmed and assigned to Antonio" on a run where zero
+      // of them ever reached the SDR's board.
+      crm_prospects_created?: number
+      crm_prospects_not_created?: number
+      crm_prospects_skipped_existing?: number
+      crm_prospects_skipped_no_name?: number
+      crm_prospects_error?: string | null
+    }>('/candidates/confirm-batch', {
       method: 'POST',
       body: JSON.stringify({ candidate_ids: candidateIds, sdr_id: sdrId }),
     }),
