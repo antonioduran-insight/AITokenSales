@@ -162,11 +162,22 @@ Global Admin has its own theme system (`GlobalAdminThemeContext`) with dark/ligh
 
 All three call the same `assignRunLeads()` (`src/lib/utils/run-assign.ts`) and are safe to race — the unique-key guard makes a duplicate assignment a no-op regardless of which layer got there first.
 
-**UPDATE 29/07 — the project was transferred to the `Insight Software` Vercel team, which is on
-Pro, so the once-per-day ceiling no longer applies.** The schedule is now hourly (`0 * * * *`),
-cutting the worst-case delay for a lead that both the webhook and the client missed from 24h to
-1h. Everything below still matters if the project is ever moved back to a Hobby scope — the
-deploy rejection is silent in `git push`, so it has to be checked in the Vercel Deployments tab.
+**UPDATE 29/07 — the project was transferred to the `Insight Software` Vercel team, which is on a
+Pro TRIAL, so the once-per-day ceiling does not currently apply.** The schedule is now hourly
+(`0 * * * *`), cutting the worst-case delay for a lead that both the webhook and the client
+missed from 24h to 1h. Verified working: the cron is enabled, registered as `0 * * * *`, and its
+last invocation returned `200`.
+
+**"Pro trial", not paid Pro — treat the hourly schedule as borrowed, not owned.** The trial has
+every Pro feature, but the team is deliberately not paying yet while they evaluate Vercel against
+AWS. If the trial lapses without converting, the scope silently reverts to Hobby and the hourly
+cron below becomes a deploy-blocker for **every** future push, including unrelated commits, with
+no error surfaced in `git push`. Whoever notices the deploys failing should suspect this first and
+set the schedule back to `0 3 * * *`.
+
+`CRON_SECRET` and `INTERNAL_API_KEY` **are** configured in Vercel (Production + Preview, added
+23–24/07). They are absent from the local `.env.local`, which matters only for `npm run dev` —
+do not infer the Vercel state from the local file, they are unrelated stores.
 
 **`vercel.json`'s cron schedule must stay Hobby-compatible (once per day) unless the plan is confirmed Pro+.** Vercel validates every cron in `vercel.json` at deploy time and **rejects the whole deployment** — not just the cron — if any schedule would fire more than once a day on a Hobby plan. A `*/10 * * * *` schedule silently blocked every single deploy (including unrelated commits) until this was caught, with zero error visible in the GitHub push itself — check the Vercel Deployments tab, not just `git push` exit codes, when changing this file.
 
