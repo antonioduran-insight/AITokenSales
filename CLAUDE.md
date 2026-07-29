@@ -162,6 +162,12 @@ Global Admin has its own theme system (`GlobalAdminThemeContext`) with dark/ligh
 
 All three call the same `assignRunLeads()` (`src/lib/utils/run-assign.ts`) and are safe to race — the unique-key guard makes a duplicate assignment a no-op regardless of which layer got there first.
 
+**UPDATE 29/07 — the project was transferred to the `Insight Software` Vercel team, which is on
+Pro, so the once-per-day ceiling no longer applies.** The schedule is now hourly (`0 * * * *`),
+cutting the worst-case delay for a lead that both the webhook and the client missed from 24h to
+1h. Everything below still matters if the project is ever moved back to a Hobby scope — the
+deploy rejection is silent in `git push`, so it has to be checked in the Vercel Deployments tab.
+
 **`vercel.json`'s cron schedule must stay Hobby-compatible (once per day) unless the plan is confirmed Pro+.** Vercel validates every cron in `vercel.json` at deploy time and **rejects the whole deployment** — not just the cron — if any schedule would fire more than once a day on a Hobby plan. A `*/10 * * * *` schedule silently blocked every single deploy (including unrelated commits) until this was caught, with zero error visible in the GitHub push itself — check the Vercel Deployments tab, not just `git push` exit codes, when changing this file.
 
 Both paths call the same `assignRunLeads()` in `src/lib/utils/run-assign.ts` — **never reimplement the assign logic inline in a route handler.** It's idempotent, so the client and cron paths racing each other is safe.
