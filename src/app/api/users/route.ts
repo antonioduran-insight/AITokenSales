@@ -161,14 +161,36 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Cannot delete the last admin. Promote another user to admin first.' }, { status: 403 })
   }
 
+  // Belt-and-braces: `prospects.assigned_to` / `created_by` are already
+  // ON DELETE SET NULL (see 20260729_user_delete_fk_policy.sql), so the
+  // cascade below would unassign these anyway. Kept explicit because
+  // "deleting a rep must never delete their leads" is a business rule, not
+  // an incidental consequence of a constraint someone could later change.
   await adminClient.from('prospects').update({ assigned_to: null }).eq('assigned_to', id)
   await adminClient.from('prospects').update({ created_by: null }).eq('created_by', id)
 
-  const { error: profileDeleteError } = await adminClient.from('users').delete().eq('id', id)
-  if (profileDeleteError) return NextResponse.json({ error: profileDeleteError.message }, { status: 400 })
-
+  // Delete ONLY the auth account. `public.users.id` is a FK to `auth.users(id)`
+  // ON DELETE CASCADE, so Postgres removes the profile row — and everything
+  // cascading from it — inside the same transaction. That makes this atomic by
+  // construction; there is no partial state to clean up.
+  //
+  // The previous version deleted the profile FIRST and the auth account second,
+  // which was neither atomic nor necessary: when the second call failed, the
+  // profile was already gone while the auth account survived. That orphan can
+  // still authenticate (with no profile, so no role) and permanently burns its
+  // email address — Supabase refuses to re-register an address that already
+  // exists in auth.users. antonio@aitokensales.com was left in exactly that
+  // state before this fix.
   const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(id)
-  if (authDeleteError) return NextResponse.json({ error: authDeleteError.message }, { status: 400 })
+  if (authDeleteError) {
+    // `.message` comes back empty on some admin-API failures, which is why the
+    // UI showed a bare `{}` with nothing actionable in it. Always send prose.
+    const detail = authDeleteError.message?.trim()
+    return NextResponse.json(
+      { error: detail || `Could not delete the auth account (status ${authDeleteError.status ?? 'unknown'}). Nothing was deleted — try again, or check the Supabase logs.` },
+      { status: 400 }
+    )
+  }
 
   return NextResponse.json({ ok: true })
 }
