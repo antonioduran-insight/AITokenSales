@@ -105,11 +105,21 @@ export default function SupportPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canManage])
 
-  // Realtime subscription for expanded ticket messages (only when not closed)
+  // Status of the currently expanded ticket, read during render so the effect
+  // below can depend on a primitive that only changes when the status actually
+  // changes — never on every incoming message.
+  const expandedStatus = expandedId ? tickets.find(t => t.id === expandedId)?.status : undefined
+
+  // Realtime subscription for expanded ticket messages (only when not closed).
+  //
+  // This effect must NOT depend on `tickets`: its own handler calls
+  // setTickets, so listing `tickets` as a dependency made every arriving
+  // message tear the channel down and re-subscribe it — a window where events
+  // are dropped, plus constant websocket churn (the observed symptom was
+  // in-thread messages showing up late while new tickets appeared instantly).
+  // The ticket list is read through `ticketsRef` (kept fresh above) instead.
   useEffect(() => {
-    if (!expandedId) return
-    const expandedTicket = tickets.find(t => t.id === expandedId)
-    if (expandedTicket?.status === 'closed') return
+    if (!expandedId || expandedStatus === 'closed') return
     const supabase = createClient()
     const channel = supabase
       .channel(`ticket-messages-${expandedId}`)
@@ -128,7 +138,7 @@ export default function SupportPage() {
       )
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [expandedId, tickets, user?.id, resolveAuthorName])
+  }, [expandedId, expandedStatus, user?.id, resolveAuthorName])
 
   // Silent variant used by the background realtime sync below — doesn't
   // toggle `loading`, which would otherwise hide the whole list (including
@@ -149,42 +159,102 @@ export default function SupportPage() {
 
   useEffect(() => { fetchTickets() }, [fetchTickets])
 
-  // Browsers block audio until the page has seen a real user gesture — grab
-  // one on first click/keypress anywhere so the AudioContext is ready by
-  // the time a ticket actually arrives.
+  // ── Ticket arrival alert ────────────────────────────────────────────────
+  // Browsers block audio until the page has seen a real user gesture. The
+  // previous version registered its unlock listener with `{ once: true }`,
+  // which broke the exact scenario this alert exists for:
+  //   (a) an agent who opens the tab and never clicks inside it left
+  //       `audioCtxRef` null forever, so every alert was silently dropped;
+  //   (b) the "resume a suspended context" branch lived inside that same
+  //       one-shot listener, so it was unreachable after the first gesture —
+  //       and Chrome suspends the AudioContext whenever the tab goes to the
+  //       background, which is precisely where a waiting agent's tab sits.
+  // Now: the gesture listeners stay registered (every gesture is another
+  // chance to unlock), the context is resumed on `visibilitychange` and again
+  // at alert time, and if the browser still refuses to make noise the alert
+  // degrades to something visible (tab-title counter + in-page banner)
+  // instead of vanishing.
   const audioCtxRef = useRef<AudioContext | null>(null)
-  useEffect(() => {
-    function unlock() {
-      if (!audioCtxRef.current) {
-        try { audioCtxRef.current = new AudioContext() } catch { /* unsupported */ }
-      } else if (audioCtxRef.current.state === 'suspended') {
-        audioCtxRef.current.resume().catch(() => {})
-      }
+  const [mutedAlerts, setMutedAlerts] = useState(0)
+
+  const ensureAudioCtx = useCallback((): AudioContext | null => {
+    if (typeof window === 'undefined') return null
+    const Ctor = window.AudioContext
+      ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!Ctor) return null
+    if (!audioCtxRef.current) {
+      try { audioCtxRef.current = new Ctor() } catch { return null }
     }
-    window.addEventListener('pointerdown', unlock, { once: true })
-    window.addEventListener('keydown', unlock, { once: true })
-    return () => {
-      window.removeEventListener('pointerdown', unlock)
-      window.removeEventListener('keydown', unlock)
-    }
+    const ctx = audioCtxRef.current
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+    return ctx
   }, [])
 
-  function playNotificationSound() {
-    const ctx = audioCtxRef.current
-    if (!ctx) return
-    try {
-      const oscillator = ctx.createOscillator()
-      const gain = ctx.createGain()
-      oscillator.connect(gain)
-      gain.connect(ctx.destination)
-      oscillator.type = 'sine'
-      oscillator.frequency.value = 880
-      gain.gain.setValueAtTime(0.18, ctx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
-      oscillator.start()
-      oscillator.stop(ctx.currentTime + 0.4)
-    } catch { /* ignore — sound is a nicety, not critical */ }
-  }
+  useEffect(() => {
+    const onGesture = () => { ensureAudioCtx() }
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return
+      // Coming back to the tab both revives the context Chrome suspended and
+      // clears the visual fallback — the agent is looking at the list now.
+      ensureAudioCtx()
+      setMutedAlerts(0)
+    }
+    // Not `{ once: true }` — a later gesture must still be able to unlock or
+    // resume the context.
+    window.addEventListener('pointerdown', onGesture)
+    window.addEventListener('keydown', onGesture)
+    document.addEventListener('visibilitychange', onVisibility)
+    // Try straight away too: in a tab the user has already interacted with,
+    // this succeeds with no further gesture needed.
+    ensureAudioCtx()
+    return () => {
+      window.removeEventListener('pointerdown', onGesture)
+      window.removeEventListener('keydown', onGesture)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [ensureAudioCtx])
+
+  // Visible fallback: prefix the tab title so a backgrounded tab still shows
+  // that something arrived even with audio blocked.
+  const baseTitleRef = useRef<string>('')
+  useEffect(() => {
+    if (!baseTitleRef.current) baseTitleRef.current = document.title
+    document.title = mutedAlerts > 0 ? `(${mutedAlerts}) ${baseTitleRef.current}` : baseTitleRef.current
+  }, [mutedAlerts])
+
+  const playNotificationSound = useCallback(() => {
+    const ctx = ensureAudioCtx()
+
+    // Only a context that is actually `running` makes a sound — scheduling on
+    // a suspended one succeeds silently, which is how the old version managed
+    // to "work" while being inaudible.
+    const beep = (): boolean => {
+      if (!ctx || ctx.state !== 'running') return false
+      try {
+        const oscillator = ctx.createOscillator()
+        const gain = ctx.createGain()
+        oscillator.connect(gain)
+        gain.connect(ctx.destination)
+        oscillator.type = 'sine'
+        oscillator.frequency.value = 880
+        gain.gain.setValueAtTime(0.18, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
+        oscillator.start()
+        oscillator.stop(ctx.currentTime + 0.4)
+        return true
+      } catch { return false }
+    }
+
+    if (beep()) return
+    if (!ctx) { setMutedAlerts(n => n + 1); return }
+
+    // Suspended. `ensureAudioCtx` already asked for a resume, but Chrome
+    // leaves that promise unsettled until the page receives a gesture, so
+    // don't await it — retry after a short grace period and degrade to the
+    // visible alert if it's still muted.
+    ctx.resume().catch(() => {})
+    window.setTimeout(() => { if (!beep()) setMutedAlerts(n => n + 1) }, 250)
+  }, [ensureAudioCtx])
 
   // New/updated tickets show up live for everyone — RLS on support_tickets
   // already scopes what each role receives (own org for admin/SDR, every
@@ -203,7 +273,7 @@ export default function SupportPage() {
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [fetchTicketsSilent, isCrossOrgViewer])
+  }, [fetchTicketsSilent, isCrossOrgViewer, playNotificationSound])
 
   useEffect(() => {
     if (isAdmin && user?.organization_id) {
@@ -417,6 +487,26 @@ export default function SupportPage() {
           )}
         </div>
       </div>
+
+      {/* Audio-blocked fallback: the browser refused to play the arrival
+          chime (no user gesture in this tab yet, or the context is still
+          suspended), so say so visibly rather than dropping the alert. */}
+      {mutedAlerts > 0 && (
+        <div
+          onClick={() => setMutedAlerts(0)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: 12, flexWrap: 'wrap', rowGap: 6, cursor: 'pointer',
+            backgroundColor: '#F59E0B18', border: '1px solid #F59E0B44',
+            borderRadius: 8, padding: '10px 14px', marginBottom: 16,
+          }}
+        >
+          <span style={{ fontSize: 13, color: '#FBBF24', fontWeight: 600 }}>
+            {mutedAlerts} new ticket{mutedAlerts !== 1 ? 's' : ''} arrived — sound is blocked by the browser.
+          </span>
+          <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>Click to dismiss and enable sound</span>
+        </div>
+      )}
 
       {/* Filters (admin/support/admin_global) */}
       {canManage && (

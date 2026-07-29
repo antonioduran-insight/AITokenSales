@@ -13,6 +13,13 @@ const PLAN_COLORS: Record<string, string> = {
   basic: '#3B82F6', premium: '#8B5CF6', enterprise: '#F59E0B', ultra: '#EF4444',
 }
 
+// Default model for a brand-new / never-configured org. This value is also
+// hardcoded in `organizations/new/page.tsx` and in `POST /api/runs`'s fallback
+// — a previous bump ("claude-sonnet-4.6" → "claude-sonnet-5") changed only one
+// of the four places and left the rest behind, so keep all of them in step
+// until this lives in a single shared constant.
+const DEFAULT_ANTHROPIC_MODEL = 'claude-sonnet-5'
+
 type OrgDetail = Organization & {
   admin_email: string | null
   sdr_count: number
@@ -74,9 +81,11 @@ export default function OrgDetailPage() {
   const [apifyToken, setApifyToken] = useState('')
   const [anthropicKey, setAnthropicKey] = useState('')
   const [anthropicBaseUrl, setAnthropicBaseUrl] = useState('https://api.aitokenking.com.tw/api/v1')
-  const [anthropicModel, setAnthropicModel] = useState('claude-sonnet-4.6')
+  const [anthropicModel, setAnthropicModel] = useState(DEFAULT_ANTHROPIC_MODEL)
   const [savingKeys, setSavingKeys] = useState(false)
   const [savedKeys, setSavedKeys] = useState(false)
+  const [saveKeysError, setSaveKeysError] = useState('')
+  const [saveNotesError, setSaveNotesError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -104,7 +113,7 @@ export default function OrgDetailPage() {
       setApifyToken(data.apify_token ?? '')
       setAnthropicKey(data.anthropic_key ?? '')
       setAnthropicBaseUrl(data.anthropic_base_url ?? 'https://api.aitokenking.com.tw/api/v1')
-      setAnthropicModel(data.anthropic_model ?? 'claude-sonnet-4.6')
+      setAnthropicModel(data.anthropic_model ?? DEFAULT_ANTHROPIC_MODEL)
       setActiveAddons(new Set(data.addons.map((a: OrganizationAddon) => a.addon_type)))
 
       // QA-F28: Vendor used to be free text, risking silent duplicates from
@@ -184,27 +193,45 @@ export default function OrgDetailPage() {
     } finally { setSavingInfo(false) }
   }
 
+  // Mirrors saveInfo(): check the HTTP status and surface the error instead of
+  // reporting "✓ Saved" unconditionally. A rejected key (bad anthropic_key,
+  // a base URL the API refuses) used to look saved here while every later
+  // scraper run failed with no visible cause.
   async function saveApiKeys() {
     setSavingKeys(true)
+    setSaveKeysError('')
     try {
-      await fetch(`/api/global-admin/organizations/${id}`, {
+      const res = await fetch(`/api/global-admin/organizations/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apify_token: apifyToken || null, anthropic_key: anthropicKey || null, anthropic_base_url: anthropicBaseUrl || null, anthropic_model: anthropicModel || null }),
       })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setSaveKeysError(data.error ?? 'Failed to save API keys'); return }
       setSavedKeys(true)
       setTimeout(() => setSavedKeys(false), 2000)
-    } catch { /* network error */ } finally { setSavingKeys(false) }
+    } catch (e) {
+      setSaveKeysError(e instanceof Error ? e.message : 'Network error')
+    } finally { setSavingKeys(false) }
   }
 
+  // Same treatment for the auto-save-on-blur notes field — silently swallowing
+  // the failure meant the admin walked away believing the note was stored.
   async function saveNotes() {
+    setSaveNotesError('')
     try {
-      await fetch(`/api/global-admin/organizations/${id}`, {
+      const res = await fetch(`/api/global-admin/organizations/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ internal_notes: internalNotes || null }),
       })
-    } catch { /* network error */ }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setSaveNotesError(data.error ?? 'Failed to save notes')
+      }
+    } catch (e) {
+      setSaveNotesError(e instanceof Error ? e.message : 'Network error')
+    }
   }
 
   async function toggleAddon(addonType: AddonType) {
@@ -280,6 +307,10 @@ export default function OrgDetailPage() {
   }
   const sectionTitle: React.CSSProperties = {
     fontSize: 14, fontWeight: 700, color: colors.textPrimary, marginBottom: 16, marginTop: 0,
+  }
+  const errorBanner: React.CSSProperties = {
+    padding: '8px 12px', backgroundColor: '#3A1A1A', border: '1px solid #EF4444',
+    borderRadius: 6, color: '#F87171', fontSize: 12, marginBottom: 14,
   }
 
   if (loading) return <div style={{ color: colors.textSecondary, padding: 60, textAlign: 'center' }}>{t('loading')}</div>
@@ -409,9 +440,7 @@ export default function OrgDetailPage() {
               <input type="password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} style={inputStyle} placeholder="Leave blank to keep current password" autoComplete="new-password" />
             </div>
 
-            {saveInfoError && (
-              <div style={{ padding: '8px 12px', backgroundColor: '#3A1A1A', border: '1px solid #EF4444', borderRadius: 6, color: '#F87171', fontSize: 12, marginBottom: 14 }}>{saveInfoError}</div>
-            )}
+            {saveInfoError && <div style={errorBanner}>{saveInfoError}</div>}
 
             <button
               onClick={saveInfo}
@@ -447,9 +476,10 @@ export default function OrgDetailPage() {
               </div>
               <div>
                 <label style={labelStyle}>Anthropic Model</label>
-                <input value={anthropicModel} onChange={e => setAnthropicModel(e.target.value)} placeholder="claude-sonnet-4.6" style={inputStyle} />
+                <input value={anthropicModel} onChange={e => setAnthropicModel(e.target.value)} placeholder={DEFAULT_ANTHROPIC_MODEL} style={inputStyle} />
               </div>
             </div>
+            {saveKeysError && <div style={errorBanner}>{saveKeysError}</div>}
             <button
               onClick={saveApiKeys}
               disabled={savingKeys}
@@ -470,7 +500,9 @@ export default function OrgDetailPage() {
               placeholder="Internal notes (not visible to the organization)..."
               style={{ ...inputStyle, resize: 'vertical', width: '100%' }}
             />
-            <p style={{ fontSize: 11, color: colors.textMuted, marginTop: 6, marginBottom: 0 }}>Auto-saves on blur</p>
+            {saveNotesError
+              ? <div style={{ ...errorBanner, marginTop: 8, marginBottom: 0 }}>{saveNotesError}</div>
+              : <p style={{ fontSize: 11, color: colors.textMuted, marginTop: 6, marginBottom: 0 }}>Auto-saves on blur</p>}
           </div>
         </div>
 
@@ -535,7 +567,7 @@ export default function OrgDetailPage() {
                     onClick={() => setConfirmDeactivate(true)}
                     style={{ backgroundColor: 'transparent', color: colors.danger, border: `1px solid ${colors.danger}`, borderRadius: 7, padding: '8px 14px', fontSize: 13, cursor: 'pointer', textAlign: 'left' }}
                   >
-                    {t('deactivate')}
+                    {t('deactivateOrganization')}
                   </button>
                 ) : (
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>

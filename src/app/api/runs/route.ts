@@ -190,7 +190,9 @@ export async function POST(req: NextRequest) {
         apify_token: org.apify_token,
         anthropic_key: org.anthropic_key,
         anthropic_base_url: org.anthropic_base_url ?? 'https://api.aitokenking.com.tw/api/v1',
-        anthropic_model: org.anthropic_model ?? 'claude-sonnet-4.6',
+        // Keep in step with the Global Admin org forms' own default — a
+        // previous bump changed only one of the four hardcoded copies.
+        anthropic_model: org.anthropic_model ?? 'claude-sonnet-5',
       }
 
       console.log('Sending to scraper:', JSON.stringify(scraperPayload, null, 2))

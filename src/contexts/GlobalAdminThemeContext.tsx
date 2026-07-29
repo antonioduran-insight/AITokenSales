@@ -37,7 +37,11 @@ const translations = {
     addOn_extended_data_retention: '延長數據保留', addOn_sso: 'SSO 整合',
     addOn_linkedin_auto_messaging: 'LinkedIn 自動發送', addOn_bridge: 'Bridge（合作夥伴探索）',
     billingDay: '計費日', save: '保存', saving: '保存中...', saved: '已保存',
-    deactivate: '停用組織', changeStatus: '更改狀態', sendReply: '發送回覆',
+    // `deactivate` is generic on purpose (it pairs with `activate` and is
+    // reused on the Vendors screen, where "Deactivate Organization" was
+    // plainly wrong). Screens that need the noun use the specific key.
+    deactivate: '停用', deactivateOrganization: '停用組織',
+    changeStatus: '更改狀態', sendReply: '發送回覆',
     noTickets: '暫無工單', loading: '加載中...',
     monthlyCosts: '每月成本', infrastructure: '基礎設施', apiCosts: 'API 成本',
     subtotal: '小計', total: '總計', monthlyTotal: '每月總計',
@@ -67,7 +71,8 @@ const translations = {
     addOn_extended_data_retention: 'Extended Data Retention', addOn_sso: 'SSO Integration',
     addOn_linkedin_auto_messaging: 'LinkedIn Auto-messaging', addOn_bridge: 'Bridge (Partnerships)',
     billingDay: 'Billing Day', save: 'Save Changes', saving: 'Saving...', saved: 'Saved',
-    deactivate: 'Deactivate Organization', changeStatus: 'Change Status',
+    deactivate: 'Deactivate', deactivateOrganization: 'Deactivate Organization',
+    changeStatus: 'Change Status',
     sendReply: 'Send Reply', noTickets: 'No open tickets', loading: 'Loading...',
     monthlyCosts: 'Monthly Costs', infrastructure: 'Infrastructure', apiCosts: 'API Costs',
     subtotal: 'Subtotal', total: 'Total', monthlyTotal: 'Monthly Total',
