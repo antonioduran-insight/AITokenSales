@@ -108,7 +108,16 @@
     "duplicateEmailWarning": "Đã tồn tại khách hàng với email này",
     "duplicateLinkedInWarning": "Đã tồn tại khách hàng với LinkedIn URL này",
     "copyMessage": "Sao chép",
-    "copied": "Đã sao chép!"
+    "copied": "Đã sao chép!",
+    "saveFailed": "Không thể lưu — thay đổi KHÔNG được ghi lại. Vui lòng kiểm tra kết nối và thử lại.",
+    "savedNoAudit": "Đã lưu thay đổi, nhưng KHÔNG thể ghi vào Nhật Ký Kiểm Toán — không còn dấu vết nào để truy lại.",
+    "marketMapLoading": "Danh sách thị trường vẫn đang tải. Chưa thể đổi thị trường vì khu vực phải được tính lại từ thị trường — vui lòng thử lại sau một lát.",
+    "marketNoArea": "“{market}” không có trong danh mục thị trường, nên không thể suy ra khu vực từ đó. Thị trường KHÔNG được thay đổi — hãy chọn một quốc gia trong danh sách.",
+    "areaRowMissing": "Không có khu vực “{area}” trong workspace này, nên không thể chuyển khách hàng sang đó. Thị trường KHÔNG được thay đổi.",
+    "marketClearedAreaKept": "Đã xóa thị trường. Khu vực và người phụ trách được giữ nguyên — không có thị trường thì không thể suy ra khu vực.",
+    "savedOwnerOtherArea": "Đã lưu. Khách hàng đã chuyển sang khu vực khác nhưng VẪN thuộc người phụ trách hiện tại — hãy phân công lại nếu người đó không phụ trách khu vực mới.",
+    "ownerOutsideArea": "Khách hàng này được phân công cho người không phải là SDR đang hoạt động trong khu vực của họ. Việc phân công vẫn có hiệu lực — chỉ chọn tên khác nếu bạn thực sự muốn phân công lại.",
+    "ownerUnknown": "Người phụ trách hiện tại"
   },
   "import": {
     "title": "Nhập CSV",

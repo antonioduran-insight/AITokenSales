@@ -108,7 +108,16 @@
     "duplicateEmailWarning": "Ya existe un lead con este email",
     "duplicateLinkedInWarning": "Ya existe un lead con esta URL de LinkedIn",
     "copyMessage": "Copiar",
-    "copied": "¡Copiado!"
+    "copied": "¡Copiado!",
+    "saveFailed": "No se pudo guardar — el cambio NO quedó registrado. Revisá tu conexión y volvé a intentarlo.",
+    "savedNoAudit": "Cambio guardado, pero NO se pudo registrar en la Auditoría — no queda ningún rastro de él.",
+    "marketMapLoading": "La lista de mercados todavía se está cargando. El mercado no se puede cambiar aún porque hay que recalcular el área a partir de él — probá de nuevo en un momento.",
+    "marketNoArea": "“{market}” no está en el catálogo de mercados, así que no se puede derivar ningún área. El mercado NO fue cambiado — elegí un país de la lista.",
+    "areaRowMissing": "No existe el área “{area}” en este workspace, así que el lead no se puede mover ahí. El mercado NO fue cambiado.",
+    "marketClearedAreaKept": "Mercado borrado. El área y el responsable quedaron sin cambios — sin mercado no hay nada de donde derivar un área.",
+    "savedOwnerOtherArea": "Guardado. El lead se movió a otra área pero SIGUE asignado a su responsable actual — reasignalo si ese responsable no cubre la nueva área.",
+    "ownerOutsideArea": "Este lead está asignado a alguien que no es un SDR activo en su área. La asignación sigue vigente — elegí otro nombre solo si querés reasignarlo.",
+    "ownerUnknown": "Responsable actual"
   },
   "import": {
     "title": "Importar CSV",

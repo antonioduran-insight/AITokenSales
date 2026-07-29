@@ -108,7 +108,16 @@
     "duplicateEmailWarning": "A lead with this email already exists",
     "duplicateLinkedInWarning": "A lead with this LinkedIn URL already exists",
     "copyMessage": "Copy",
-    "copied": "Copied!"
+    "copied": "Copied!",
+    "saveFailed": "Could not save — the change was NOT stored. Check your connection and try again.",
+    "savedNoAudit": "Change saved, but it could NOT be recorded in the Audit Log — there is no trail for it.",
+    "marketMapLoading": "Market list is still loading. The market cannot be changed yet because the area has to be recalculated from it — try again in a moment.",
+    "marketNoArea": "“{market}” is not in the market catalogue, so no area can be derived from it. The market was NOT changed — pick a country from the list.",
+    "areaRowMissing": "No “{area}” area exists in this workspace, so the lead cannot be moved there. The market was NOT changed.",
+    "marketClearedAreaKept": "Market cleared. Area and owner were left unchanged — with no market there is nothing to derive an area from.",
+    "savedOwnerOtherArea": "Saved. The lead moved to another area but is STILL assigned to its current owner — reassign it if that owner does not cover the new area.",
+    "ownerOutsideArea": "This lead is assigned to someone who is not an active SDR in its area. The assignment still stands — only pick another name if you mean to reassign.",
+    "ownerUnknown": "Current owner"
   },
   "import": {
     "title": "Import CSV",

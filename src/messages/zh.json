@@ -108,7 +108,16 @@
     "duplicateEmailWarning": "此電子郵件的潛在客戶已存在",
     "duplicateLinkedInWarning": "此 LinkedIn 網址的潛在客戶已存在",
     "copyMessage": "複製",
-    "copied": "已複製！"
+    "copied": "已複製！",
+    "saveFailed": "無法儲存 — 這項變更並未寫入。請檢查網路連線後再試一次。",
+    "savedNoAudit": "變更已儲存，但無法寫入審計日誌 — 這筆變更沒有留下任何可追溯的紀錄。",
+    "marketMapLoading": "市場清單仍在載入中。變更市場時必須依市場重新計算地區，因此目前還無法變更 — 請稍候再試。",
+    "marketNoArea": "「{market}」不在市場目錄中，無法由它推斷出地區。市場並未變更 — 請從清單中選擇一個國家。",
+    "areaRowMissing": "此工作區中不存在「{area}」地區，因此無法將此潛在客戶移至該地區。市場並未變更。",
+    "marketClearedAreaKept": "已清除市場。地區與負責人維持不變 — 沒有市場就無從推斷地區。",
+    "savedOwnerOtherArea": "已儲存。此潛在客戶已移至其他地區，但仍指派給目前的負責人 — 若該負責人不負責新的地區，請重新分配。",
+    "ownerOutsideArea": "此潛在客戶指派給的人員並不是其所屬地區的活躍銷售代表。指派仍然有效 — 只有在確定要重新分配時才選擇其他人。",
+    "ownerUnknown": "目前負責人"
   },
   "import": {
     "title": "匯入 CSV",
