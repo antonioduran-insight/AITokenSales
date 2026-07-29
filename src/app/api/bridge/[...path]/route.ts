@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { backendHeaders, SCRAPER_API_URL } from '@/lib/scraper-backend'
+import { assignBridgeCandidates } from '@/lib/utils/bridge-assign'
 
 const BACKEND = SCRAPER_API_URL || 'http://localhost:8000'
 
@@ -88,6 +89,12 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
   // the authoritative id — used to force it into the response regardless of
   // what shape the backend echoes back.
   let createdRunId: string | null = null
+  // Set only for POST /bridge/candidates/confirm-batch. Once the backend has
+  // confirmed the candidates and written their messages, the CRM owns the
+  // handoff into `prospects` (see bridge-assign.ts) — these carry the
+  // already-validated inputs across to the response block below.
+  let confirmCandidateIds: string[] | null = null
+  let confirmSdrId: string | null = null
 
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     let body: Record<string, unknown> = {}
@@ -198,13 +205,34 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
       }
       const { data: sdr } = await admin
         .from('users')
-        .select('id')
+        .select('id, area_id')
         .eq('id', sdrId)
         .eq('organization_id', orgId)
         .eq('is_active', true)
         .maybeSingle()
       if (!sdr) {
         return NextResponse.json({ error: 'SDR not found in this organization' }, { status: 400 })
+      }
+
+      // The confirmed candidates get copied into `prospects` after the backend
+      // responds, and `prospects.area_id` is NOT NULL — the SDR's own area is
+      // the only source Bridge has for it (no region/market of its own). Fail
+      // here, BEFORE the backend confirms and burns Anthropic tokens generating
+      // messages, rather than confirming and then discovering the leads have
+      // nowhere to land. Never insert with an invented area.
+      if (!(sdr as { area_id: string | null }).area_id) {
+        return NextResponse.json(
+          { error: 'The selected SDR has no area set — set it in Settings → Users before confirming candidates.' },
+          { status: 400 }
+        )
+      }
+
+      confirmSdrId = sdrId
+      confirmCandidateIds = Array.isArray(body.candidate_ids)
+        ? (body.candidate_ids as unknown[]).filter((id): id is string => typeof id === 'string' && id !== '')
+        : []
+      if (confirmCandidateIds.length === 0) {
+        return NextResponse.json({ error: 'candidate_ids is required' }, { status: 400 })
       }
 
       // Resolve the SDR's default sender profile so the client never has to.
@@ -248,6 +276,70 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
           .update({ status: 'failed', error_message: text.slice(0, 2000) })
           .eq('id', createdRunId)
       }
+    }
+
+    // The backend deliberately does NOT insert into `prospects` (it has no
+    // value for CRM-owned NOT NULL columns like area_id) and documents the CRM
+    // as the owner of that step. It was implemented for the main scraper
+    // (`assignRunLeads`) and never for Bridge, so confirmed candidates with
+    // generated messages died in `bridge_candidates` and the SDR saw nothing.
+    // This is that missing step.
+    if (res.ok && confirmCandidateIds && confirmSdrId) {
+      let created = 0
+      let notCreated = confirmCandidateIds.length
+      // Split out of `notCreated` so the UI can tell a benign outcome (already
+      // on that SDR's board — a re-confirm/retry) apart from a real loss.
+      let skippedExisting = 0
+      let skippedNoName = 0
+      let assignError: string | null = null
+
+      try {
+        const result = await assignBridgeCandidates({
+          admin,
+          candidateIds: confirmCandidateIds,
+          sdrId: confirmSdrId,
+          organizationId: orgId,
+        })
+        if (result.ok) {
+          created = result.assigned
+          notCreated = Math.max(0, confirmCandidateIds.length - result.assigned)
+          skippedExisting = result.skipped
+          skippedNoName = result.skippedNoName
+        } else {
+          assignError = result.error
+        }
+      } catch (e) {
+        assignError = String(e)
+      }
+
+      if (assignError) {
+        console.error('[bridge] confirm-batch succeeded but prospects handoff failed:', assignError)
+      }
+
+      // A failed handoff must NOT fail the response: the backend already
+      // confirmed the candidates and generated their messages, and replaying
+      // that is neither free nor idempotent on its side. But it must not be
+      // invisible either — the UI reports `ids.length` blindly today, which is
+      // exactly how this bug stayed hidden. Return the real numbers so it can
+      // tell the truth.
+      let payload: Record<string, unknown> = {}
+      try {
+        const parsed = JSON.parse(text)
+        payload = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? (parsed as Record<string, unknown>)
+          : { result: parsed }
+      } catch {
+        payload = {}
+      }
+
+      return NextResponse.json({
+        ...payload,
+        crm_prospects_created: created,
+        crm_prospects_not_created: notCreated,
+        crm_prospects_skipped_existing: skippedExisting,
+        crm_prospects_skipped_no_name: skippedNoName,
+        crm_prospects_error: assignError,
+      }, { status: res.status })
     }
 
     return new NextResponse(text, {
