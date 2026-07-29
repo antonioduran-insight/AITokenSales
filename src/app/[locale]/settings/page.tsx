@@ -588,11 +588,21 @@ function ScraperTab() {
                         </div>
                         <div>
                           <label style={S.label}>Language</label>
+                          {/* Codes must match the scraper's _language_instruction()
+                              map (linkedin-scraper/api/message_generator.py).
+                              Bare "zh" used to be the only Chinese option and the
+                              backend resolves it to SIMPLIFIED — so picking it for a
+                              Taiwan or Hong Kong SDR silently produced the wrong
+                              script, with no way to ask for Traditional at all.
+                              Portuguese was missing entirely even though Brazil and
+                              Portugal are both configured as 'pt' in `markets`. */}
                           <select value={formFields.language} onChange={e => setFormFields(p => ({ ...p, language: e.target.value }))} style={S.select}>
                             <option value="">Automatic (match market)</option>
                             <option value="en">English</option>
-                            <option value="zh">中文</option>
+                            <option value="zh-TW">繁體中文 (Traditional)</option>
+                            <option value="zh-CN">简体中文 (Simplified)</option>
                             <option value="es">Español</option>
+                            <option value="pt">Português</option>
                             <option value="vi">Tiếng Việt</option>
                           </select>
                         </div>
