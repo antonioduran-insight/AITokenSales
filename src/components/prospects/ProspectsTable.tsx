@@ -53,7 +53,7 @@ const PROSPECT_SELECT = '*, area:areas(*), assigned_user:users!assigned_to(id, f
 
 export function ProspectsTable() {
   const { user } = useUser()
-  const { isImpersonating, impersonateOrgId, isAdmin } = useOrgId()
+  const { isImpersonating, impersonateOrgId, isAdmin, isReadOnly } = useOrgId()
   const t = useTranslations()
   const comboLabels = useComboLabels()
 
@@ -105,16 +105,50 @@ export function ProspectsTable() {
   // "Missing conversation" badge.
   const [chatCounts, setChatCounts] = useState<Record<string, number>>({})
 
+  // SDR list behind the admin-only SDR filter + the reassign modals.
+  // Same cross-org leak as KanbanBoard had: no `organization_id` filter and no
+  // impersonation routing meant `admin_global` got every org's SDRs (name AND
+  // email, since this one selected `*`). `areas` needs no scoping — it's a
+  // global catalogue table with no organization_id column.
   useEffect(() => {
     const supabase = createClient()
+
+    async function fetchSdrs(): Promise<User[]> {
+      if (!isAdmin) return []
+
+      if (isImpersonating) {
+        if (!impersonateOrgId) return []
+        // /api/crm/[table] applies the org scope server-side; role/is_active
+        // aren't supported as query filters there, so they're applied here.
+        const params = new URLSearchParams({
+          impersonate_org_id: impersonateOrgId,
+          select: '*',
+          limit: '1000',
+        })
+        const res = await fetch(`/api/crm/users?${params}`)
+        if (!res.ok) return []
+        const json = await res.json()
+        return ((json.data ?? []) as User[]).filter(u => u.role === 'sdr' && u.is_active)
+      }
+
+      if (!user?.organization_id) return []
+      const { data } = await supabase
+        .from('users')
+        .select('*')
+        .eq('organization_id', user.organization_id)
+        .eq('role', 'sdr')
+        .eq('is_active', true)
+      return (data ?? []) as User[]
+    }
+
     Promise.all([
       supabase.from('areas').select('*').eq('is_active', true),
-      isAdmin ? supabase.from('users').select('*').eq('role', 'sdr').eq('is_active', true) : Promise.resolve({ data: null }),
-    ]).then(([areasRes, sdrsRes]) => {
+      fetchSdrs(),
+    ]).then(([areasRes, sdrList]) => {
       if (areasRes.data) setAreas(areasRes.data as Area[])
-      if (sdrsRes.data) setSdrs(sdrsRes.data as User[])
+      setSdrs(sdrList)
     })
-  }, [isAdmin])
+  }, [isAdmin, isImpersonating, impersonateOrgId, user?.organization_id])
 
   // Debounce the search box into `search` (300ms) so typing fast doesn't
   // fire a request per keystroke.
@@ -236,6 +270,7 @@ export function ProspectsTable() {
   }, [sdrReassignFrom])
 
   async function handleSdrReassign() {
+    if (isReadOnly) return
     if (!sdrReassignFrom || !sdrReassignTo) return
     setSdrReassigning(true)
     setSdrReassignError(null)
@@ -283,6 +318,7 @@ export function ProspectsTable() {
   // ProspectDrawer already uses, unlike the by-quantity mode above which
   // only logs a count.
   async function handleReassignSelected() {
+    if (isReadOnly) return
     if (selected.size === 0 || !selectedReassignTo) return
     setSelectedReassigning(true)
     setSelectedReassignError(null)
@@ -322,6 +358,7 @@ export function ProspectsTable() {
   }
 
   async function handleBulkDelete() {
+    if (isReadOnly) return
     if (selected.size === 0) return
     setDeleting(true)
     setDeleteError(null)
@@ -430,7 +467,7 @@ export function ProspectsTable() {
             {PAGE_SIZE_OPTIONS.map(n => <option key={n} value={n}>Show {n}</option>)}
           </select>
 
-          {isAdmin && !isImpersonating && (
+          {isAdmin && !isReadOnly && (
             <button
               onClick={() => { setSdrReassignOpen(true); setSdrReassignError(null) }}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 6, border: '1px solid #6C63FF40', backgroundColor: '#6C63FF15', color: 'var(--crm-accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
@@ -643,7 +680,7 @@ export function ProspectsTable() {
       )}
 
       {/* Fixed bottom action bar (admin, selection active) — bulk delete */}
-      {isAdmin && !isImpersonating && selected.size > 0 && (
+      {isAdmin && !isReadOnly && selected.size > 0 && (
         <div style={{
           position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40,
           backgroundColor: '#0D0D14', borderTop: '1px solid var(--crm-border)',

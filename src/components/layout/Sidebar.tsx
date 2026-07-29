@@ -67,10 +67,20 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
   const showAdmin = isAdmin || isImpersonating
   const isSupport = user?.role === 'support'
 
+  // `admin_global` browsing the CRM WITHOUT ?impersonate_org_id= is now bounced
+  // back to /global-admin/organizations by the middleware, with exactly one
+  // exception: /support, because the cross-org ticket queue lives on the CRM
+  // page (support/page.tsx treats admin_global as a cross-org viewer, same as
+  // the `support` role). Without this branch the Global Admin standing on
+  // /support saw the whole CRM sidebar and every single link bounced it — dead
+  // links that look like a broken app. While impersonating it keeps the full
+  // CRM sidebar, which is the entire point of impersonation.
+  const isGlobalAdminOutsideOrg = user?.role === 'admin_global' && !isImpersonating
+
   // Support is org-independent internal staff confined to the ticket queue
   // (middleware enforces this server-side too) — every other link here
   // would just redirect straight back, so don't show them at all.
-  const navItems = isSupport
+  const navItems = isSupport || isGlobalAdminOutsideOrg
     ? [{ href: '/support', label: t('support'), icon: Headphones, always: true }]
     : [
         { href: '/kanban', label: t('kanban'), icon: LayoutGrid, always: true },

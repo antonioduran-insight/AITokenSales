@@ -28,7 +28,7 @@ interface PipelineStage {
 
 export function KanbanBoard() {
   const { user } = useUser()
-  const { isImpersonating, impersonateOrgId, isAdmin } = useOrgId()
+  const { isImpersonating, impersonateOrgId, isAdmin, isReadOnly } = useOrgId()
   const t = useTranslations()
 
   const [prospects, setProspects] = useState<Prospect[]>([])
@@ -73,9 +73,48 @@ export function KanbanBoard() {
     const supabase = createClient()
     setLoading(true)
 
+    // SDR list behind the admin-only "view one SDR's board" picker.
+    // Must be scoped by organization explicitly and routed through the
+    // impersonation proxy, exactly like the prospects queries below — leaving
+    // it on the browser client with no `organization_id` filter leaked every
+    // other org's SDR names + UUIDs into the dropdown for `admin_global`
+    // (whose RLS on `users` is cross-org): impersonating an org with zero
+    // seats still listed 12 people from two other orgs.
+    async function fetchOrgSdrs(): Promise<{ id: string; full_name: string }[]> {
+      if (!isAdmin) return []
+
+      if (isImpersonating) {
+        if (!impersonateOrgId) return []
+        // /api/crm/[table] scopes to the impersonated org server-side but has
+        // no role/is_active filter, so those two are applied here.
+        const params = new URLSearchParams({
+          impersonate_org_id: impersonateOrgId,
+          select: 'id, full_name, role, is_active',
+          order: 'full_name',
+          order_dir: 'asc',
+        })
+        const res = await fetch(`/api/crm/users?${params}`)
+        if (!res.ok) return []
+        const json = await res.json()
+        return ((json.data ?? []) as { id: string; full_name: string; role: string; is_active: boolean }[])
+          .filter(u => u.role === 'sdr' && u.is_active)
+          .map(u => ({ id: u.id, full_name: u.full_name }))
+      }
+
+      if (!user?.organization_id) return []
+      const { data } = await supabase
+        .from('users')
+        .select('id, full_name')
+        .eq('organization_id', user.organization_id)
+        .eq('role', 'sdr')
+        .eq('is_active', true)
+        .order('full_name')
+      return (data ?? []) as { id: string; full_name: string }[]
+    }
+
     async function init() {
       // Phase 1 — all meta queries in parallel
-      const [areasRes, sdrAreasRes, stagesRes, orgSdrsRes] = await Promise.all([
+      const [areasRes, sdrAreasRes, stagesRes, orgSdrsList] = await Promise.all([
         isAdmin
           ? supabase.from('areas').select('*').order('name')
           : Promise.resolve({ data: null }),
@@ -85,13 +124,11 @@ export function KanbanBoard() {
         !isImpersonating
           ? supabase.from('pipeline_stages').select('name, color, outreach_status')
           : Promise.resolve({ data: null }),
-        isAdmin
-          ? supabase.from('users').select('id, full_name').eq('role', 'sdr').eq('is_active', true).order('full_name')
-          : Promise.resolve({ data: null }),
+        fetchOrgSdrs(),
       ])
 
       if (areasRes.data) setAreas(areasRes.data as Area[])
-      if (orgSdrsRes.data) setOrgSdrs(orgSdrsRes.data as { id: string; full_name: string }[])
+      setOrgSdrs(orgSdrsList)
 
       // Resolve SDR areas locally so prospects query doesn't need a re-render
       let resolvedSdrAreas: Area[] = []
@@ -211,6 +248,10 @@ export function KanbanBoard() {
   }
 
   async function commitStatusChange(prospect: Prospect, newStatus: OutreachStatus, prevStatus: OutreachStatus) {
+    // Belt-and-braces: every caller is already gated, but this is the single
+    // place that actually writes a status, so it refuses in read-only mode too.
+    if (isReadOnly) return false
+
     setProspects(prev => prev.map(p => p.id === prospect.id ? { ...p, outreach_status: newStatus } : p))
 
     const supabase = createClient()
@@ -244,7 +285,10 @@ export function KanbanBoard() {
 
   async function handleDragEnd({ active, over }: DragEndEvent) {
     setDraggingId(null)
-    if (!over || isImpersonating) return
+    // isReadOnly, not isImpersonating — an admin_global on a bare /kanban URL
+    // (no ?impersonate_org_id=) is not impersonating and could drag other orgs'
+    // cards between columns, writing to prospects.outreach_status for real.
+    if (!over || isReadOnly) return
 
     const newStatus = over.id as OutreachStatus
     const prospect = prospects.find(p => p.id === active.id)
@@ -427,7 +471,7 @@ export function KanbanBoard() {
             <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
           </button>
 
-          {!isImpersonating && (
+          {!isReadOnly && (
             <Button
               onClick={() => setFormOpen(true)}
               style={{ backgroundColor: 'var(--crm-accent)', color: 'var(--crm-text-primary)', fontSize: 13, height: 34, gap: 6, display: 'flex', alignItems: 'center' }}

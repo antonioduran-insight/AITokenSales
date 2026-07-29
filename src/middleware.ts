@@ -127,6 +127,55 @@ export async function middleware(request: NextRequest) {
       }
     }
 
+    // `admin_global` has no CRM data of its own — every CRM page it opens is
+    // somebody else's org. Its RLS policies are cross-org, so a bare
+    // `/zh/prospects` (no `?impersonate_org_id=`) rendered the union of every
+    // organization's prospects, with no column saying who owns which lead and
+    // every drawer field editable (P1, reproduced in production).
+    //
+    // Impersonation is the only sanctioned way in: it scopes reads through
+    // `/api/crm/[table]` with an explicit org id and flips the client into
+    // read-only. The client-side `isReadOnly` flag in `useOrgId` only stops
+    // *writes* — the reads still ran under admin_global's RLS — so this has to
+    // be a route-level redirect, not just a UI guard.
+    //
+    // NOTE: like the `support` gate above, this inherits the 900ms fail-open
+    // of the profile read — on a timeout `userData` is null and this whole
+    // block is skipped, so a bare CRM URL still gets through on that one
+    // request. That is the deliberate tradeoff documented above and is left
+    // alone here; `useOrgId`'s `isReadOnly` is the second layer covering it.
+    if (userData.role === 'admin_global') {
+      const locale = pathnameHasLocale ? pathname.split('/')[1] : defaultLocale
+      const pathAfterLocale = pathnameHasLocale ? pathname.slice(`/${locale}`.length) || '/' : pathname
+
+      // Global Admin's own panel — must never be gated, it's the redirect
+      // target (and `/global-admin/...` subpaths link back into it), so
+      // gating it would be an infinite redirect loop. Matched exactly, not
+      // by a bare `startsWith`, so a lookalike path can't slip past.
+      const isGlobalAdminPanel =
+        pathAfterLocale === '/global-admin' || pathAfterLocale.startsWith('/global-admin/')
+
+      // The CRM ticket queue is deliberately cross-org for `admin_global`:
+      // both `src/app/[locale]/support/page.tsx` and `/api/support/tickets`
+      // branch on `role === 'admin_global'` to show every org's tickets and
+      // to allow status changes/replies. It's the one CRM route this role is
+      // *meant* to open without impersonating, and `/global-admin/support` is
+      // a different page (internal staff accounts, no ticket queue), so it
+      // can't be substituted.
+      const isSupportQueue = pathAfterLocale === '/support'
+
+      // An empty value counts as absent: `useOrgId` does `!!impersonateOrgId`,
+      // so letting `?impersonate_org_id=` through would hand back exactly the
+      // fully-writable cross-org CRM this gate exists to stop.
+      const isImpersonating = !!request.nextUrl.searchParams.get('impersonate_org_id')
+
+      if (!isGlobalAdminPanel && !isSupportQueue && !isImpersonating) {
+        const redirectResponse = NextResponse.redirect(new URL(`/${locale}/global-admin/organizations`, request.url))
+        response.cookies.getAll().forEach(cookie => redirectResponse.cookies.set(cookie))
+        return redirectResponse
+      }
+    }
+
     intlResponse.cookies.set('user_role',   userData.role ?? '',             { path: '/', sameSite: 'lax' })
     intlResponse.cookies.set('user_org_id', userData.organization_id ?? '', { path: '/', sameSite: 'lax' })
   }
