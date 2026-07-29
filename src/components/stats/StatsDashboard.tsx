@@ -80,6 +80,24 @@ const S: Record<string, React.CSSProperties> = {
 
 const STATS_SELECT = 'id, outreach_status, lead_temperature, area_id, assigned_to, created_at, area:areas(name, label_en), assigned_user:users!assigned_to(id, full_name, area_id)'
 
+// Every metric on this page is computed client-side from the full prospect list,
+// so the list has to actually BE full. PostgREST caps any single response at
+// Supabase's default `max-rows` (1000) and truncates *silently* — no error, no
+// flag — which made a 1258-lead org report exactly 1000 everywhere (funnel,
+// areas, temperatures and the conversion denominator all summed to 1000).
+// Page through explicitly instead of relying on one unbounded request.
+const PAGE_SIZE = 1000
+// Pages are fetched sequentially (never N unbounded parallel requests), and this
+// hard cap stops a pathological org — or a future paging bug — from looping
+// forever: 200k prospects is far beyond any real plan's lead quota.
+const MAX_PAGES = 200
+
+function errorMessage(e: unknown): string {
+  if (e instanceof Error) return e.message
+  if (typeof e === 'string') return e
+  return 'Unknown error'
+}
+
 export function StatsDashboard() {
   const t = useTranslations('stats')
   const tc = useTranslations('common')
@@ -88,33 +106,140 @@ export function StatsDashboard() {
 
   const [prospects, setProspects] = useState<ProspectRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     if (!user && !isImpersonating) return
 
-    async function load() {
-      if (isImpersonating && impersonateOrgId) {
-        const params = new URLSearchParams({ impersonate_org_id: impersonateOrgId, select: STATS_SELECT, limit: '5000' })
+    // Impersonation path: /api/crm/prospects clamps `limit` to 2000 server-side
+    // (so the old `limit: '5000'` was truncating too), but it does accept
+    // `offset` — so page through it the same way. Ordering by `id` (a unique
+    // key) keeps offset paging deterministic; ordering by a non-unique column
+    // like created_at can duplicate or skip rows across page boundaries.
+    async function fetchImpersonated(orgId: string): Promise<ProspectRow[]> {
+      const all: ProspectRow[] = []
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const params = new URLSearchParams({
+          impersonate_org_id: orgId,
+          select: STATS_SELECT,
+          limit: String(PAGE_SIZE),
+          offset: String(page * PAGE_SIZE),
+          order: 'id',
+          order_dir: 'asc',
+        })
         const res = await fetch(`/api/crm/prospects?${params}`)
-        const json = await res.json()
-        if (json.data) setProspects(json.data as ProspectRow[])
-      } else {
-        const supabase = createClient()
-        let query = supabase.from('prospects').select(STATS_SELECT)
-        if (!userIsAdmin && user?.area_id) query = query.eq('area_id', user.area_id)
-        const { data } = await query
-        if (data) setProspects(data as unknown as ProspectRow[])
+        const json = await res.json().catch(() => null)
+        if (!res.ok || json?.error) {
+          const err = json?.error
+          throw new Error(
+            (typeof err === 'string' ? err : err?.message) || `Request failed (${res.status})`
+          )
+        }
+        const batch = (json?.data ?? []) as ProspectRow[]
+        all.push(...batch)
+        // A short page means we've reached the end.
+        if (batch.length < PAGE_SIZE) return all
       }
-      setLoading(false)
+      return all
+    }
+
+    async function fetchDirect(): Promise<ProspectRow[]> {
+      const supabase = createClient()
+
+      // `users.area_id` is only the SDR's *primary* area. A multi-region SDR's
+      // real coverage lives in `user_areas`, so filtering on `users.area_id`
+      // silently dropped every lead outside that one area (Stats said 222 while
+      // the Kanban said 224 for a 3-area SDR) — the same QA-F25 class of bug.
+      // Resolution order is deliberately identical to KanbanBoard's, so the two
+      // pages can never disagree again.
+      let areaIds: string[] = []
+      if (!userIsAdmin && user) {
+        const { data: uaRows, error: uaError } = await supabase
+          .from('user_areas')
+          .select('area_id')
+          .eq('user_id', user.id)
+        if (uaError) throw new Error(uaError.message)
+        areaIds = (uaRows ?? [])
+          .map(r => (r as { area_id: string | null }).area_id)
+          .filter((id): id is string => Boolean(id))
+        if (areaIds.length === 0 && user.area_id) areaIds = [user.area_id]
+        // No `user_areas` rows AND no primary area → no area filter at all
+        // (same as KanbanBoard). That is not a data leak: the `prospects` RLS
+        // policy for an SDR is `assigned_to = auth.uid()`, so they still only
+        // ever see their own leads. Forcing an impossible filter here would
+        // just make Stats report 0 while the Kanban shows their real leads.
+      }
+
+      const all: ProspectRow[] = []
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const from = page * PAGE_SIZE
+        // Fresh builder per page (they're mutable, so reusing one would stack up
+        // `order` params), and filters go on before .order()/.range().
+        // Ordering by `id` — a unique key — keeps offset paging deterministic.
+        let query = supabase.from('prospects').select(STATS_SELECT)
+        if (areaIds.length === 1) query = query.eq('area_id', areaIds[0])
+        else if (areaIds.length > 1) query = query.in('area_id', areaIds)
+        const { data, error } = await query
+          .order('id', { ascending: true })
+          .range(from, from + PAGE_SIZE - 1)
+        // The error was never checked before, so any failure rendered a fully
+        // populated dashboard of zeroes that looked like real data.
+        if (error) throw new Error(error.message)
+        const batch = (data ?? []) as unknown as ProspectRow[]
+        all.push(...batch)
+        if (batch.length < PAGE_SIZE) return all
+      }
+      return all
+    }
+
+    async function load() {
+      setLoading(true)
+      setLoadError(null)
+      try {
+        const rows = isImpersonating && impersonateOrgId
+          ? await fetchImpersonated(impersonateOrgId)
+          : await fetchDirect()
+        setProspects(rows)
+      } catch (e) {
+        setProspects([])
+        setLoadError(errorMessage(e))
+      } finally {
+        setLoading(false)
+      }
     }
 
     load()
-  }, [user, userIsAdmin, isAdmin, isImpersonating, impersonateOrgId])
+  }, [user, userIsAdmin, isAdmin, isImpersonating, impersonateOrgId, reloadKey])
 
   if (loading) {
     return (
       <div style={{ ...S.page, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ color: 'var(--crm-text-muted)' }}>{tc('loading')}</span>
+      </div>
+    )
+  }
+
+  // A failed fetch must never fall through to the normal dashboard — every
+  // metric would render 0 / 0.0% and read as a genuine (catastrophic) result.
+  if (loadError) {
+    return (
+      <div style={S.page}>
+        <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>{t('title')}</h1>
+        <div style={{ ...S.card, borderColor: '#EF4444', maxWidth: 560 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#EF4444', marginBottom: 8 }}>
+            {tc('error')}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)', fontFamily: 'JetBrains Mono, monospace', marginBottom: 16, wordBreak: 'break-word' }}>
+            {loadError}
+          </div>
+          <button
+            onClick={() => setReloadKey(k => k + 1)}
+            style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)', color: 'var(--crm-text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          >
+            {tc('retry')}
+          </button>
+        </div>
       </div>
     )
   }
