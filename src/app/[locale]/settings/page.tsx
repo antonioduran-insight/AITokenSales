@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { useUser } from '@/contexts/UserContext'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Pencil } from 'lucide-react'
 import { OrgMarketsSettings } from '@/components/markets/OrgMarketsSettings'
 import type { Organization, OrganizationAddon, ScraperComboMaster, User, SenderProfile } from '@/lib/types'
 
@@ -405,6 +405,12 @@ function ScraperTab() {
   const [sdrs, setSdrs] = useState<User[]>([])
   const [profilesBySdr, setProfilesBySdr] = useState<Record<string, SenderProfile[]>>({})
   const [openFormFor, setOpenFormFor] = useState<string | null>(null)
+  // null = the open form is creating a new profile; an id = editing that one.
+  // Until this existed the only way to change a profile was delete-and-recreate,
+  // and since the row showed just name/title/company you couldn't see what the
+  // language or style hint had been before overwriting it — you were editing
+  // blind, on the exact fields that drive message personalisation.
+  const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
   const [formFields, setFormFields] = useState({ display_name: '', title: '', company: '', style_hint: '', language: '', is_default: true })
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
@@ -457,8 +463,65 @@ function ScraperTab() {
           : existing
         return { ...prev, [sdrId]: [...updated, data] }
       })
-      setOpenFormFor(null)
-      setFormFields({ display_name: '', title: '', company: '', style_hint: '', language: '', is_default: true })
+      closeProfileForm()
+    } catch { setProfileError('Network error') } finally { setSavingProfile(false) }
+  }
+
+  // Open the form pre-filled with an existing profile. `language` is stored as
+  // NULL when the SDR never picked one (that's what tells the backend to fall
+  // back to the market's language), and the <select> needs '' for that, so the
+  // null has to be coalesced here — not defaulted to 'en', which would silently
+  // turn "automatic" into an explicit English choice on every save.
+  function startEditProfile(sdrId: string, p: SenderProfile) {
+    setOpenFormFor(sdrId)
+    setEditingProfileId(p.id)
+    setProfileError(null)
+    setFormFields({
+      display_name: p.display_name ?? '',
+      title: p.title ?? '',
+      company: p.company ?? '',
+      style_hint: p.style_hint ?? '',
+      language: p.language ?? '',
+      is_default: p.is_default,
+    })
+  }
+
+  function closeProfileForm() {
+    setOpenFormFor(null)
+    setEditingProfileId(null)
+    setProfileError(null)
+    setFormFields({ display_name: '', title: '', company: '', style_hint: '', language: '', is_default: true })
+  }
+
+  async function updateProfile(sdrId: string, profileId: string) {
+    if (!formFields.display_name || !formFields.title || !formFields.company) {
+      setProfileError('Display name, title and company are required')
+      return
+    }
+    setSavingProfile(true); setProfileError(null)
+    try {
+      const res = await fetch(`/api/sender-profiles/${profileId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formFields),
+      })
+      const data = await res.json()
+      if (!res.ok) { setProfileError(data.error ?? 'Failed to save'); return }
+      setProfilesBySdr(prev => {
+        const existing = prev[sdrId] ?? []
+        return {
+          ...prev,
+          // Promoting this one to default demotes the others locally, mirroring
+          // what the API does server-side — otherwise the UI would briefly show
+          // two DEFAULT badges until the next reload.
+          [sdrId]: existing.map(p =>
+            p.id === profileId
+              ? { ...p, ...data }
+              : formFields.is_default ? { ...p, is_default: false } : p
+          ),
+        }
+      })
+      closeProfileForm()
     } catch { setProfileError('Network error') } finally { setSavingProfile(false) }
   }
 
@@ -530,7 +593,7 @@ function ScraperTab() {
                       )}
                     </div>
                     <button
-                      onClick={() => { setOpenFormFor(isOpen ? null : sdr.id); setProfileError(null); setFormFields({ display_name: '', title: '', company: '', style_hint: '', language: '', is_default: true }) }}
+                      onClick={() => { if (isOpen && !editingProfileId) { closeProfileForm() } else { closeProfileForm(); setOpenFormFor(sdr.id) } }}
                       style={{ ...S.btn, padding: '5px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}
                     >
                       <Plus size={12} /> Add profile
@@ -558,7 +621,15 @@ function ScraperTab() {
                               </button>
                             )}
                             <button
+                              onClick={() => startEditProfile(sdr.id, p)}
+                              title="Edit profile"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: editingProfileId === p.id ? 'var(--crm-accent)' : 'var(--crm-text-muted)', display: 'flex', padding: 4 }}
+                            >
+                              <Pencil size={13} />
+                            </button>
+                            <button
                               onClick={() => deleteProfile(sdr.id, p.id)}
+                              title="Delete profile"
                               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', display: 'flex', padding: 4 }}
                             >
                               <Trash2 size={13} />
@@ -572,6 +643,15 @@ function ScraperTab() {
                   {/* Create form */}
                   {isOpen && (
                     <div style={{ padding: '12px 16px', borderTop: '1px solid var(--crm-border)', backgroundColor: '#6C63FF06' }}>
+                      {/* The form renders at the bottom of the SDR card, far from the
+                          row you clicked, so it has to say which profile it is acting
+                          on — otherwise with several profiles you can't tell whether
+                          you're editing one or adding another. */}
+                      <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: 'var(--crm-text-muted)', margin: '0 0 10px' }}>
+                        {editingProfileId
+                          ? `EDITING · ${(profiles.find(p => p.id === editingProfileId)?.display_name) ?? 'profile'}`
+                          : 'NEW PROFILE'}
+                      </p>
                       {profileError && <p style={{ fontSize: 12, color: '#EF4444', margin: '0 0 10px' }}>{profileError}</p>}
                       <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                         <div>
@@ -616,10 +696,14 @@ function ScraperTab() {
                           <input type="checkbox" checked={formFields.is_default} onChange={e => setFormFields(p => ({ ...p, is_default: e.target.checked }))} style={{ accentColor: 'var(--crm-accent)' }} />
                           Set as default
                         </label>
-                        <button onClick={() => createProfile(sdr.id)} disabled={savingProfile} style={{ ...S.btn, opacity: savingProfile ? 0.6 : 1 }}>
-                          {savingProfile ? 'Saving…' : 'Create profile'}
+                        <button
+                          onClick={() => editingProfileId ? updateProfile(sdr.id, editingProfileId) : createProfile(sdr.id)}
+                          disabled={savingProfile}
+                          style={{ ...S.btn, opacity: savingProfile ? 0.6 : 1 }}
+                        >
+                          {savingProfile ? 'Saving…' : editingProfileId ? 'Save changes' : 'Create profile'}
                         </button>
-                        <button onClick={() => setOpenFormFor(null)} style={S.btnGhost}>Cancel</button>
+                        <button onClick={closeProfileForm} style={S.btnGhost}>Cancel</button>
                       </div>
                     </div>
                   )}
