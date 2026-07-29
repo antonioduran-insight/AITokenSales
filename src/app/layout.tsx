@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const inter = Inter({
@@ -37,7 +38,23 @@ export default function RootLayout({
     // en/es/vi and worth fixing separately (it affects screen readers and
     // hyphenation, not the UI copy).
     <html lang="zh" translate="no" className={`${inter.variable} h-full antialiased notranslate`}>
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        {children}
+        {/* Vercel Speed Insights — real-user performance metrics (LCP, CLS, INP)
+            while the app is being trialled with the team.
+
+            In the root layout on purpose: it has to cover every route, including
+            /landing and /global-admin, not just the [locale] tree.
+
+            It reports the route PATTERN (`/[locale]/global-admin/organizations/[id]`),
+            never the resolved URL, so no org or prospect ids leave the browser —
+            worth knowing given this app renders client data on almost every page.
+
+            No-ops outside Vercel, so `npm run dev` doesn't send anything and
+            needs no env gating. To remove it later, delete this line and the
+            import; the package can stay installed harmlessly. */}
+        <SpeedInsights />
+      </body>
     </html>
   );
 }
