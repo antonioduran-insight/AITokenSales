@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/contexts/UserContext'
 import { Plus, X, ChevronDown, ChevronUp, Send, RefreshCw } from 'lucide-react'
@@ -41,6 +42,8 @@ const S: Record<string, React.CSSProperties> = {
   label: { fontSize: 12, color: 'var(--crm-text-secondary)', fontWeight: 600, display: 'block', marginBottom: 6 },
   btn: { backgroundColor: 'var(--crm-accent)', color: '#fff', border: 'none', borderRadius: 7, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   btnGhost: { backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', border: '1px solid var(--crm-border)', borderRadius: 7, padding: '7px 14px', fontSize: 13, cursor: 'pointer' },
+  th: { fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' },
+  sectionHeading: { fontSize: 12, fontWeight: 700, color: 'var(--crm-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' },
 }
 
 function Badge({ label, color }: { label: string; color: string }) {
@@ -55,6 +58,8 @@ function Badge({ label, color }: { label: string; color: string }) {
 }
 
 export default function SupportPage() {
+  const t = useTranslations('support')
+  const tc = useTranslations('common')
   const { user, isAdmin } = useUser()
   const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [loading, setLoading] = useState(true)
@@ -82,7 +87,7 @@ export default function SupportPage() {
 
   const getUserName = (userId: string) => {
     const found = orgUsers.find(u => u.id === userId)
-    return found?.full_name ?? 'Unknown'
+    return found?.full_name ?? t('unknownUser')
   }
 
   // Always-fresh mirror of `tickets` for closures that shouldn't re-subscribe
@@ -96,19 +101,22 @@ export default function SupportPage() {
   // we already know about that user from other tickets/messages in memory
   // before falling back to the generic label.
   const resolveAuthorName = useCallback((userId: string): string => {
-    for (const t of ticketsRef.current) {
-      if (t.created_by === userId && t.created_by_user?.full_name) return t.created_by_user.full_name
-      const found = t.messages.find(m => m.created_by === userId && m.author_name)
+    for (const ticket of ticketsRef.current) {
+      if (ticket.created_by === userId && ticket.created_by_user?.full_name) return ticket.created_by_user.full_name
+      const found = ticket.messages.find(m => m.created_by === userId && m.author_name)
       if (found?.author_name) return found.author_name
     }
-    return canManage ? getUserName(userId) : 'Support'
+    return canManage ? getUserName(userId) : t('supportTeam')
+  // `t` is deliberately not a dependency: this callback is itself a dependency
+  // of the realtime effect below, and a new identity on every render would tear
+  // the channel down and re-subscribe it on each render (see the comment there).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canManage])
 
   // Status of the currently expanded ticket, read during render so the effect
   // below can depend on a primitive that only changes when the status actually
   // changes — never on every incoming message.
-  const expandedStatus = expandedId ? tickets.find(t => t.id === expandedId)?.status : undefined
+  const expandedStatus = expandedId ? tickets.find(x => x.id === expandedId)?.status : undefined
 
   // Realtime subscription for expanded ticket messages (only when not closed).
   //
@@ -128,11 +136,11 @@ export default function SupportPage() {
         { event: 'INSERT', schema: 'public', table: 'support_ticket_messages', filter: `ticket_id=eq.${expandedId}` },
         (payload) => {
           const newMsg = payload.new as TicketMessage
-          setTickets(prev => prev.map(t => {
-            if (t.id !== expandedId) return t
-            if (t.messages.some(m => m.id === newMsg.id)) return t
+          setTickets(prev => prev.map(x => {
+            if (x.id !== expandedId) return x
+            if (x.messages.some(m => m.id === newMsg.id)) return x
             const enriched = newMsg.created_by === user?.id ? newMsg : { ...newMsg, author_name: resolveAuthorName(newMsg.created_by) }
-            return { ...t, messages: [...t.messages, enriched] }
+            return { ...x, messages: [...x.messages, enriched] }
           }))
         }
       )
@@ -288,7 +296,7 @@ export default function SupportPage() {
   }, [isAdmin, user?.organization_id])
 
   async function createTicket() {
-    if (!subject.trim() || !description.trim()) { setError('Subject and description are required'); return }
+    if (!subject.trim() || !description.trim()) { setError(t('errRequiredFields')); return }
     setCreating(true); setError(null)
     const res = await fetch('/api/support/tickets', {
       method: 'POST',
@@ -296,7 +304,9 @@ export default function SupportPage() {
       body: JSON.stringify({ subject, description, priority }),
     })
     const data = await res.json()
-    if (!res.ok) { setError(data.error); setCreating(false); return }
+    // `data.error` is whatever the API sent (not a translation key) — fall back
+    // to the generic localised message when the response carries none.
+    if (!res.ok) { setError(data.error || tc('error')); setCreating(false); return }
     setTickets(prev => [data, ...prev])
     setSubject(''); setDescription(''); setPriority('medium')
     setShowNew(false); setCreating(false)
@@ -316,9 +326,9 @@ export default function SupportPage() {
         console.error('sendReply error:', data)
         return
       }
-      setTickets(prev => prev.map(t => t.id === ticketId
-        ? { ...t, messages: [...t.messages.filter(m => m.id !== data.id), data] }
-        : t
+      setTickets(prev => prev.map(x => x.id === ticketId
+        ? { ...x, messages: [...x.messages.filter(m => m.id !== data.id), data] }
+        : x
       ))
       setReplyContent('')
     } catch (e) {
@@ -335,21 +345,21 @@ export default function SupportPage() {
       body: JSON.stringify({ status }),
     })
     if (res.ok) {
-      setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: status as SupportTicket['status'] } : t))
+      setTickets(prev => prev.map(x => x.id === ticketId ? { ...x, status: status as SupportTicket['status'] } : x))
     }
   }
 
   let filtered = tickets
-  if (filterStatus) filtered = filtered.filter(t => t.status === filterStatus)
-  if (filterPriority) filtered = filtered.filter(t => t.priority === filterPriority)
+  if (filterStatus) filtered = filtered.filter(x => x.status === filterStatus)
+  if (filterPriority) filtered = filtered.filter(x => x.priority === filterPriority)
 
-  const openCount = tickets.filter(t => t.status === 'open' || t.status === 'in_progress').length
+  const openCount = tickets.filter(x => x.status === 'open' || x.status === 'in_progress').length
 
   // Unreviewed (anything not yet closed) vs. closed — kept in separate
   // sections so a long-resolved backlog doesn't bury what still needs
   // attention.
-  const openFiltered = filtered.filter(t => t.status !== 'closed')
-  const closedFiltered = filtered.filter(t => t.status === 'closed')
+  const openFiltered = filtered.filter(x => x.status !== 'closed')
+  const closedFiltered = filtered.filter(x => x.status === 'closed')
 
   const gridColsBase = ['1fr', '100px', '100px', ...(isCrossOrgViewer ? ['140px'] : []), ...(canManage ? ['140px'] : []), '80px']
   const gridTemplateColumns = gridColsBase.join(' ')
@@ -359,7 +369,7 @@ export default function SupportPage() {
 
   function renderTicketRow(ticket: SupportTicket) {
     const isExpanded = expandedId === ticket.id
-    const createdByName = ticket.created_by_user?.full_name ?? (canManage ? getUserName(ticket.created_by) : 'Me')
+    const createdByName = ticket.created_by_user?.full_name ?? (canManage ? getUserName(ticket.created_by) : t('me'))
     return (
       <div key={ticket.id} style={S.card}>
         {/* Row */}
@@ -375,11 +385,11 @@ export default function SupportPage() {
             <div>
               <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--crm-text-primary)' }}>{ticket.subject}</div>
               <div style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 2 }}>
-                {ticket.messages.length} message{ticket.messages.length !== 1 ? 's' : ''}
+                {t('messagesCount', { count: ticket.messages.length })}
               </div>
             </div>
-            <Badge label={ticket.priority} color={PRIORITY_COLORS[ticket.priority] ?? '#6B7280'} />
-            <Badge label={ticket.status.replace('_', ' ')} color={STATUS_COLORS[ticket.status] ?? 'var(--crm-text-muted)'} />
+            <Badge label={t(`priority.${ticket.priority}`)} color={PRIORITY_COLORS[ticket.priority] ?? '#6B7280'} />
+            <Badge label={t(`status.${ticket.status}`)} color={STATUS_COLORS[ticket.status] ?? 'var(--crm-text-muted)'} />
             {isCrossOrgViewer && <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{ticket.organization?.name ?? '—'}</span>}
             {canManage && <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{createdByName}</span>}
             <span style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{new Date(ticket.created_at).toLocaleDateString()}</span>
@@ -394,13 +404,13 @@ export default function SupportPage() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: '#22C55E', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                   <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#22C55E', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                  Live
+                  {t('live')}
                 </span>
               </div>
             )}
             {/* Description */}
             <div style={{ backgroundColor: 'var(--crm-surface-raised)', borderRadius: 8, padding: '12px 14px', marginBottom: 12, fontSize: 13, color: 'var(--crm-text-secondary)', lineHeight: 1.6 }}>
-              <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, marginBottom: 6 }}>ORIGINAL REQUEST</div>
+              <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase' }}>{t('originalRequest')}</div>
               {ticket.description}
             </div>
 
@@ -410,7 +420,7 @@ export default function SupportPage() {
                 {ticket.messages.map(msg => (
                   <div key={msg.id} style={{ backgroundColor: msg.created_by === user?.id ? '#6C63FF12' : 'var(--crm-surface-raised)', border: `1px solid ${msg.created_by === user?.id ? '#6C63FF30' : 'var(--crm-border)'}`, borderRadius: 8, padding: '10px 14px' }}>
                     <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginBottom: 6, fontWeight: 600 }}>
-                      {msg.created_by === user?.id ? 'You' : (msg.author_name ?? (canManage ? getUserName(msg.created_by) : 'Support'))} · {new Date(msg.created_at).toLocaleString()}
+                      {msg.created_by === user?.id ? t('you') : (msg.author_name ?? (canManage ? getUserName(msg.created_by) : t('supportTeam')))} · {new Date(msg.created_at).toLocaleString()}
                     </div>
                     <div style={{ fontSize: 13, color: 'var(--crm-text-primary)', lineHeight: 1.6 }}>{msg.content}</div>
                   </div>
@@ -425,7 +435,7 @@ export default function SupportPage() {
                   value={replyContent}
                   onChange={e => setReplyContent(e.target.value)}
                   onFocus={() => { /* keep expanded */ }}
-                  placeholder="Type a reply..."
+                  placeholder={t('replyPlaceholder')}
                   rows={2}
                   style={{ ...S.input, resize: 'vertical', flex: 1 }}
                 />
@@ -434,7 +444,7 @@ export default function SupportPage() {
                   disabled={sending || !replyContent.trim()}
                   style={{ ...S.btn, display: 'flex', alignItems: 'center', gap: 6, alignSelf: 'flex-end', opacity: !replyContent.trim() ? 0.5 : 1 }}
                 >
-                  <Send size={13} /> {sending ? '…' : 'Send'}
+                  <Send size={13} /> {sending ? '…' : t('send')}
                 </button>
               </div>
             )}
@@ -442,7 +452,7 @@ export default function SupportPage() {
             {/* Status controls — only for support/admin_global roles */}
             {isCrossOrgViewer && (
               <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, color: 'var(--crm-text-muted)', alignSelf: 'center' }}>Change status:</span>
+                <span style={{ fontSize: 12, color: 'var(--crm-text-muted)', alignSelf: 'center' }}>{t('changeStatus')}</span>
                 {(['open', 'in_progress', 'closed'] as const).map(s => (
                   <button key={s} onClick={() => updateStatus(ticket.id, s)}
                     style={{
@@ -450,7 +460,7 @@ export default function SupportPage() {
                       backgroundColor: ticket.status === s ? STATUS_COLORS[s] : 'var(--crm-surface-raised)',
                       color: ticket.status === s ? '#fff' : 'var(--crm-text-secondary)',
                     }}>
-                    {s.replace('_', ' ')}
+                    {t(`status.${s}`)}
                   </button>
                 ))}
               </div>
@@ -465,13 +475,13 @@ export default function SupportPage() {
     <div style={S.page}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 10, marginBottom: 20 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>Support</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>{t('title')}</h1>
           <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
             {isCrossOrgViewer
-              ? `${openCount} open ticket${openCount !== 1 ? 's' : ''} across all organizations`
+              ? t('subtitleAllOrgs', { count: openCount })
               : isAdmin
-              ? `${openCount} open ticket${openCount !== 1 ? 's' : ''} across your organization`
-              : 'Submit and track your support requests'}
+              ? t('subtitleOrg', { count: openCount })
+              : t('subtitleSdr')}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -482,7 +492,7 @@ export default function SupportPage() {
               ticket "for" an org doesn't make sense from this account. */}
           {!isCrossOrgViewer && (
             <button onClick={() => setShowNew(true)} style={{ ...S.btn, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Plus size={14} /> New Ticket
+              <Plus size={14} /> {t('newTicket')}
             </button>
           )}
         </div>
@@ -502,9 +512,9 @@ export default function SupportPage() {
           }}
         >
           <span style={{ fontSize: 13, color: '#FBBF24', fontWeight: 600 }}>
-            {mutedAlerts} new ticket{mutedAlerts !== 1 ? 's' : ''} arrived — sound is blocked by the browser.
+            {t('soundBlocked', { count: mutedAlerts })}
           </span>
-          <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>Click to dismiss and enable sound</span>
+          <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>{t('soundBlockedHint')}</span>
         </div>
       )}
 
@@ -513,20 +523,20 @@ export default function SupportPage() {
         <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
             style={{ ...S.input, width: 'auto', padding: '6px 10px' }}>
-            <option value="">All Status</option>
-            <option value="open">Open</option>
-            <option value="in_progress">In Progress</option>
-            <option value="closed">Closed</option>
+            <option value="">{t('allStatus')}</option>
+            <option value="open">{t('status.open')}</option>
+            <option value="in_progress">{t('status.in_progress')}</option>
+            <option value="closed">{t('status.closed')}</option>
           </select>
           <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
             style={{ ...S.input, width: 'auto', padding: '6px 10px' }}>
-            <option value="">All Priority</option>
-            <option value="urgent">Urgent</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
+            <option value="">{t('allPriority')}</option>
+            <option value="urgent">{t('priority.urgent')}</option>
+            <option value="high">{t('priority.high')}</option>
+            <option value="medium">{t('priority.medium')}</option>
+            <option value="low">{t('priority.low')}</option>
           </select>
-          <span style={{ fontSize: 12, color: 'var(--crm-text-muted)', alignSelf: 'center' }}>{filtered.length} ticket{filtered.length !== 1 ? 's' : ''}</span>
+          <span style={{ fontSize: 12, color: 'var(--crm-text-muted)', alignSelf: 'center' }}>{t('ticketsCount', { count: filtered.length })}</span>
         </div>
       )}
 
@@ -534,23 +544,23 @@ export default function SupportPage() {
       {filtered.length > 0 && (
         <div style={{ overflowX: 'auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns, gap: 12, padding: '8px 16px', marginBottom: 4, minWidth: gridMinWidth }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Subject</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Priority</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</span>
-            {isCrossOrgViewer && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Organization</span>}
-            {canManage && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Created by</span>}
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</span>
+            <span style={S.th}>{t('colSubject')}</span>
+            <span style={S.th}>{t('colPriority')}</span>
+            <span style={S.th}>{t('colStatus')}</span>
+            {isCrossOrgViewer && <span style={S.th}>{t('colOrganization')}</span>}
+            {canManage && <span style={S.th}>{t('colCreatedBy')}</span>}
+            <span style={S.th}>{t('colDate')}</span>
           </div>
         </div>
       )}
 
       {loading && (
-        <div style={{ textAlign: 'center', color: 'var(--crm-text-muted)', padding: 48 }}>Loading tickets…</div>
+        <div style={{ textAlign: 'center', color: 'var(--crm-text-muted)', padding: 48 }}>{tc('loading')}</div>
       )}
 
       {!loading && filtered.length === 0 && (
         <div style={{ textAlign: 'center', color: 'var(--crm-text-muted)', padding: 48, fontSize: 14 }}>
-          {tickets.length === 0 ? 'No tickets yet. Everything is good! 🎉' : 'No tickets match the current filters.'}
+          {tickets.length === 0 ? t('noTicketsYet') : t('noTicketsMatch')}
         </div>
       )}
 
@@ -558,19 +568,19 @@ export default function SupportPage() {
           still needs attention */}
       {!loading && filtered.length > 0 && (
         <>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--crm-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '4px 0 8px' }}>
-            Open ({openFiltered.length})
+          <div style={{ ...S.sectionHeading, margin: '4px 0 8px' }}>
+            {t('sectionOpen', { count: openFiltered.length })}
           </div>
           {openFiltered.length === 0 && (
-            <div style={{ color: 'var(--crm-text-muted)', fontSize: 13, padding: '8px 4px 20px' }}>No open tickets.</div>
+            <div style={{ color: 'var(--crm-text-muted)', fontSize: 13, padding: '8px 4px 20px' }}>{t('noOpenTickets')}</div>
           )}
           {openFiltered.map(renderTicketRow)}
 
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--crm-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '20px 0 8px' }}>
-            Closed ({closedFiltered.length})
+          <div style={{ ...S.sectionHeading, margin: '20px 0 8px' }}>
+            {t('sectionClosed', { count: closedFiltered.length })}
           </div>
           {closedFiltered.length === 0 && (
-            <div style={{ color: 'var(--crm-text-muted)', fontSize: 13, padding: '8px 4px' }}>No closed tickets.</div>
+            <div style={{ color: 'var(--crm-text-muted)', fontSize: 13, padding: '8px 4px' }}>{t('noClosedTickets')}</div>
           )}
           {closedFiltered.map(renderTicketRow)}
         </>
@@ -581,26 +591,26 @@ export default function SupportPage() {
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
           <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 28, width: 480, maxWidth: '92vw' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
-              <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>New Support Ticket</h3>
-              <button onClick={() => setShowNew(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)' }}><X size={16} /></button>
+              <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>{t('newTicketTitle')}</h3>
+              <button onClick={() => setShowNew(false)} aria-label={tc('close')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)' }}><X size={16} /></button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label style={S.label}>Subject *</label>
-                <input value={subject} onChange={e => setSubject(e.target.value)} style={S.input} placeholder="Brief description of the issue" />
+                <label style={S.label}>{t('colSubject')} *</label>
+                <input value={subject} onChange={e => setSubject(e.target.value)} style={S.input} placeholder={t('subjectPlaceholder')} />
               </div>
               <div>
-                <label style={S.label}>Description *</label>
-                <textarea value={description} onChange={e => setDescription(e.target.value)} rows={4} style={{ ...S.input, resize: 'vertical' }} placeholder="Describe the issue in detail…" />
+                <label style={S.label}>{t('fieldDescription')} *</label>
+                <textarea value={description} onChange={e => setDescription(e.target.value)} rows={4} style={{ ...S.input, resize: 'vertical' }} placeholder={t('descriptionPlaceholder')} />
               </div>
               <div>
-                <label style={S.label}>Priority</label>
+                <label style={S.label}>{t('colPriority')}</label>
                 <select value={priority} onChange={e => setPriority(e.target.value as typeof priority)} style={S.input}>
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
+                  <option value="low">{t('priority.low')}</option>
+                  <option value="medium">{t('priority.medium')}</option>
+                  <option value="high">{t('priority.high')}</option>
+                  <option value="urgent">{t('priority.urgent')}</option>
                 </select>
               </div>
 
@@ -609,9 +619,9 @@ export default function SupportPage() {
               <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
                 <button onClick={createTicket} disabled={creating || !subject.trim() || !description.trim()}
                   style={{ ...S.btn, flex: 1, opacity: creating ? 0.7 : 1 }}>
-                  {creating ? 'Creating…' : 'Create Ticket'}
+                  {creating ? t('creating') : t('createTicket')}
                 </button>
-                <button onClick={() => setShowNew(false)} style={{ ...S.btnGhost, flex: 1 }}>Cancel</button>
+                <button onClick={() => setShowNew(false)} style={{ ...S.btnGhost, flex: 1 }}>{tc('cancel')}</button>
               </div>
             </div>
           </div>

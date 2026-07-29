@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import {
   bridgeApi, CHANNEL_FAMILIES, HEADCOUNTS,
   type SeedList, type BridgeRun, type BridgeCandidate, type BridgeLog, type VerificationStatus,
@@ -12,11 +13,19 @@ import { MarketSelect } from '@/components/markets/MarketSelect'
 
 const ACTIVE = new Set(['pending', 'running', 'searching'])
 
-const STATUS_LABEL: Record<string, string> = {
-  pending: 'Initializing…',
-  running: '🔍 Searching companies',
-  searching: '🔍 Searching companies',
+// Run status → key inside the `bridge` namespace. Module scope has no
+// translator, so only the key lives here; it's resolved with `t()` in the JSX.
+const PROGRESS_KEY: Record<string, string> = {
+  pending: 'progressInitializing',
+  running: 'progressSearching',
+  searching: 'progressSearching',
 }
+
+// Statuses we actually ship a label for. The backend owns both vocabularies and
+// can add a value we don't know — fall back to the raw string rather than
+// rendering an i18n key/error in its place.
+const RUN_STATES = new Set(['pending', 'running', 'searching', 'completed', 'failed', 'cancelled'])
+const CANDIDATE_STATES = new Set(['pending', 'confirmed', 'rejected'])
 
 const S: Record<string, React.CSSProperties> = {
   page: { padding: '24px', color: 'var(--crm-text-primary)', maxWidth: 980, margin: '0 auto' },
@@ -50,6 +59,8 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
 }
 
 export function BridgeClient() {
+  const t = useTranslations('bridge')
+  const tc = useTranslations('common')
   const [tab, setTab] = useState<'search' | 'history'>('search')
   const [error, setError] = useState<string | null>(null)
   const { markets: orgMarkets, loading: marketsLoading, error: marketsError } = useOrgMarkets()
@@ -224,7 +235,7 @@ export function BridgeClient() {
     try {
       const res = await bridgeApi.createRun(selectedSeedId)
       const id = res.id ?? res.run_id
-      if (!id) throw new Error('Backend did not return a run id')
+      if (!id) throw new Error(t('errorNoRunId'))
       setCandidates([]); setLogs([]); setRun(null)
       setRunId(id)
     } catch (e) {
@@ -267,7 +278,7 @@ export function BridgeClient() {
     const ids = [...selectedIds]
     try {
       const res = await bridgeApi.confirmBatch(ids, batchSdrId)
-      const name = sdrs.find(s => s.id === batchSdrId)?.full_name ?? 'the SDR'
+      const name = sdrs.find(s => s.id === batchSdrId)?.full_name ?? t('theSdr')
 
       // Report what actually landed on the SDR's board, never `ids.length`.
       // Confirming and handing over to `prospects` are two separate steps: the
@@ -277,11 +288,11 @@ export function BridgeClient() {
       const created = res.crm_prospects_created
       if (created === undefined) {
         // Older proxy without the handoff — say only what we can stand behind.
-        setBatchMsg(`${ids.length} candidate${ids.length !== 1 ? 's' : ''} confirmed for ${name}.`)
+        setBatchMsg(t('confirmedForSdr', { count: ids.length, name }))
       } else {
-        const parts = [`${created} of ${ids.length} added to ${name}'s board`]
-        if (res.crm_prospects_skipped_existing) parts.push(`${res.crm_prospects_skipped_existing} already there`)
-        if (res.crm_prospects_skipped_no_name) parts.push(`${res.crm_prospects_skipped_no_name} skipped (no name)`)
+        const parts = [t('addedToBoard', { created, total: ids.length, name })]
+        if (res.crm_prospects_skipped_existing) parts.push(t('alreadyThere', { count: res.crm_prospects_skipped_existing }))
+        if (res.crm_prospects_skipped_no_name) parts.push(t('skippedNoName', { count: res.crm_prospects_skipped_no_name }))
         const summary = `${parts.join(' · ')}.`
 
         // Amber, not green and not a hard error: the confirm itself succeeded
@@ -334,7 +345,7 @@ export function BridgeClient() {
       const key = c.company_id || c.company || '—'
       let group = groups.get(key)
       if (!group) {
-        group = { key, company: c.company || 'Unknown company', companyLinkedinUrl: c.company_linkedin_url, items: [] }
+        group = { key, company: c.company || t('unknownCompany'), companyLinkedinUrl: c.company_linkedin_url, items: [] }
         groups.set(key, group)
         order.push(key)
       }
@@ -342,7 +353,7 @@ export function BridgeClient() {
       group.items.push(c)
     }
     return order.map(key => groups.get(key)!)
-  }, [shown])
+  }, [shown, t])
 
   return (
     <div style={S.page}>
@@ -350,15 +361,15 @@ export function BridgeClient() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Handshake size={20} color="var(--crm-accent)" />
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Partnerships</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{t('title')}</h1>
             <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', margin: '2px 0 0' }}>
-              Discover B2B partnership contacts inside target companies.
+              {t('subtitle')}
             </p>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => setTab('search')} style={tabBtn(tab === 'search')}>Search</button>
-          <button onClick={() => setTab('history')} style={tabBtn(tab === 'history')}>Past Searches</button>
+          <button onClick={() => setTab('search')} style={tabBtn(tab === 'search')}>{t('tabSearch')}</button>
+          <button onClick={() => setTab('history')} style={tabBtn(tab === 'history')}>{t('pastSearches')}</button>
         </div>
       </div>
 
@@ -373,11 +384,11 @@ export function BridgeClient() {
       {/* ══════════ PAST SEARCHES ══════════ */}
       {tab === 'history' && (
         <div style={S.card}>
-          <span style={S.label}>Past Searches</span>
+          <span style={S.label}>{t('pastSearches')}</span>
           {loadingRuns ? (
-            <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>Loading…</p>
+            <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>{tc('loading')}</p>
           ) : runs.length === 0 ? (
-            <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>No searches yet.</p>
+            <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>{t('noSearchesYet')}</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {runs.map(r => (
@@ -390,12 +401,14 @@ export function BridgeClient() {
                     {new Date(r.created_at).toLocaleString()}
                   </span>
                   <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--crm-text-primary)' }}>
-                    {r.seed_list_name ?? seedLists.find(s => s.id === r.seed_list_id)?.name ?? 'Seed list'}
+                    {r.seed_list_name ?? seedLists.find(s => s.id === r.seed_list_id)?.name ?? t('seedListFallback')}
                   </span>
                   <span style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>
-                    {r.candidates_found ?? 0} candidates
+                    {t('candidatesCount', { count: r.candidates_found ?? 0 })}
                   </span>
-                  <span style={{ ...S.badge, textTransform: 'capitalize' }}>{r.status}</span>
+                  <span style={{ ...S.badge, textTransform: 'capitalize' }}>
+                    {RUN_STATES.has(r.status) ? t(`runState.${r.status}`) : r.status}
+                  </span>
                 </button>
               ))}
             </div>
@@ -408,19 +421,19 @@ export function BridgeClient() {
           {/* ══════════ A — SEED LISTS ══════════ */}
           <div style={S.card}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <span style={{ ...S.label, marginBottom: 0 }}>Seed Lists</span>
+              <span style={{ ...S.label, marginBottom: 0 }}>{t('seedLists')}</span>
               <button onClick={() => setShowForm(v => !v)} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600,
                 color: '#FFF', backgroundColor: 'var(--crm-accent)', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer',
               }}>
-                <Plus size={14} /> New Seed List
+                <Plus size={14} /> {t('newSeedList')}
               </button>
             </div>
 
             {loadingSeeds ? (
-              <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>Loading…</p>
+              <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>{tc('loading')}</p>
             ) : seedLists.length === 0 ? (
-              <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>No seed lists yet — create one to start.</p>
+              <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>{t('noSeedLists')}</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {seedLists.map(sl => {
@@ -434,14 +447,14 @@ export function BridgeClient() {
                         {CHANNEL_FAMILIES.find(c => c.value === sl.channel_family)?.label ?? String(sl.channel_family)}
                       </span>
                       <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>
-                        {nCompanies > 0 && `${nCompanies} companies`}
+                        {nCompanies > 0 && t('companiesCount', { count: nCompanies })}
                         {nCompanies > 0 && nCriteria > 0 && ' · '}
-                        {nCriteria > 0 && `${nCriteria} criteria`}
+                        {nCriteria > 0 && t('criteriaCount', { count: nCriteria })}
                         {nCompanies === 0 && nCriteria === 0 && '—'}
                       </span>
                       <button
                         onClick={() => setDeleteTarget(sl)}
-                        title="Delete seed list"
+                        title={t('deleteSeedListTooltip')}
                         style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', padding: 4, flexShrink: 0 }}
                       >
                         <Trash2 size={14} />
@@ -456,28 +469,28 @@ export function BridgeClient() {
             {showForm && (
               <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--crm-border)' }}>
                 <div style={{ marginBottom: 14 }}>
-                  <label style={S.label}>Name</label>
-                  <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Taiwan SaaS resellers" style={S.input} />
+                  <label style={S.label}>{t('fieldName')}</label>
+                  <input value={name} onChange={e => setName(e.target.value)} placeholder={t('namePlaceholder')} style={S.input} />
                 </div>
 
                 <div style={{ marginBottom: 14 }}>
-                  <label style={S.label}>Channel Family</label>
+                  <label style={S.label}>{t('channelFamily')}</label>
                   <select value={channelFamily} onChange={e => setChannelFamily(e.target.value as typeof channelFamily)} style={S.input}>
                     {CHANNEL_FAMILIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                   </select>
                 </div>
 
                 <div style={{ marginBottom: 14 }}>
-                  <label style={S.label}>Sources <span style={{ textTransform: 'none', fontWeight: 400 }}>(you can combine both)</span></label>
+                  <label style={S.label}>{t('sources')} <span style={{ textTransform: 'none', fontWeight: 400 }}>{t('sourcesHint')}</span></label>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button onClick={() => setUseCompanies(v => !v)} style={chip(useCompanies)}>Specific companies</button>
-                    <button onClick={() => setUseCriteria(v => !v)} style={chip(useCriteria)}>Search criteria</button>
+                    <button onClick={() => setUseCompanies(v => !v)} style={chip(useCompanies)}>{t('sourceCompanies')}</button>
+                    <button onClick={() => setUseCriteria(v => !v)} style={chip(useCriteria)}>{t('sourceCriteria')}</button>
                   </div>
                 </div>
 
                 {useCompanies && (
                   <div style={{ marginBottom: 14 }}>
-                    <label style={S.label}>Companies <span style={{ textTransform: 'none', fontWeight: 400 }}>(one per line or comma-separated)</span></label>
+                    <label style={S.label}>{t('companies')} <span style={{ textTransform: 'none', fontWeight: 400 }}>{t('companiesHint')}</span></label>
                     <textarea
                       value={companiesText}
                       onChange={e => setCompaniesText(e.target.value)}
@@ -486,7 +499,7 @@ export function BridgeClient() {
                       style={{ ...S.input, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
                     />
                     {companies.length > 0 && (
-                      <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', margin: '6px 0 0' }}>{companies.length} companies</p>
+                      <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', margin: '6px 0 0' }}>{t('companiesCount', { count: companies.length })}</p>
                     )}
                   </div>
                 )}
@@ -494,11 +507,11 @@ export function BridgeClient() {
                 {useCriteria && (
                   <div style={{ marginBottom: 14, padding: 14, borderRadius: 8, backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)' }}>
                     <div style={{ marginBottom: 12 }}>
-                      <label style={S.label}>Industry</label>
-                      <input value={industry} onChange={e => setIndustry(e.target.value)} placeholder="e.g. Software, Logistics" style={S.input} />
+                      <label style={S.label}>{t('industry')}</label>
+                      <input value={industry} onChange={e => setIndustry(e.target.value)} placeholder={t('industryPlaceholder')} style={S.input} />
                     </div>
                     <div style={{ marginBottom: 12 }}>
-                      <label style={S.label}>Company Headcount</label>
+                      <label style={S.label}>{t('headcount')}</label>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {HEADCOUNTS.map(h => (
                           <button key={h} onClick={() => toggleHeadcount(h)} style={chip(headcounts.includes(h))}>{h}</button>
@@ -506,7 +519,7 @@ export function BridgeClient() {
                       </div>
                     </div>
                     <div>
-                      <label style={S.label}>Market</label>
+                      <label style={S.label}>{t('market')}</label>
                       <MarketSelect
                         markets={orgMarkets}
                         loading={marketsLoading}
@@ -524,13 +537,13 @@ export function BridgeClient() {
                     backgroundColor: canSaveSeed && !savingSeed ? 'var(--crm-accent)' : 'var(--crm-border)',
                     cursor: canSaveSeed && !savingSeed ? 'pointer' : 'not-allowed',
                   }}>
-                    {savingSeed ? 'Saving…' : 'Save Seed List'}
+                    {savingSeed ? t('saving') : t('saveSeedList')}
                   </button>
                   <button onClick={() => { setShowForm(false); resetForm() }} style={{
                     fontSize: 13, fontWeight: 600, color: 'var(--crm-text-muted)', background: 'none',
                     border: '1px solid var(--crm-border)', borderRadius: 8, padding: '10px 18px', cursor: 'pointer',
                   }}>
-                    Cancel
+                    {tc('cancel')}
                   </button>
                 </div>
               </div>
@@ -539,10 +552,10 @@ export function BridgeClient() {
 
           {/* ══════════ B — RUN SEARCH ══════════ */}
           <div style={S.card}>
-            <span style={S.label}>Run Bridge Search</span>
+            <span style={S.label}>{t('runSearch')}</span>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
               <select value={selectedSeedId} onChange={e => setSelectedSeedId(e.target.value)} style={{ ...S.input, flex: 1, minWidth: 240 }}>
-                <option value="">Select a seed list…</option>
+                <option value="">{t('selectSeedList')}</option>
                 {seedLists.map(sl => <option key={sl.id} value={sl.id}>{sl.name}</option>)}
               </select>
               <button onClick={startRun} disabled={!selectedSeedId || starting || isRunning} style={{
@@ -550,7 +563,7 @@ export function BridgeClient() {
                 backgroundColor: selectedSeedId && !starting && !isRunning ? 'var(--crm-accent)' : 'var(--crm-border)',
                 cursor: selectedSeedId && !starting && !isRunning ? 'pointer' : 'not-allowed',
               }}>
-                {starting ? 'Starting…' : 'Search Partnerships'}
+                {starting ? t('starting') : t('searchPartnerships')}
               </button>
             </div>
 
@@ -564,11 +577,11 @@ export function BridgeClient() {
                       strokeDasharray="300" style={{ animation: 'scraper-ring 1.6s ease-in-out infinite' }} />
                   </svg>
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: 13, fontWeight: 700, padding: 16 }}>
-                    {STATUS_LABEL[run?.status ?? ''] ?? 'Working…'}
+                    {t(PROGRESS_KEY[run?.status ?? ''] ?? 'progressWorking')}
                   </div>
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', textAlign: 'center', maxWidth: 400, lineHeight: 1.6 }}>
-                  This usually takes a few minutes. You can leave this page — the search keeps running.
+                  {t('progressHint')}
                 </p>
                 {logs.length > 0 && (
                   <div style={{ marginTop: 14, width: '100%', maxWidth: 560, maxHeight: 160, overflowY: 'auto', backgroundColor: '#0D1117', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '10px 12px', fontFamily: 'monospace', fontSize: 11, lineHeight: 1.7 }}>
@@ -585,13 +598,13 @@ export function BridgeClient() {
 
             {isFailed && (
               <p style={{ fontSize: 13, color: '#EF4444', margin: '16px 0 0', textAlign: 'center' }}>
-                This search {run?.status === 'cancelled' ? 'was cancelled' : 'failed'}. Contact support.
+                {run?.status === 'cancelled' ? t('searchCancelled') : t('searchFailed')}
               </p>
             )}
 
             {!isRunning && run?.status === 'completed' && (
               <p style={{ fontSize: 13, color: '#22C55E', fontWeight: 600, margin: '16px 0 0' }}>
-                ✅ {run.candidates_found ?? candidates.length} candidates found
+                ✅ {t('candidatesFoundResult', { count: run.candidates_found ?? candidates.length })}
               </p>
             )}
           </div>
@@ -600,13 +613,13 @@ export function BridgeClient() {
           {runId && !isRunning && !isFailed && (
             <div style={S.card}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
-                <span style={{ ...S.label, marginBottom: 0 }}>Candidate Review</span>
+                <span style={{ ...S.label, marginBottom: 0 }}>{t('candidateReview')}</span>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {([
-                    ['all', 'All', counts.all],
-                    ['pending', 'Pending', counts.pending],
-                    ['confirmed', 'Confirmed', counts.confirmed],
-                    ['rejected', 'Rejected', counts.rejected],
+                    ['all', tc('all'), counts.all],
+                    ['pending', t('status.pending'), counts.pending],
+                    ['confirmed', t('status.confirmed'), counts.confirmed],
+                    ['rejected', t('status.rejected'), counts.rejected],
                   ] as const).map(([key, label, n]) => (
                     <button key={key} onClick={() => setFilter(key as typeof filter)} style={chip(filter === key)}>
                       {label} ({n})
@@ -631,12 +644,12 @@ export function BridgeClient() {
                   position: 'sticky', top: 12, zIndex: 5,
                 }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text-primary)' }}>
-                    {selectedIds.size} candidate{selectedIds.size !== 1 ? 's' : ''} selected
+                    {t('candidatesSelected', { count: selectedIds.size })}
                   </span>
 
                   <select value={batchSdrId} onChange={e => setBatchSdrId(e.target.value)} disabled={confirming}
                     style={{ ...S.input, width: 'auto', minWidth: 190, padding: '7px 10px' }}>
-                    <option value="">Assign to SDR…</option>
+                    <option value="">{t('assignToSdr')}</option>
                     {sdrs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
                   </select>
 
@@ -647,12 +660,12 @@ export function BridgeClient() {
                       border: 'none', borderRadius: 8, padding: '9px 18px',
                       cursor: !batchSdrId || confirming ? 'default' : 'pointer',
                     }}>
-                    <Check size={14} /> Confirm &amp; Send Messages
+                    <Check size={14} /> {t('confirmAndSend')}
                   </button>
 
                   <button onClick={() => setSelectedIds(new Set())} disabled={confirming}
                     style={{ fontSize: 12, color: 'var(--crm-text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                    Clear
+                    {t('clear')}
                   </button>
 
                   {confirming && (
@@ -662,17 +675,17 @@ export function BridgeClient() {
                         border: '2px solid var(--crm-border)', borderTopColor: 'var(--crm-accent)',
                         animation: 'spin .8s linear infinite', display: 'inline-block',
                       }} />
-                      Generating personalized messages for {selectedIds.size} candidate{selectedIds.size !== 1 ? 's' : ''}…
+                      {t('generatingMessages', { count: selectedIds.size })}
                     </span>
                   )}
                 </div>
               )}
 
               {loadingCandidates ? (
-                <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>Loading candidates…</p>
+                <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>{t('loadingCandidates')}</p>
               ) : shown.length === 0 ? (
                 <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>
-                  {candidates.length === 0 ? 'No candidates for this search.' : 'No candidates match this filter.'}
+                  {candidates.length === 0 ? t('noCandidates') : t('noCandidatesMatchFilter')}
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
@@ -682,12 +695,12 @@ export function BridgeClient() {
                         <Building2 size={14} color="var(--crm-text-muted)" />
                         <span style={{ fontSize: 13, fontWeight: 700 }}>{group.company}</span>
                         <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>
-                          {group.items.length} contact{group.items.length === 1 ? '' : 's'}
+                          {t('contactsCount', { count: group.items.length })}
                         </span>
                         {group.companyLinkedinUrl && (
                           <a href={group.companyLinkedinUrl} target="_blank" rel="noopener noreferrer"
                             style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--crm-accent)', textDecoration: 'none' }}>
-                            Company page <ExternalLink size={11} />
+                            {t('companyPage')} <ExternalLink size={11} />
                           </a>
                         )}
                       </div>
@@ -712,7 +725,7 @@ export function BridgeClient() {
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => toggleSelected(c.id)}
-                              aria-label={`Select ${c.full_name ?? 'candidate'}`}
+                              aria-label={t('selectCandidateAria', { name: c.full_name ?? t('candidateFallback') })}
                               style={{ accentColor: 'var(--crm-accent)', width: 16, height: 16, marginTop: 3, flexShrink: 0, cursor: 'pointer' }}
                             />
                           )}
@@ -720,7 +733,7 @@ export function BridgeClient() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                               <span style={{ fontSize: 14, fontWeight: 700 }}>{c.full_name || '—'}</span>
                               <span style={{ ...S.badge, backgroundColor: sc.bg, color: sc.color, borderColor: 'transparent', textTransform: 'capitalize' }}>
-                                {c.verification_status}
+                                {CANDIDATE_STATES.has(c.verification_status) ? t(`status.${c.verification_status}`) : c.verification_status}
                               </span>
                               {c.linkedin_url && (
                                 <a href={c.linkedin_url} target="_blank" rel="noopener noreferrer"
@@ -745,7 +758,7 @@ export function BridgeClient() {
                                 color: 'var(--crm-text-secondary)', background: 'transparent', border: '1px solid var(--crm-border)',
                                 borderRadius: 7, padding: '6px 12px', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1,
                               }}>
-                                <RotateCcw size={12} /> Restore
+                                <RotateCcw size={12} /> {t('restore')}
                               </button>
                             ) : (
                               <>
@@ -755,7 +768,7 @@ export function BridgeClient() {
                                     color: 'var(--crm-text-secondary)', background: 'transparent', border: '1px solid var(--crm-border)',
                                     borderRadius: 7, padding: '6px 12px', cursor: 'pointer',
                                   }}>
-                                    {isOpen ? 'Hide message' : 'View message'}
+                                    {isOpen ? t('hideMessage') : t('viewMessage')}
                                   </button>
                                 )}
                                 {isPending && (
@@ -764,7 +777,7 @@ export function BridgeClient() {
                                     color: '#EF4444', background: 'transparent', border: '1px solid #EF444440', borderRadius: 7, padding: '7px 14px',
                                     cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1,
                                   }}>
-                                    <Ban size={13} /> Reject
+                                    <Ban size={13} /> {t('reject')}
                                   </button>
                                 )}
                               </>
@@ -776,16 +789,19 @@ export function BridgeClient() {
                         {isConfirmed && isOpen && (
                           <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--crm-border)', display: 'flex', flexDirection: 'column', gap: 12 }}>
                             <div style={{ fontSize: 12, color: 'var(--crm-text-secondary)' }}>
-                              Assigned to:{' '}
+                              {t('assignedTo')}{' '}
                               <strong style={{ color: 'var(--crm-text-primary)' }}>
                                 {sdrs.find(s => s.id === c.assigned_to)?.full_name ?? c.assigned_to ?? '—'}
                               </strong>
                             </div>
-                            {([['Connection request', c.custom1], ['Value message', c.custom2]] as const)
+                            {/* The message bodies themselves (custom1/custom2) come from the
+                                backend already written in the lead's language — only their
+                                labels are translated. */}
+                            {([['connectionRequest', c.custom1], ['valueMessage', c.custom2]] as const)
                               .filter(([, v]) => !!v)
-                              .map(([label, v]) => (
-                                <div key={label}>
-                                  <div style={{ fontSize: 10, color: 'var(--crm-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>{label}</div>
+                              .map(([labelKey, v]) => (
+                                <div key={labelKey}>
+                                  <div style={{ fontSize: 10, color: 'var(--crm-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>{t(labelKey)}</div>
                                   <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: 'var(--crm-text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
                                     {v}
                                   </div>
@@ -811,22 +827,22 @@ export function BridgeClient() {
           onClick={e => { if (e.target === e.currentTarget && !deletingSeed) setDeleteTarget(null) }}
         >
           <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 24, width: 420, maxWidth: '90vw' }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>Delete seed list &quot;{deleteTarget.name}&quot;?</h3>
-            <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', marginBottom: 20 }}>This cannot be undone.</p>
+            <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>{t('deleteSeedListTitle', { name: deleteTarget.name })}</h3>
+            <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', marginBottom: 20 }}>{t('cannotBeUndone')}</p>
             <div style={{ display: 'flex', gap: 10 }}>
               <button
                 onClick={() => setDeleteTarget(null)}
                 disabled={deletingSeed}
                 style={{ flex: 1, padding: '9px 0', borderRadius: 8, border: 'none', backgroundColor: 'var(--crm-border)', color: 'var(--crm-text-primary)', fontSize: 13, fontWeight: 600, cursor: deletingSeed ? 'default' : 'pointer' }}
               >
-                Cancel
+                {tc('cancel')}
               </button>
               <button
                 onClick={confirmDeleteSeedList}
                 disabled={deletingSeed}
                 style={{ flex: 1, padding: '9px 0', borderRadius: 8, border: 'none', backgroundColor: '#EF4444', color: '#FFF', fontSize: 13, fontWeight: 600, cursor: deletingSeed ? 'default' : 'pointer', opacity: deletingSeed ? 0.6 : 1 }}
               >
-                {deletingSeed ? 'Deleting…' : 'Delete'}
+                {deletingSeed ? t('deleting') : tc('delete')}
               </button>
             </div>
           </div>

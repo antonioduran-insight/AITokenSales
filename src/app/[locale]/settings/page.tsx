@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { useUser } from '@/contexts/UserContext'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import { OrgMarketsSettings } from '@/components/markets/OrgMarketsSettings'
@@ -16,13 +16,16 @@ const PLAN_COLORS: Record<string, string> = {
   ultra: '#EF4444',
 }
 
-const ADDON_LABELS: Record<string, string> = {
-  account_management: 'Account Management',
-  multi_workspace: 'Multi Workspace',
-  extended_data_retention: 'Extended Data Retention',
-  sso: 'SSO',
-  linkedin_auto_messaging: 'LinkedIn Auto Messaging',
-}
+// Add-on types that have a translated label under `settings.addons.*`.
+// Anything not listed here falls back to the raw `addon_type` from the DB,
+// exactly as the old hardcoded label map did.
+const TRANSLATED_ADDONS = new Set([
+  'account_management',
+  'multi_workspace',
+  'extended_data_retention',
+  'sso',
+  'linkedin_auto_messaging',
+])
 
 const S: Record<string, React.CSSProperties> = {
   page:    { padding: '28px 32px', color: 'var(--crm-text-primary)', maxWidth: 860 },
@@ -51,6 +54,8 @@ function Bar({ value, max, color = 'var(--crm-accent)' }: { value: number; max: 
 // Tab 1 — Organization
 // ────────────────────────────────────────────────────────────────────────────
 function OrgTab() {
+  const t = useTranslations('settings')
+  const tc = useTranslations('common')
   const [org, setOrg] = useState<Organization | null>(null)
   const [name, setName] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
@@ -107,30 +112,30 @@ function OrgTab() {
       const { data: urlData } = supabase.storage.from('logos').getPublicUrl(path)
       setLogoUrl(urlData.publicUrl + `?t=${Date.now()}`)
     } catch (e) {
-      setLogoError(e instanceof Error ? e.message : 'Upload failed')
+      setLogoError(e instanceof Error ? e.message : t('uploadFailed'))
     } finally {
       setUploadingLogo(false)
     }
   }
 
-  if (!org) return <div style={{ color: 'var(--crm-text-muted)', padding: 40, textAlign: 'center' }}>Loading…</div>
+  if (!org) return <div style={{ color: 'var(--crm-text-muted)', padding: 40, textAlign: 'center' }}>{tc('loading')}</div>
 
   return (
     <div>
       <div style={S.card}>
-        <p style={S.sectionTitle}>General</p>
+        <p style={S.sectionTitle}>{t('general')}</p>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={S.label}>Organization Name</label>
+          <label style={S.label}>{t('orgName')}</label>
           <input value={name} onChange={e => setName(e.target.value)} style={S.input} />
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={S.label}>Logo</label>
+          <label style={S.label}>{t('logo')}</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {logoUrl && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt="Logo" style={{ height: 44, maxWidth: 120, objectFit: 'contain', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)' }} />
+              <img src={logoUrl} alt={t('logo')} style={{ height: 44, maxWidth: 120, objectFit: 'contain', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)' }} />
             )}
             <div>
               <input
@@ -145,7 +150,7 @@ function OrgTab() {
                 disabled={uploadingLogo}
                 style={{ ...S.btnGhost, fontSize: 12, padding: '6px 14px' }}
               >
-                {uploadingLogo ? 'Uploading…' : logoUrl ? 'Change Logo' : 'Upload Logo'}
+                {uploadingLogo ? t('uploading') : logoUrl ? t('changeLogo') : t('uploadLogo')}
               </button>
               {logoError && <p style={{ fontSize: 12, color: '#EF4444', margin: '4px 0 0' }}>{logoError}</p>}
             </div>
@@ -156,37 +161,37 @@ function OrgTab() {
       <OrgMarketsSettings />
 
       <div style={S.card}>
-        <p style={S.sectionTitle}>Company Context</p>
+        <p style={S.sectionTitle}>{t('companyContext')}</p>
         <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginBottom: 12 }}>
-          Used to personalise the outreach messages the scraper generates.
+          {t('companyContextDesc')}
         </p>
         <textarea
           value={companyContext}
           onChange={e => setCompanyContext(e.target.value)}
           rows={8}
-          placeholder={"Describe what your company does, who you sell to, and any specific products or focus you want your outreach messages to mention. Example: We sell AI-powered CRM software to B2B sales teams in Asia. Right now we're pushing our new automation feature — mention it when relevant."}
+          placeholder={t('companyContextPlaceholder')}
           style={{ ...S.input, resize: 'vertical', minHeight: 140, lineHeight: 1.6 }}
         />
       </div>
 
       <div style={S.card}>
-        <p style={S.sectionTitle}>Bridge Context</p>
+        <p style={S.sectionTitle}>{t('bridgeContext')}</p>
         <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginBottom: 12 }}>
-          Used to personalise the partnership messages Bridge generates when you confirm candidates.
+          {t('bridgeContextDesc')}
         </p>
         <textarea
           value={bridgeContext}
           onChange={e => setBridgeContext(e.target.value)}
           rows={8}
-          placeholder={"Describe what kind of partnerships you're looking for through Bridge — what you offer as a partner, what you're looking for in return, and any specific type of deal you want to prioritize right now. Example: We're looking for reseller partners in the SaaS space who serve mid-market companies. We offer 20% commission and full onboarding support."}
+          placeholder={t('bridgeContextPlaceholder')}
           style={{ ...S.input, resize: 'vertical', minHeight: 140, lineHeight: 1.6 }}
         />
       </div>
 
       <div style={S.card}>
-        <p style={S.sectionTitle}>Domain Blacklist</p>
+        <p style={S.sectionTitle}>{t('domainBlacklist')}</p>
         <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginBottom: 12 }}>
-          One domain or company name per line. These will be blocked from CSV imports and manual prospect creation.
+          {t('domainBlacklistDesc')}
         </p>
         <textarea
           value={blacklist}
@@ -200,7 +205,7 @@ function OrgTab() {
       {error && <p style={{ color: '#EF4444', fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
       <button onClick={save} disabled={saving} style={S.btn}>
-        {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save Changes'}
+        {saving ? t('saving') : saved ? `✓ ${tc('saved')}` : t('saveChanges')}
       </button>
     </div>
   )
@@ -219,6 +224,8 @@ interface PlanData {
 }
 
 function PlanTab() {
+  const t = useTranslations('settings')
+  const tc = useTranslations('common')
   const router = useRouter()
   const locale = useLocale()
   const [data, setData] = useState<PlanData | null>(null)
@@ -235,8 +242,8 @@ function PlanTab() {
       .catch(() => setLoading(false))
   }, [])
 
-  if (loading) return <div style={{ color: 'var(--crm-text-muted)', padding: 40, textAlign: 'center' }}>Loading…</div>
-  if (!data) return <div style={{ color: 'var(--crm-text-muted)', padding: 40, textAlign: 'center' }}>Could not load the plan. Please reload the page.</div>
+  if (loading) return <div style={{ color: 'var(--crm-text-muted)', padding: 40, textAlign: 'center' }}>{tc('loading')}</div>
+  if (!data) return <div style={{ color: 'var(--crm-text-muted)', padding: 40, textAlign: 'center' }}>{t('planLoadError')}</div>
 
   const { org, sdrCount, sdrs, leadsCount, periodStart, addons } = data
   const maxSeats = org.max_seats ?? 0
@@ -255,7 +262,7 @@ function PlanTab() {
     <div>
       {/* Current plan */}
       <div style={S.card}>
-        <p style={{ ...S.sectionTitle, marginBottom: 16 }}>Current Plan</p>
+        <p style={{ ...S.sectionTitle, marginBottom: 16 }}>{t('currentPlan')}</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <span style={{
             backgroundColor: (PLAN_COLORS[org.plan] ?? '#6C63FF') + '22',
@@ -268,14 +275,14 @@ function PlanTab() {
           <div>
             <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--crm-text-primary)' }}>
               {org.plan === 'enterprise' && org.custom_price
-                ? `$${org.custom_price.toLocaleString()}/mo`
-                : org.plan === 'ultra' ? 'Internal'
-                : org.plan === 'enterprise' ? 'Custom pricing'
-                : org.plan === 'premium' ? '$2,300/mo'
-                : '$550/mo'}
+                ? `$${org.custom_price.toLocaleString()}${t('perMonth')}`
+                : org.plan === 'ultra' ? t('pricingInternal')
+                : org.plan === 'enterprise' ? t('pricingCustom')
+                : org.plan === 'premium' ? `$2,300${t('perMonth')}`
+                : `$550${t('perMonth')}`}
             </div>
             <div style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>
-              Billing period: {periodDate.toLocaleDateString()} → {nextPeriod.toLocaleDateString()}
+              {t('billingPeriod', { from: periodDate.toLocaleDateString(), to: nextPeriod.toLocaleDateString() })}
             </div>
           </div>
         </div>
@@ -284,22 +291,22 @@ function PlanTab() {
       {/* Seats */}
       <div style={S.card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <p style={{ ...S.sectionTitle, marginBottom: 0 }}>Seats</p>
+          <p style={{ ...S.sectionTitle, marginBottom: 0 }}>{t('seats')}</p>
           {seatsAtLimit ? (
-            <button onClick={() => setShowBuySeats(true)} style={{ ...S.btn, padding: '6px 14px', fontSize: 12 }}>Buy More Seats</button>
+            <button onClick={() => setShowBuySeats(true)} style={{ ...S.btn, padding: '6px 14px', fontSize: 12 }}>{t('buyMoreSeats')}</button>
           ) : org.plan === 'basic' ? (
-            <button onClick={() => router.push(`/${locale}/settings?tab=plan`)} style={{ ...S.btnGhost, fontSize: 12 }}>Upgrade to Premium</button>
+            <button onClick={() => router.push(`/${locale}/settings?tab=plan`)} style={{ ...S.btnGhost, fontSize: 12 }}>{t('upgradeToPremium')}</button>
           ) : null}
         </div>
 
         {seatsUnlimited ? (
-          <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>Unlimited seats on your plan.</p>
+          <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{t('unlimitedSeats')}</p>
         ) : (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{sdrCount} of {maxSeats} seats used</span>
+              <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{t('seatsUsed', { used: sdrCount, max: maxSeats })}</span>
               <span style={{ fontSize: 13, fontWeight: 600, color: seatsAtLimit ? '#EF4444' : '#22C55E' }}>
-                {maxSeats - sdrCount} remaining
+                {t('remaining', { count: maxSeats - sdrCount })}
               </span>
             </div>
             <Bar value={sdrCount} max={maxSeats} color={seatsAtLimit ? '#EF4444' : 'var(--crm-accent)'} />
@@ -308,7 +315,7 @@ function PlanTab() {
 
         {sdrs.length > 0 && (
           <div style={{ marginTop: 16 }}>
-            <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Active SDRs</p>
+            <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>{t('activeSdrs')}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {sdrs.map(sdr => (
                 <div key={sdr.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '8px 12px', backgroundColor: 'var(--crm-surface-raised)', borderRadius: 7 }}>
@@ -316,7 +323,7 @@ function PlanTab() {
                     <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--crm-text-primary)' }}>{sdr.full_name}</span>
                     <span style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginLeft: 8 }}>{sdr.email}</span>
                   </div>
-                  <span style={{ fontSize: 11, color: 'var(--crm-text-muted)', flexShrink: 0 }}>since {new Date(sdr.created_at).toLocaleDateString()}</span>
+                  <span style={{ fontSize: 11, color: 'var(--crm-text-muted)', flexShrink: 0 }}>{t('memberSince', { date: new Date(sdr.created_at).toLocaleDateString() })}</span>
                 </div>
               ))}
             </div>
@@ -327,45 +334,45 @@ function PlanTab() {
       {/* Leads this period */}
       <div style={S.card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <p style={{ ...S.sectionTitle, marginBottom: 0 }}>Leads This Period</p>
+          <p style={{ ...S.sectionTitle, marginBottom: 0 }}>{t('leadsThisPeriod')}</p>
           {leadsAtLimit && (
-            <button onClick={() => alert('Contact your account manager to purchase additional leads')} style={{ ...S.btn, padding: '6px 14px', fontSize: 12 }}>Buy More Leads</button>
+            <button onClick={() => alert(t('buyMoreLeadsAlert'))} style={{ ...S.btn, padding: '6px 14px', fontSize: 12 }}>{t('buyMoreLeads')}</button>
           )}
         </div>
 
         {leadsUnlimited ? (
-          <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>Unlimited leads on your plan.</p>
+          <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{t('unlimitedLeads')}</p>
         ) : (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{leadsCount.toLocaleString()} of {maxLeads.toLocaleString()} leads</span>
+              <span style={{ fontSize: 13, color: 'var(--crm-text-secondary)' }}>{t('leadsUsed', { used: leadsCount.toLocaleString(), max: maxLeads.toLocaleString() })}</span>
               <span style={{ fontSize: 13, fontWeight: 600, color: leadsAtLimit ? '#EF4444' : '#22C55E' }}>
-                {Math.max(0, maxLeads - leadsCount).toLocaleString()} remaining
+                {t('remaining', { count: Math.max(0, maxLeads - leadsCount).toLocaleString() })}
               </span>
             </div>
             <Bar value={leadsCount} max={maxLeads} color={leadsAtLimit ? '#EF4444' : 'var(--crm-accent)'} />
           </>
         )}
         <p style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 10 }}>
-          Resets on {nextPeriod.toLocaleDateString()} · Leads are deleted after 3 months. Add Extended Data Retention to keep them.
+          {t('leadsResetNote', { date: nextPeriod.toLocaleDateString() })}
         </p>
       </div>
 
       {/* Add-ons */}
       <div style={S.card}>
-        <p style={{ ...S.sectionTitle, marginBottom: 16 }}>Active Add-ons</p>
+        <p style={{ ...S.sectionTitle, marginBottom: 16 }}>{t('activeAddons')}</p>
         {addons.length === 0 ? (
-          <p style={{ fontSize: 13, color: 'var(--crm-text-muted)' }}>No active add-ons.</p>
+          <p style={{ fontSize: 13, color: 'var(--crm-text-muted)' }}>{t('noAddons')}</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {addons.map(a => (
               <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: 'var(--crm-surface-raised)', borderRadius: 8 }}>
                 <div>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--crm-text-primary)' }}>{ADDON_LABELS[a.addon_type] ?? a.addon_type}</span>
-                  <span style={{ display: 'inline-block', marginLeft: 10, fontSize: 10, backgroundColor: '#22C55E20', color: '#22C55E', border: '1px solid #22C55E30', borderRadius: 3, padding: '1px 6px' }}>Active</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--crm-text-primary)' }}>{TRANSLATED_ADDONS.has(a.addon_type) ? t(`addons.${a.addon_type}`) : a.addon_type}</span>
+                  <span style={{ display: 'inline-block', marginLeft: 10, fontSize: 10, backgroundColor: '#22C55E20', color: '#22C55E', border: '1px solid #22C55E30', borderRadius: 3, padding: '1px 6px' }}>{t('active')}</span>
                 </div>
                 {a.price_monthly && (
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-secondary)' }}>${a.price_monthly}/mo</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-secondary)' }}>${a.price_monthly}{t('perMonth')}</span>
                 )}
               </div>
             ))}
@@ -377,15 +384,15 @@ function PlanTab() {
       {showBuySeats && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
           <div style={{ backgroundColor: 'var(--crm-surface)', border: '1px solid var(--crm-border)', borderRadius: 12, padding: 28, width: 380, maxWidth: '90vw', boxSizing: 'border-box' }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Buy More Seats</h3>
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>{t('buyMoreSeats')}</h3>
             <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', marginBottom: 20 }}>
-              Contact us to add more seats to your plan. We&apos;ll get back to you within one business day.
+              {t('buySeatsBody')}
             </p>
             <div style={{ display: 'flex', gap: 10 }}>
               <a href="mailto:placeholder@aitokenking.com?subject=Add+more+seats" style={{ ...S.btn, flex: 1, textAlign: 'center', textDecoration: 'none' }}>
-                Contact Us
+                {t('contactUs')}
               </a>
-              <button onClick={() => setShowBuySeats(false)} style={{ ...S.btnGhost, flex: 1 }}>Close</button>
+              <button onClick={() => setShowBuySeats(false)} style={{ ...S.btnGhost, flex: 1 }}>{tc('close')}</button>
             </div>
           </div>
         </div>
@@ -398,6 +405,8 @@ function PlanTab() {
 // Tab 4 — Scraper
 // ────────────────────────────────────────────────────────────────────────────
 function ScraperTab() {
+  const t = useTranslations('settings')
+  const tc = useTranslations('common')
   const [combos, setCombos] = useState<ScraperComboMaster[]>([])
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState<Record<string, boolean>>({})
@@ -444,7 +453,7 @@ function ScraperTab() {
 
   async function createProfile(sdrId: string) {
     if (!formFields.display_name || !formFields.title || !formFields.company) {
-      setProfileError('Display name, title and company are required')
+      setProfileError(t('profileFieldsRequired'))
       return
     }
     setSavingProfile(true); setProfileError(null)
@@ -455,7 +464,7 @@ function ScraperTab() {
         body: JSON.stringify({ ...formFields, user_id: sdrId }),
       })
       const data = await res.json()
-      if (!res.ok) { setProfileError(data.error ?? 'Failed to create'); return }
+      if (!res.ok) { setProfileError(data.error ?? t('profileCreateFailed')); return }
       setProfilesBySdr(prev => {
         const existing = prev[sdrId] ?? []
         const updated = formFields.is_default
@@ -464,7 +473,7 @@ function ScraperTab() {
         return { ...prev, [sdrId]: [...updated, data] }
       })
       closeProfileForm()
-    } catch { setProfileError('Network error') } finally { setSavingProfile(false) }
+    } catch { setProfileError(t('networkError')) } finally { setSavingProfile(false) }
   }
 
   // Open the form pre-filled with an existing profile. `language` is stored as
@@ -495,7 +504,7 @@ function ScraperTab() {
 
   async function updateProfile(sdrId: string, profileId: string) {
     if (!formFields.display_name || !formFields.title || !formFields.company) {
-      setProfileError('Display name, title and company are required')
+      setProfileError(t('profileFieldsRequired'))
       return
     }
     setSavingProfile(true); setProfileError(null)
@@ -506,7 +515,7 @@ function ScraperTab() {
         body: JSON.stringify(formFields),
       })
       const data = await res.json()
-      if (!res.ok) { setProfileError(data.error ?? 'Failed to save'); return }
+      if (!res.ok) { setProfileError(data.error ?? t('profileSaveFailed')); return }
       setProfilesBySdr(prev => {
         const existing = prev[sdrId] ?? []
         return {
@@ -522,7 +531,7 @@ function ScraperTab() {
         }
       })
       closeProfileForm()
-    } catch { setProfileError('Network error') } finally { setSavingProfile(false) }
+    } catch { setProfileError(t('networkError')) } finally { setSavingProfile(false) }
   }
 
   async function deleteProfile(sdrId: string, profileId: string) {
@@ -558,7 +567,7 @@ function ScraperTab() {
     finally { setToggling(p => ({ ...p, [code]: false })) }
   }
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--crm-text-muted)' }}>Loading…</div>
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--crm-text-muted)' }}>{tc('loading')}</div>
 
   const activeCount = combos.filter(c => c.org_active).length
 
@@ -567,9 +576,9 @@ function ScraperTab() {
       {/* Sender Profiles — only shown when there are SDRs with scraper access */}
       {sdrs.length > 0 && (
         <div style={S.card}>
-          <p style={S.sectionTitle}>Sender Profiles</p>
+          <p style={S.sectionTitle}>{t('senderProfiles')}</p>
           <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', marginBottom: 16, marginTop: 0 }}>
-            Each SDR needs a default sender profile so the scraper can personalize outreach messages.
+            {t('senderProfilesDesc')}
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {sdrs.map(sdr => {
@@ -588,7 +597,7 @@ function ScraperTab() {
                         </span>
                       ) : (
                         <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, backgroundColor: '#EF444420', color: '#EF4444', fontWeight: 700 }}>
-                          No default profile
+                          {t('noDefaultProfile')}
                         </span>
                       )}
                     </div>
@@ -596,7 +605,7 @@ function ScraperTab() {
                       onClick={() => { if (isOpen && !editingProfileId) { closeProfileForm() } else { closeProfileForm(); setOpenFormFor(sdr.id) } }}
                       style={{ ...S.btn, padding: '5px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}
                     >
-                      <Plus size={12} /> Add profile
+                      <Plus size={12} /> {t('addProfile')}
                     </button>
                   </div>
 
@@ -611,25 +620,25 @@ function ScraperTab() {
                           </div>
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
                             {p.is_default ? (
-                              <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, backgroundColor: '#6C63FF20', color: 'var(--crm-accent)', fontWeight: 700 }}>DEFAULT</span>
+                              <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, backgroundColor: '#6C63FF20', color: 'var(--crm-accent)', fontWeight: 700, textTransform: 'uppercase' }}>{t('defaultBadge')}</span>
                             ) : (
                               <button
                                 onClick={() => setDefault(sdr.id, p.id)}
                                 style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-muted)', cursor: 'pointer' }}
                               >
-                                Set default
+                                {t('setDefault')}
                               </button>
                             )}
                             <button
                               onClick={() => startEditProfile(sdr.id, p)}
-                              title="Edit profile"
+                              title={t('editProfile')}
                               style={{ background: 'none', border: 'none', cursor: 'pointer', color: editingProfileId === p.id ? 'var(--crm-accent)' : 'var(--crm-text-muted)', display: 'flex', padding: 4 }}
                             >
                               <Pencil size={13} />
                             </button>
                             <button
                               onClick={() => deleteProfile(sdr.id, p.id)}
-                              title="Delete profile"
+                              title={t('deleteProfile')}
                               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', display: 'flex', padding: 4 }}
                             >
                               <Trash2 size={13} />
@@ -647,27 +656,27 @@ function ScraperTab() {
                           row you clicked, so it has to say which profile it is acting
                           on — otherwise with several profiles you can't tell whether
                           you're editing one or adding another. */}
-                      <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: 'var(--crm-text-muted)', margin: '0 0 10px' }}>
+                      <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: 'var(--crm-text-muted)', margin: '0 0 10px', textTransform: 'uppercase' }}>
                         {editingProfileId
-                          ? `EDITING · ${(profiles.find(p => p.id === editingProfileId)?.display_name) ?? 'profile'}`
-                          : 'NEW PROFILE'}
+                          ? t('editingProfile', { name: (profiles.find(p => p.id === editingProfileId)?.display_name) ?? t('profileFallbackName') })
+                          : t('newProfile')}
                       </p>
                       {profileError && <p style={{ fontSize: 12, color: '#EF4444', margin: '0 0 10px' }}>{profileError}</p>}
                       <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                         <div>
-                          <label style={S.label}>Display name *</label>
+                          <label style={S.label}>{t('displayName')} *</label>
                           <input value={formFields.display_name} onChange={e => setFormFields(p => ({ ...p, display_name: e.target.value }))} placeholder="John D." style={S.input} />
                         </div>
                         <div>
-                          <label style={S.label}>Title *</label>
-                          <input value={formFields.title} onChange={e => setFormFields(p => ({ ...p, title: e.target.value }))} placeholder="Sales Manager" style={S.input} />
+                          <label style={S.label}>{t('profileTitle')} *</label>
+                          <input value={formFields.title} onChange={e => setFormFields(p => ({ ...p, title: e.target.value }))} placeholder={t('profileTitlePlaceholder')} style={S.input} />
                         </div>
                         <div>
-                          <label style={S.label}>Company *</label>
+                          <label style={S.label}>{t('profileCompany')} *</label>
                           <input value={formFields.company} onChange={e => setFormFields(p => ({ ...p, company: e.target.value }))} placeholder="AITokenKing" style={S.input} />
                         </div>
                         <div>
-                          <label style={S.label}>Language</label>
+                          <label style={S.label}>{t('language')}</label>
                           {/* Codes must match the scraper's _language_instruction()
                               map (linkedin-scraper/api/message_generator.py).
                               Bare "zh" used to be the only Chinese option and the
@@ -677,7 +686,7 @@ function ScraperTab() {
                               Portuguese was missing entirely even though Brazil and
                               Portugal are both configured as 'pt' in `markets`. */}
                           <select value={formFields.language} onChange={e => setFormFields(p => ({ ...p, language: e.target.value }))} style={S.select}>
-                            <option value="">Automatic (match market)</option>
+                            <option value="">{t('languageAutomatic')}</option>
                             <option value="en">English</option>
                             <option value="zh-TW">繁體中文 (Traditional)</option>
                             <option value="zh-CN">简体中文 (Simplified)</option>
@@ -687,23 +696,23 @@ function ScraperTab() {
                           </select>
                         </div>
                         <div style={{ gridColumn: 'span 2' }}>
-                          <label style={S.label}>Style hint (optional)</label>
-                          <input value={formFields.style_hint} onChange={e => setFormFields(p => ({ ...p, style_hint: e.target.value }))} placeholder="Professional, concise, focuses on ROI..." style={S.input} />
+                          <label style={S.label}>{t('styleHint')}</label>
+                          <input value={formFields.style_hint} onChange={e => setFormFields(p => ({ ...p, style_hint: e.target.value }))} placeholder={t('styleHintPlaceholder')} style={S.input} />
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, color: 'var(--crm-text-secondary)' }}>
                           <input type="checkbox" checked={formFields.is_default} onChange={e => setFormFields(p => ({ ...p, is_default: e.target.checked }))} style={{ accentColor: 'var(--crm-accent)' }} />
-                          Set as default
+                          {t('setAsDefault')}
                         </label>
                         <button
                           onClick={() => editingProfileId ? updateProfile(sdr.id, editingProfileId) : createProfile(sdr.id)}
                           disabled={savingProfile}
                           style={{ ...S.btn, opacity: savingProfile ? 0.6 : 1 }}
                         >
-                          {savingProfile ? 'Saving…' : editingProfileId ? 'Save changes' : 'Create profile'}
+                          {savingProfile ? t('saving') : editingProfileId ? t('saveChanges') : t('createProfile')}
                         </button>
-                        <button onClick={closeProfileForm} style={S.btnGhost}>Cancel</button>
+                        <button onClick={closeProfileForm} style={S.btnGhost}>{tc('cancel')}</button>
                       </div>
                     </div>
                   )}
@@ -715,12 +724,12 @@ function ScraperTab() {
       )}
 
       <div style={S.card}>
-        <p style={S.sectionTitle}>Search Combos</p>
+        <p style={S.sectionTitle}>{t('searchCombos')}</p>
         <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', marginBottom: 16, marginTop: 0 }}>
-          Enable the search combos your team will use in New Pipeline. {activeCount > 0 && `${activeCount} active.`}
+          {t('searchCombosDesc')} {activeCount > 0 && t('combosActiveCount', { count: activeCount })}
         </p>
         {combos.length === 0 ? (
-          <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>No combos available.</p>
+          <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>{t('noCombos')}</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {combos.map(c => (
@@ -737,8 +746,8 @@ function ScraperTab() {
                       {c.name}
                     </span>
                     {c.org_active && (
-                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, backgroundColor: '#6C63FF20', color: 'var(--crm-accent)', fontWeight: 700 }}>
-                        ACTIVE
+                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, backgroundColor: '#6C63FF20', color: 'var(--crm-accent)', fontWeight: 700, textTransform: 'uppercase' }}>
+                        {t('active')}
                       </span>
                     )}
                   </div>
@@ -758,7 +767,7 @@ function ScraperTab() {
                       ))}
                       {c.title_keywords.length > 5 && (
                         <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', padding: '2px 0' }}>
-                          +{c.title_keywords.length - 5} more
+                          {t('moreKeywords', { count: c.title_keywords.length - 5 })}
                         </span>
                       )}
                     </div>
@@ -775,7 +784,7 @@ function ScraperTab() {
                     transition: 'all .15s',
                   }}
                 >
-                  {c.org_active ? '● Enabled' : '○ Disabled'}
+                  {c.org_active ? `● ${t('enabled')}` : `○ ${t('disabled')}`}
                 </button>
               </div>
             ))}
@@ -790,12 +799,14 @@ function ScraperTab() {
 // Main Settings page
 // ────────────────────────────────────────────────────────────────────────────
 const TABS = [
-  { key: 'organization', label: 'Organization' },
-  { key: 'plan',         label: 'Plan & Usage' },
-  { key: 'scraper',      label: 'Scraper' },
+  { key: 'organization', labelKey: 'tabOrganization' },
+  { key: 'plan',         labelKey: 'tabPlan' },
+  { key: 'scraper',      labelKey: 'tabScraper' },
 ]
 
 function SettingsContent() {
+  const t = useTranslations('settings')
+  const tc = useTranslations('common')
   const searchParams = useSearchParams()
   const router = useRouter()
   const locale = useLocale()
@@ -804,13 +815,13 @@ function SettingsContent() {
   const tab = searchParams.get('tab') ?? 'organization'
 
   if (!user) {
-    return <div style={{ padding: 40, color: 'var(--crm-text-muted)', textAlign: 'center' }}>Loading…</div>
+    return <div style={{ padding: 40, color: 'var(--crm-text-muted)', textAlign: 'center' }}>{tc('loading')}</div>
   }
 
   if (user.role !== 'admin') {
     return (
       <div style={{ padding: 40, color: 'var(--crm-text-muted)', textAlign: 'center' }}>
-        <p style={{ fontSize: 15 }}>Settings are only accessible to organization admins.</p>
+        <p style={{ fontSize: 15 }}>{t('adminOnly')}</p>
       </div>
     )
   }
@@ -821,7 +832,7 @@ function SettingsContent() {
 
   return (
     <div style={S.page}>
-      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 24 }}>Settings</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 24 }}>{t('title')}</h1>
 
       {/* Tab nav — scrolls horizontally instead of wrapping (wrapping would
           break the connected underline strip look) if it doesn't fit.
@@ -834,22 +845,22 @@ function SettingsContent() {
           border-bottom line. */}
       <div style={{ marginBottom: 28, borderBottom: '1px solid var(--crm-border)' }}>
         <div style={{ display: 'flex', gap: 2, overflowX: 'auto', paddingBottom: 4 }}>
-          {TABS.map(t => (
+          {TABS.map(tb => (
             <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
+              key={tb.key}
+              onClick={() => setTab(tb.key)}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
                 padding: '8px 18px',
-                fontSize: 13, fontWeight: tab === t.key ? 600 : 400,
-                color: tab === t.key ? 'var(--crm-text-primary)' : 'var(--crm-text-muted)',
-                borderBottom: tab === t.key ? '2px solid var(--crm-accent)' : '2px solid transparent',
+                fontSize: 13, fontWeight: tab === tb.key ? 600 : 400,
+                color: tab === tb.key ? 'var(--crm-text-primary)' : 'var(--crm-text-muted)',
+                borderBottom: tab === tb.key ? '2px solid var(--crm-accent)' : '2px solid transparent',
                 transition: 'color 0.15s',
                 flexShrink: 0,
                 whiteSpace: 'nowrap',
               }}
             >
-              {t.label}
+              {t(tb.labelKey)}
             </button>
           ))}
         </div>
@@ -863,8 +874,9 @@ function SettingsContent() {
 }
 
 export default function SettingsPage() {
+  const tc = useTranslations('common')
   return (
-    <Suspense fallback={<div style={{ padding: 40, color: 'var(--crm-text-muted)', textAlign: 'center' }}>Loading…</div>}>
+    <Suspense fallback={<div style={{ padding: 40, color: 'var(--crm-text-muted)', textAlign: 'center' }}>{tc('loading')}</div>}>
       <SettingsContent />
     </Suspense>
   )
