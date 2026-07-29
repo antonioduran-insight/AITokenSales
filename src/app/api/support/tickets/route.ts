@@ -59,10 +59,17 @@ export async function GET() {
   // created_by/support_ticket_messages.created_by reference auth.users, not
   // public.users, so PostgREST can't embed a name via FK — resolve names
   // with one follow-up lookup instead.
+  //
+  // `created_by` is nullable since 20260729_support_fk_auth_users.sql (deleting
+  // a user nulls it rather than destroying the support history), so skip nulls
+  // here — letting one into the Set would put an empty element inside the
+  // `.in(...)` filter below, which PostgREST does not parse as "no value".
   const userIds = new Set<string>()
   tickets.forEach(t => {
-    userIds.add(t.created_by)
-    ;(t.messages ?? []).forEach((m: { created_by: string }) => userIds.add(m.created_by))
+    if (t.created_by) userIds.add(t.created_by)
+    ;(t.messages ?? []).forEach((m: { created_by: string | null }) => {
+      if (m.created_by) userIds.add(m.created_by)
+    })
   })
   const { data: authors } = userIds.size > 0
     ? await admin.from('users').select('id, full_name').in('id', Array.from(userIds))
