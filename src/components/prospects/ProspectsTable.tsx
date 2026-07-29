@@ -64,6 +64,12 @@ export function ProspectsTable() {
   const [loading, setLoading] = useState(true)
   const [areas, setAreas] = useState<Area[]>([])
   const [sdrs, setSdrs] = useState<User[]>([])
+  // Every area this SDR covers, from `user_areas` — NOT the single legacy
+  // `users.area_id`. `null` means "not resolved yet" and is distinct from `[]`
+  // ("resolved, and this user has no user_areas rows"): fetching prospects
+  // before it resolves would run the query with no area filter for one render
+  // and briefly show an SDR leads from areas they don't cover.
+  const [sdrAreaIds, setSdrAreaIds] = useState<string[] | null>(null)
 
   // Filters — searchInput is what the input box shows (updates every
   // keystroke); search is the debounced value that actually drives the
@@ -144,11 +150,17 @@ export function ProspectsTable() {
     Promise.all([
       supabase.from('areas').select('*').eq('is_active', true),
       fetchSdrs(),
-    ]).then(([areasRes, sdrList]) => {
+      // Same source the Kanban uses, so both pages agree on what an SDR covers.
+      isAdmin || !user?.id
+        ? Promise.resolve({ data: null })
+        : supabase.from('user_areas').select('area_id').eq('user_id', user.id),
+    ]).then(([areasRes, sdrList, userAreasRes]) => {
       if (areasRes.data) setAreas(areasRes.data as Area[])
       setSdrs(sdrList)
+      if (isAdmin) setSdrAreaIds([])
+      else setSdrAreaIds(((userAreasRes.data ?? []) as { area_id: string }[]).map(r => r.area_id))
     })
-  }, [isAdmin, isImpersonating, impersonateOrgId, user?.organization_id])
+  }, [isAdmin, isImpersonating, impersonateOrgId, user?.organization_id, user?.id])
 
   // Debounce the search box into `search` (300ms) so typing fast doesn't
   // fire a request per keystroke.
@@ -207,7 +219,16 @@ export function ProspectsTable() {
           .order('created_at', { ascending: false })
           .range(page * pageSize, (page + 1) * pageSize - 1)
 
-        if (!isAdmin && user?.area_id) query = query.eq('area_id', user.area_id)
+        // A multi-area SDR must see ALL of their areas, not just the single
+        // legacy `users.area_id`. Filtering on that one field is why leads
+        // showed up on the Kanban (which reads `user_areas` and uses
+        // `.in('area_id', ids)`) but were missing from this page for the same
+        // SDR — reproduced with an SDR covering 3 areas. `users.area_id` is
+        // only the fallback for a user with no `user_areas` rows at all.
+        if (!isAdmin) {
+          if (sdrAreaIds && sdrAreaIds.length > 0) query = query.in('area_id', sdrAreaIds)
+          else if (user?.area_id) query = query.eq('area_id', user.area_id)
+        }
         if (filterArea) query = query.eq('area_id', filterArea)
         if (filterSdr === 'unassigned') query = query.is('assigned_to', null)
         else if (filterSdr) query = query.eq('assigned_to', filterSdr)
@@ -225,10 +246,12 @@ export function ProspectsTable() {
     } finally {
       if (seq === fetchSeq.current) setLoading(false)
     }
-  }, [page, pageSize, search, filterArea, filterSdr, filterStatus, filterTemp, isAdmin, user?.area_id, isImpersonating, impersonateOrgId])
+  }, [page, pageSize, search, filterArea, filterSdr, filterStatus, filterTemp, isAdmin, user?.area_id, sdrAreaIds, isImpersonating, impersonateOrgId])
 
   useEffect(() => {
-    if (user) fetchProspects()
+    // Wait for the SDR's areas to resolve before the first fetch — see the
+    // null-vs-[] note on sdrAreaIds. Admins don't need them.
+    if (user && (isAdmin || sdrAreaIds !== null)) fetchProspects()
   }, [user, fetchProspects])
 
   // Reset page when filters or page size change
@@ -426,7 +449,13 @@ export function ProspectsTable() {
           {isAdmin && (
             <select value={filterArea} onChange={e => setFilterArea(e.target.value)} style={S.select}>
               <option value="">{t('areas.all')}</option>
-              {areas.map(a => <option key={a.id} value={a.id}>{a.label_en}</option>)}
+              {/* Only offer areas the user can actually see results for. An SDR
+                  picking an area they don't cover used to get an empty table
+                  (this filter ANDs with the area scope above), which reads as
+                  "my leads disappeared" rather than "wrong filter". Same
+                  behaviour the Kanban already had. */}
+              {(isAdmin || !sdrAreaIds?.length ? areas : areas.filter(a => sdrAreaIds.includes(a.id)))
+                .map(a => <option key={a.id} value={a.id}>{a.label_en}</option>)}
             </select>
           )}
 
