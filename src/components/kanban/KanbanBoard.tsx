@@ -20,6 +20,38 @@ import { OUTREACH_STATUSES } from '@/lib/types'
 
 const PROSPECT_SELECT = '*, area:areas(*), assigned_user:users!assigned_to(id, full_name, email, role, area_id, is_active, created_at)'
 
+// PostgREST caps every response at 1000 rows and gives NO signal when it
+// truncates — no error, no flag, just a short array. The Kanban read straight
+// into `setProspects()` with no range, so an org past 1000 prospects silently
+// rendered an incomplete board: cards simply missing, no way for anyone to
+// notice. AITokenSales crossed that line (1033 prospects) while this was
+// unpaginated, so this was already happening in production, not a hypothetical.
+//
+// A board can't be paginated the way the Leads table is — every column needs
+// its full set to be meaningful — so the fix is to page through server-side
+// and reassemble the whole list, not to expose page controls.
+const FETCH_PAGE = 1000
+const FETCH_HARD_CAP = 20000
+
+async function fetchAllProspects(
+  fetchPage: (offset: number, limit: number) => Promise<Prospect[]>
+): Promise<Prospect[]> {
+  const all: Prospect[] = []
+  for (let offset = 0; ; offset += FETCH_PAGE) {
+    const batch = await fetchPage(offset, FETCH_PAGE)
+    all.push(...batch)
+    // A short batch means the end of the data.
+    if (batch.length < FETCH_PAGE) break
+    // Safety valve: if a backend ever ignores the range params, a full batch
+    // would come back forever. Bail rather than hang the tab.
+    if (all.length >= FETCH_HARD_CAP) {
+      console.warn(`[Kanban] stopped at ${FETCH_HARD_CAP} prospects — the board is showing a partial set.`)
+      break
+    }
+  }
+  return all
+}
+
 interface PipelineStage {
   name: string
   color: string
@@ -152,24 +184,29 @@ export function KanbanBoard() {
       try {
         let data: Prospect[] = []
         if (isImpersonating && impersonateOrgId) {
-          const res = await fetch(
-            `/api/crm/prospects?impersonate_org_id=${impersonateOrgId}&select=${encodeURIComponent(PROSPECT_SELECT)}&limit=1000`
-          )
-          const json = await res.json()
-          data = (json.data ?? []) as Prospect[]
+          data = await fetchAllProspects(async (offset, limit) => {
+            const res = await fetch(
+              `/api/crm/prospects?impersonate_org_id=${impersonateOrgId}&select=${encodeURIComponent(PROSPECT_SELECT)}&limit=${limit}&offset=${offset}`
+            )
+            const json = await res.json()
+            return (json.data ?? []) as Prospect[]
+          })
         } else {
-          let query = supabase
-            .from('prospects')
-            .select(PROSPECT_SELECT)
-            .order('created_at', { ascending: false })
-          if (user?.role === 'sdr') {
-            const ids = resolvedSdrAreas.map(a => a.id)
-            if (ids.length === 1) query = query.eq('area_id', ids[0])
-            else if (ids.length > 1) query = query.in('area_id', ids)
-            else if (user.area_id) query = query.eq('area_id', user.area_id)
-          }
-          const { data: rows } = await query
-          data = (rows ?? []) as unknown as Prospect[]
+          data = await fetchAllProspects(async (offset, limit) => {
+            let query = supabase
+              .from('prospects')
+              .select(PROSPECT_SELECT)
+              .order('created_at', { ascending: false })
+              .range(offset, offset + limit - 1)
+            if (user?.role === 'sdr') {
+              const ids = resolvedSdrAreas.map(a => a.id)
+              if (ids.length === 1) query = query.eq('area_id', ids[0])
+              else if (ids.length > 1) query = query.in('area_id', ids)
+              else if (user.area_id) query = query.eq('area_id', user.area_id)
+            }
+            const { data: rows } = await query
+            return (rows ?? []) as unknown as Prospect[]
+          })
         }
         setProspects(data)
       } finally {
@@ -188,27 +225,32 @@ export function KanbanBoard() {
     try {
       let data: Prospect[] = []
       if (isImpersonating && impersonateOrgId) {
-        const res = await fetch(
-          `/api/crm/prospects?impersonate_org_id=${impersonateOrgId}&select=${encodeURIComponent(PROSPECT_SELECT)}&limit=1000`
-        )
-        const json = await res.json()
-        data = (json.data ?? []) as Prospect[]
+        data = await fetchAllProspects(async (offset, limit) => {
+          const res = await fetch(
+            `/api/crm/prospects?impersonate_org_id=${impersonateOrgId}&select=${encodeURIComponent(PROSPECT_SELECT)}&limit=${limit}&offset=${offset}`
+          )
+          const json = await res.json()
+          return (json.data ?? []) as Prospect[]
+        })
       } else {
         const supabase = createClient()
-        let query = supabase
-          .from('prospects')
-          .select(PROSPECT_SELECT)
-          .order('created_at', { ascending: false })
-        if (isAdmin) {
-          if (selectedAreaId) query = query.eq('area_id', selectedAreaId)
-        } else if (isSdr) {
-          const filterIds = selectedAreaId ? [selectedAreaId] : sdrAreaIds
-          if (filterIds.length === 1) query = query.eq('area_id', filterIds[0])
-          else if (filterIds.length > 1) query = query.in('area_id', filterIds)
-          else if (user?.area_id) query = query.eq('area_id', user.area_id)
-        }
-        const { data: rows } = await query
-        data = (rows ?? []) as unknown as Prospect[]
+        data = await fetchAllProspects(async (offset, limit) => {
+          let query = supabase
+            .from('prospects')
+            .select(PROSPECT_SELECT)
+            .order('created_at', { ascending: false })
+            .range(offset, offset + limit - 1)
+          if (isAdmin) {
+            if (selectedAreaId) query = query.eq('area_id', selectedAreaId)
+          } else if (isSdr) {
+            const filterIds = selectedAreaId ? [selectedAreaId] : sdrAreaIds
+            if (filterIds.length === 1) query = query.eq('area_id', filterIds[0])
+            else if (filterIds.length > 1) query = query.in('area_id', filterIds)
+            else if (user?.area_id) query = query.eq('area_id', user.area_id)
+          }
+          const { data: rows } = await query
+          return (rows ?? []) as unknown as Prospect[]
+        })
       }
       setProspects(data)
     } finally {
