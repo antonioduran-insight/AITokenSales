@@ -107,10 +107,23 @@ export const bridgeApi = {
   createSeedList: (payload: Record<string, unknown>) =>
     request<SeedList>('/seed-lists', { method: 'POST', body: JSON.stringify(payload) }),
 
+  // Partial update: send ONLY the fields being changed. The backend applies
+  // `exclude_unset`, so an omitted filter is left alone rather than cleared —
+  // renaming a list does not wipe its companies. An explicit `[]` still clears
+  // that filter, which is a real edit.
+  updateSeedList: (id: string, changes: Record<string, unknown>) =>
+    request<SeedList>(`/seed-lists/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(changes),
+    }),
+
   // No local ownership check needed here beyond what the proxy already does
   // (org-scoped) — the backend owns seed lists entirely, same as create/list.
   deleteSeedList: (id: string) =>
-    request<{ ok?: boolean }>(`/seed-lists/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    request<{ deleted?: boolean; id?: string }>(
+      `/seed-lists/${encodeURIComponent(id)}`,
+      { method: 'DELETE' }
+    ),
 
   createRun: (seedListId: string) =>
     request<{ id?: string; run_id?: string }>('/runs', {
