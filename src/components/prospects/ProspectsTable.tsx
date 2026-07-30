@@ -9,7 +9,7 @@ import { useOrgId } from '@/lib/hooks/useOrgId'
 import { ProspectDrawer } from './ProspectDrawer'
 import { TemperatureBadge } from '@/components/ui/TemperatureBadge'
 import { AreaBadge } from '@/components/ui/AreaBadge'
-import { Search, ChevronLeft, ChevronRight, Users, RefreshCw, X, Trash2, CheckCircle, ArrowRight, MessageSquareWarning, Star } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, Users, RefreshCw, X, Trash2, CheckCircle, ArrowRight, MessageSquareWarning, Star, Link2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, Area, User, LeadTemperature } from '@/lib/types'
@@ -580,7 +580,26 @@ export function ProspectsTable() {
                 <td style={S.td}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                     {p.flag_tomorrow && <Star size={12} fill="#F59E0B" stroke="#F59E0B" style={{ flexShrink: 0 }} />}
-                    <div style={{ fontWeight: 500, color: 'var(--crm-text-primary)' }}>{p.name}</div>
+                    <div style={{ fontWeight: 500, color: 'var(--crm-text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                      {/* See ProspectCard: a Bridge candidate is a partnership
+                          contact, not a cold ICP lead, and nothing else in this
+                          row says so. */}
+                      {p.source === 'bridge' && (
+                        <span
+                          title={t('prospect.fromBridge')}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0,
+                            backgroundColor: '#6C63FF20', color: '#8B84FF',
+                            border: '1px solid #6C63FF40', borderRadius: 4,
+                            padding: '1px 5px', fontSize: 9, fontWeight: 700, letterSpacing: 0.3,
+                          }}
+                        >
+                          <Link2 size={9} />
+                          {t('prospect.bridgeBadge')}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   {p.title && <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 2 }}>{p.title}</div>}
                 </td>

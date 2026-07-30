@@ -139,23 +139,59 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
     if (!isAdmin) return
     setSdrsLoaded(false)
     if (!prospect.area_id) { setSdrsForArea([]); setSdrsLoaded(true); return }
-    createClient()
-      .from('users')
-      .select('*')
-      .eq('role', 'sdr')
-      .eq('is_active', true)
-      .eq('area_id', prospect.area_id)
-      .order('full_name')
-      .then(({ data, error }) => {
-        if (error) {
-          // Left as "not loaded": an empty list from a failed query must not be
-          // presented as a factual "this area has no SDRs".
-          console.error(`[prospect-drawer] could not load SDRs for area (${error.code}): ${error.message}`)
-          return
-        }
-        setSdrsForArea((data ?? []) as User[])
-        setSdrsLoaded(true)
-      })
+
+    // An SDR's areas live in `user_areas` (many-to-many). `users.area_id` holds
+    // only ONE of them and is the legacy field, kept as a fallback for users who
+    // have no `user_areas` rows at all.
+    //
+    // Reading `users.area_id` alone — as this did — makes every multi-area SDR
+    // invisible on any lead outside their primary area. The consequence was not
+    // just a short dropdown: `ownerOutsideArea` then evaluates true and the
+    // drawer warns "assigned to someone who is not an active SDR in its area"
+    // about a rep who covers that area perfectly well. Reported for SDRs whose
+    // market was demonstrably active.
+    //
+    // Same defect, same fix as ProspectsTable and KanbanBoard — this was its
+    // third instance in this codebase. Any new "SDRs for this area" query
+    // should start from `user_areas`, never from `users.area_id`.
+    const supabase = createClient()
+    ;(async () => {
+      const { data: links, error: linkErr } = await supabase
+        .from('user_areas')
+        .select('user_id')
+        .eq('area_id', prospect.area_id)
+
+      if (linkErr) {
+        console.error(`[prospect-drawer] could not load user_areas (${linkErr.code}): ${linkErr.message}`)
+        return // stays "not loaded" — see below
+      }
+
+      const linkedIds = (links ?? []).map(l => (l as { user_id: string }).user_id)
+
+      let query = supabase
+        .from('users')
+        .select('*')
+        .eq('role', 'sdr')
+        .eq('is_active', true)
+        .order('full_name')
+
+      // `or(...)` rather than two round-trips: an SDR qualifies through EITHER
+      // a user_areas row for this area OR the legacy column. Both are needed —
+      // dropping the legacy side would hide any SDR who predates user_areas.
+      query = linkedIds.length > 0
+        ? query.or(`area_id.eq.${prospect.area_id},id.in.(${linkedIds.join(',')})`)
+        : query.eq('area_id', prospect.area_id)
+
+      const { data, error } = await query
+      if (error) {
+        // Left as "not loaded": an empty list from a failed query must not be
+        // presented as a factual "this area has no SDRs".
+        console.error(`[prospect-drawer] could not load SDRs for area (${error.code}): ${error.message}`)
+        return
+      }
+      setSdrsForArea((data ?? []) as User[])
+      setSdrsLoaded(true)
+    })()
   }, [isAdmin, prospect.area_id])
 
   // Close on Escape

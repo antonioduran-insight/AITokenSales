@@ -147,7 +147,9 @@
     "marketClearedAreaKept": "已清除市場。地區與負責人維持不變 — 沒有市場就無從推斷地區。",
     "savedOwnerOtherArea": "已儲存。此潛在客戶已移至其他地區，但仍指派給目前的負責人 — 若該負責人不負責新的地區，請重新分配。",
     "ownerOutsideArea": "此潛在客戶指派給的人員並不是其所屬地區的活躍銷售代表。指派仍然有效 — 只有在確定要重新分配時才選擇其他人。",
-    "ownerUnknown": "目前負責人"
+    "ownerUnknown": "目前負責人",
+    "fromBridge": "此聯絡人來自 Bridge（合作夥伴），非抓取工具",
+    "bridgeBadge": "合作"
   },
   "import": {
     "title": "匯入 CSV",
@@ -314,7 +316,9 @@
     "pasteConversationLabel": "請貼上與客戶的完整對話：",
     "conversationPlaceholder": "對話...",
     "saveChat": "保存對話",
-    "errorSaving": "保存失敗"
+    "errorSaving": "保存失敗",
+    "fromBridge": "此聯絡人來自 Bridge（合作夥伴），非抓取工具",
+    "bridgeBadge": "合作"
   },
   "users": {
     "title": "用戶管理",

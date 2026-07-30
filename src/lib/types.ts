@@ -93,7 +93,11 @@ export interface Prospect {
   area_id: string
   assigned_to: string | null
   flag_tomorrow: boolean
-  source: 'manual' | 'csv_import'
+  // Kept in sync with the CHECK constraint on prospects.source. This type had
+  // drifted: it listed only two values while the scraper had been writing
+  // 'scraper' for months, which is why nobody trusted it when deciding whether
+  // 'bridge' was safe to insert.
+  source: 'manual' | 'csv_import' | 'scraper' | 'bridge'
   created_by: string | null
   created_at: string
   updated_at: string

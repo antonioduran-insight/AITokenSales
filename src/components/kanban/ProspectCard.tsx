@@ -3,7 +3,7 @@
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { useTranslations } from 'next-intl'
-import { Star, MessageSquareWarning } from 'lucide-react'
+import { Star, MessageSquareWarning, Link2 } from 'lucide-react'
 import { AreaBadge } from '@/components/ui/AreaBadge'
 import { TemperatureBadge } from '@/components/ui/TemperatureBadge'
 import { ICPScore } from '@/components/ui/ICPScore'
@@ -78,6 +78,24 @@ export function ProspectCard({ prospect, onClick, isDragOverlay = false, missing
           <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--crm-text-primary)', lineHeight: 1.3, flex: 1 }}>
             {prospect.name}
           </span>
+          {/* Bridge candidates are a different kind of contact from scraper
+              leads — a partnership prospect, not a cold ICP lead — and the rep
+              needs to know which one they are looking at BEFORE they write.
+              Nothing else on the card distinguishes them. */}
+          {prospect.source === 'bridge' && (
+            <span
+              title={t('fromBridge')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginTop: 1,
+                backgroundColor: '#6C63FF20', color: '#8B84FF',
+                border: '1px solid #6C63FF40', borderRadius: 4,
+                padding: '1px 5px', fontSize: 9, fontWeight: 700, letterSpacing: 0.3,
+              }}
+            >
+              <Link2 size={9} />
+              {t('bridgeBadge')}
+            </span>
+          )}
           {missingConversation && (
             <span title={t('missingConversation')} style={{ display: 'flex', flexShrink: 0, marginTop: 1 }}>
               <MessageSquareWarning size={13} color="#EF4444" />

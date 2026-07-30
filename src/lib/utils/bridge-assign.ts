@@ -223,19 +223,19 @@ export async function assignBridgeCandidates({
       // `markets` rows. Writing it into `market` would corrupt every
       // market-filtered view, so it stays null.
       market: null,
-      // `source` is typed as 'manual' | 'csv_import' in types.ts, which is
-      // already stale (the scraper writes 'scraper' and it works). Whether the
-      // column has a CHECK constraint could not be confirmed from this repo —
-      // there is no migration that creates `prospects` here — so 'bridge' is
-      // NOT used: an unknown-value rejection would fail the whole handoff again.
-      // Reusing the scraper's value is the safe choice until the constraint is
-      // verified and, if needed, widened by a migration.
-      // Caveat to keep in mind: `assignRunLeads()` manual mode ("Send to another
-      // SDR") deletes prospects by (org, source='scraper', linkedin_url) — a
-      // Bridge prospect sharing a linkedin_url with a scraper lead in the same
-      // run would be caught by that sweep. Vanishingly unlikely (partnership
-      // contacts vs. ICP leads), but it's the price of the shared value.
-      source: 'scraper',
+      // Bridge candidates now carry their own source value. The constraint on
+      // `prospects.source` WAS real — verified in production as
+      // ARRAY['manual','csv_import','scraper'] — so the earlier caution about
+      // writing 'bridge' was correct; it would have been rejected. It is
+      // widened by 20260730_prospects_source_bridge.sql, which must be run
+      // before this code deploys.
+      //
+      // Beyond the UI badge this enables, it closes a latent bug:
+      // `assignRunLeads()` manual mode ("Send to another SDR") deletes
+      // prospects by (organization_id, source='scraper', linkedin_url). While
+      // Bridge shared that value, a partnership contact sharing a LinkedIn URL
+      // with a scraper lead in the same run was silently swept up by it.
+      source: 'bridge',
       outreach_status: 'new',
       lead_temperature: 'Cold',
       area_id: sdrAreaId,

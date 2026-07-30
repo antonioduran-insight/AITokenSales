@@ -147,7 +147,9 @@
     "marketClearedAreaKept": "Mercado borrado. El área y el responsable quedaron sin cambios — sin mercado no hay nada de donde derivar un área.",
     "savedOwnerOtherArea": "Guardado. El lead se movió a otra área pero SIGUE asignado a su responsable actual — reasignalo si ese responsable no cubre la nueva área.",
     "ownerOutsideArea": "Este lead está asignado a alguien que no es un SDR activo en su área. La asignación sigue vigente — elegí otro nombre solo si querés reasignarlo.",
-    "ownerUnknown": "Responsable actual"
+    "ownerUnknown": "Responsable actual",
+    "fromBridge": "Este contacto vino de Bridge (partnerships), no del scraper",
+    "bridgeBadge": "BRIDGE"
   },
   "import": {
     "title": "Importar CSV",
@@ -314,7 +316,9 @@
     "pasteConversationLabel": "Pegá la conversación completa con el cliente:",
     "conversationPlaceholder": "Conversación...",
     "saveChat": "Guardar chat",
-    "errorSaving": "Error al guardar"
+    "errorSaving": "Error al guardar",
+    "fromBridge": "Este contacto vino de Bridge (partnerships), no del scraper",
+    "bridgeBadge": "BRIDGE"
   },
   "users": {
     "title": "Gestión de Usuarios",

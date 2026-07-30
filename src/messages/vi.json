@@ -147,7 +147,9 @@
     "marketClearedAreaKept": "Đã xóa thị trường. Khu vực và người phụ trách được giữ nguyên — không có thị trường thì không thể suy ra khu vực.",
     "savedOwnerOtherArea": "Đã lưu. Khách hàng đã chuyển sang khu vực khác nhưng VẪN thuộc người phụ trách hiện tại — hãy phân công lại nếu người đó không phụ trách khu vực mới.",
     "ownerOutsideArea": "Khách hàng này được phân công cho người không phải là SDR đang hoạt động trong khu vực của họ. Việc phân công vẫn có hiệu lực — chỉ chọn tên khác nếu bạn thực sự muốn phân công lại.",
-    "ownerUnknown": "Người phụ trách hiện tại"
+    "ownerUnknown": "Người phụ trách hiện tại",
+    "fromBridge": "Liên hệ này đến từ Bridge (đối tác), không phải từ công cụ thu thập",
+    "bridgeBadge": "BRIDGE"
   },
   "import": {
     "title": "Nhập CSV",
@@ -314,7 +316,9 @@
     "pasteConversationLabel": "Dán toàn bộ cuộc trò chuyện với khách hàng:",
     "conversationPlaceholder": "Cuộc trò chuyện...",
     "saveChat": "Lưu chat",
-    "errorSaving": "Lỗi khi lưu"
+    "errorSaving": "Lỗi khi lưu",
+    "fromBridge": "Liên hệ này đến từ Bridge (đối tác), không phải từ công cụ thu thập",
+    "bridgeBadge": "BRIDGE"
   },
   "users": {
     "title": "Quản Lý Người Dùng",

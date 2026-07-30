@@ -147,7 +147,9 @@
     "marketClearedAreaKept": "Market cleared. Area and owner were left unchanged — with no market there is nothing to derive an area from.",
     "savedOwnerOtherArea": "Saved. The lead moved to another area but is STILL assigned to its current owner — reassign it if that owner does not cover the new area.",
     "ownerOutsideArea": "This lead is assigned to someone who is not an active SDR in its area. The assignment still stands — only pick another name if you mean to reassign.",
-    "ownerUnknown": "Current owner"
+    "ownerUnknown": "Current owner",
+    "fromBridge": "This contact came from Bridge (partnerships), not from the scraper",
+    "bridgeBadge": "BRIDGE"
   },
   "import": {
     "title": "Import CSV",
@@ -314,7 +316,9 @@
     "pasteConversationLabel": "Paste the full conversation with the client:",
     "conversationPlaceholder": "Conversation...",
     "saveChat": "Save chat",
-    "errorSaving": "Error saving"
+    "errorSaving": "Error saving",
+    "fromBridge": "This contact came from Bridge (partnerships), not from the scraper",
+    "bridgeBadge": "BRIDGE"
   },
   "users": {
     "title": "User Management",
