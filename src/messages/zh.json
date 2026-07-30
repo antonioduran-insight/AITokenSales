@@ -391,7 +391,8 @@
     "noActiveSdrsInArea": "此地區沒有活躍的銷售代表",
     "selected": "已選 {count} 個",
     "leadsCount": "{count} 個線索",
-    "flagTomorrow": "已標記明天跟進"
+    "flagTomorrow": "已標記明天跟進",
+    "remove": "移除"
   },
   "export": {
     "title": "匯出 CSV",
@@ -570,7 +571,10 @@
     "alreadyThere": "{count} 位已存在",
     "skippedNoName": "{count} 位已略過（無姓名）",
     "editSeedListTooltip": "編輯此種子清單",
-    "editingSeedList": "編輯中 · {name}"
+    "editingSeedList": "編輯中 · {name}",
+    "showAllContacts": "顯示其他 {count} 位",
+    "showFewer": "收合",
+    "industryNoMatch": "沒有符合的產業"
   },
   "settings": {
     "title": "設定",

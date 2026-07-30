@@ -391,7 +391,8 @@
     "noActiveSdrsInArea": "No active SDRs in this area",
     "selected": "{count} selected",
     "leadsCount": "{count} leads",
-    "flagTomorrow": "Flagged for Tomorrow"
+    "flagTomorrow": "Flagged for Tomorrow",
+    "remove": "Remove"
   },
   "export": {
     "title": "Export CSV",
@@ -570,7 +571,10 @@
     "alreadyThere": "{count} already there",
     "skippedNoName": "{count} skipped (no name)",
     "editSeedListTooltip": "Edit this seed list",
-    "editingSeedList": "EDITING · {name}"
+    "editingSeedList": "EDITING · {name}",
+    "showAllContacts": "Show {count} more",
+    "showFewer": "Show fewer",
+    "industryNoMatch": "No industry matches that search"
   },
   "settings": {
     "title": "Settings",

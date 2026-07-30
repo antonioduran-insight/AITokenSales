@@ -10,6 +10,7 @@ import { Plus, X, ExternalLink, Check, Ban, RotateCcw, AlertCircle, Handshake, B
 import { createClient } from '@/lib/supabase/client'
 import { useOrgMarkets } from '@/lib/hooks/useOrgMarkets'
 import { MarketSelect } from '@/components/markets/MarketSelect'
+import { INDUSTRY_BY_ID, searchIndustries } from '@/lib/industry-codes'
 
 const ACTIVE = new Set(['pending', 'running', 'searching'])
 
@@ -82,7 +83,12 @@ export function BridgeClient() {
   const [useCompanies, setUseCompanies] = useState(true)
   const [useCriteria, setUseCriteria] = useState(false)
   const [companiesText, setCompaniesText] = useState('')
-  const [industry, setIndustry] = useState('')
+  // Real LinkedIn industry ids, not free text. The field used to be a plain
+  // input whose value the proxy discarded (`industry_codes: []`), because no
+  // name -> code mapping existed — while still counting as a valid criterion,
+  // so a seed list filtered "by industry" actually searched unfiltered.
+  const [industryIds, setIndustryIds] = useState<number[]>([])
+  const [industryQuery, setIndustryQuery] = useState('')
   const [headcounts, setHeadcounts] = useState<string[]>([])
   const [market, setMarket] = useState<string | null>(null)
 
@@ -112,6 +118,11 @@ export function BridgeClient() {
   // `prospects` is neither a success nor a failure of the confirm itself.
   const [batchWarn, setBatchWarn] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  // Deliberately NOT reusing `expanded`: that one holds candidate ids (the
+  // per-contact detail toggle) and this holds company group keys. Sharing one
+  // Set would make a company_id that happens to match a candidate id expand
+  // both, and reads as a bug that is very hard to spot.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
   // ── History ──
   const [runs, setRuns] = useState<BridgeRun[]>([])
@@ -202,7 +213,7 @@ export function BridgeClient() {
   function resetForm() {
     setName(''); setChannelFamily(CHANNEL_FAMILIES[0].value)
     setUseCompanies(true); setUseCriteria(false)
-    setCompaniesText(''); setIndustry(''); setHeadcounts([]); setMarket(null)
+    setCompaniesText(''); setIndustryIds([]); setIndustryQuery(''); setHeadcounts([]); setMarket(null)
   }
 
   const companies = companiesText
@@ -211,7 +222,7 @@ export function BridgeClient() {
   const canSaveSeed = !!name.trim()
     && (useCompanies || useCriteria)
     && (!useCompanies || companies.length > 0)
-    && (!useCriteria || !!industry.trim() || headcounts.length > 0 || !!market)
+    && (!useCriteria || industryIds.length > 0 || headcounts.length > 0 || !!market)
 
   // Load an existing list into the same form the create flow uses, rather than
   // building a second one. The backend stores its own field names
@@ -226,17 +237,16 @@ export function BridgeClient() {
     setChannelFamily((sl.channel_family as typeof channelFamily) ?? CHANNEL_FAMILIES[0].value)
     setCompaniesText(seedCompanies.join('\n'))
     setHeadcounts(seedHeadcounts)
-    // Industry has no code->name mapping in either direction yet (the proxy
-    // sends industry_codes: [] on the way out for the same reason), so it can't
-    // be round-tripped and starts blank on every edit.
-    setIndustry('')
+    // Industry round-trips now that the codes are real numbers on both sides.
+    setIndustryIds((sl.industry_codes ?? []) as number[])
+    setIndustryQuery('')
     // Market is stored as geo_codes, and resolving those back to a market name
     // would need a lookup this form doesn't do. Left unset: the user re-picks
     // it only if they open the criteria section, and an untouched section is
     // never sent, so the stored value survives.
     setMarket(null)
     setUseCompanies(seedCompanies.length > 0)
-    setUseCriteria(seedHeadcounts.length > 0)
+    setUseCriteria(seedHeadcounts.length > 0 || (sl.industry_codes?.length ?? 0) > 0)
     setShowForm(true)
   }
 
@@ -260,7 +270,7 @@ export function BridgeClient() {
         }
         if (useCompanies) changes.companies = companies
         if (useCriteria) {
-          changes.criteria = { industry: industry.trim() || null, headcounts, market }
+          changes.criteria = { industry_ids: industryIds, headcounts, market }
         }
         await bridgeApi.updateSeedList(editingSeedId, changes)
       } else {
@@ -269,7 +279,7 @@ export function BridgeClient() {
           channel_family: channelFamily,
           companies: useCompanies ? companies : [],
           criteria: useCriteria ? {
-            industry: industry.trim() || null,
+            industry_ids: industryIds,
             headcounts,
             market,
           } : null,
@@ -581,7 +591,72 @@ export function BridgeClient() {
                   <div style={{ marginBottom: 14, padding: 14, borderRadius: 8, backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)' }}>
                     <div style={{ marginBottom: 12 }}>
                       <label style={S.label}>{t('industry')}</label>
-                      <input value={industry} onChange={e => setIndustry(e.target.value)} placeholder={t('industryPlaceholder')} style={S.input} />
+
+                      {/* Chips for what's already picked. Selection is by id,
+                          so what the user sees and what the actor receives are
+                          the same thing — unlike the free-text field this
+                          replaced, whose value never left the browser. */}
+                      {industryIds.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                          {industryIds.map(id => (
+                            <span key={id} style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 5,
+                              padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                              backgroundColor: '#6C63FF20', color: 'var(--crm-accent)',
+                              border: '1px solid #6C63FF40',
+                            }}>
+                              {INDUSTRY_BY_ID.get(id)?.label ?? `#${id}`}
+                              <button
+                                onClick={() => setIndustryIds(prev => prev.filter(x => x !== id))}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: 0, display: 'flex' }}
+                                title={tc('remove')}
+                              >
+                                <X size={11} />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* 434 industries is far too many for a <select>, so it's
+                          a search box: type, pick, repeat. */}
+                      <input
+                        value={industryQuery}
+                        onChange={e => setIndustryQuery(e.target.value)}
+                        placeholder={t('industryPlaceholder')}
+                        style={S.input}
+                      />
+                      {industryQuery.trim() && (
+                        <div style={{
+                          marginTop: 6, maxHeight: 190, overflowY: 'auto',
+                          border: '1px solid var(--crm-border)', borderRadius: 8,
+                          backgroundColor: 'var(--crm-surface)',
+                        }}>
+                          {searchIndustries(industryQuery)
+                            .filter(i => !industryIds.includes(i.id))
+                            .slice(0, 40)
+                            .map(i => (
+                              <button
+                                key={i.id}
+                                onClick={() => { setIndustryIds(prev => [...prev, i.id]); setIndustryQuery('') }}
+                                style={{
+                                  display: 'block', width: '100%', textAlign: 'left',
+                                  padding: '7px 10px', background: 'none', border: 'none',
+                                  borderBottom: '1px solid var(--crm-border)', cursor: 'pointer',
+                                  color: 'var(--crm-text-primary)', fontSize: 12,
+                                }}
+                              >
+                                {i.label}
+                                <span style={{ color: 'var(--crm-text-muted)', fontSize: 10, marginLeft: 6 }}>{i.group}</span>
+                              </button>
+                            ))}
+                          {searchIndustries(industryQuery).filter(i => !industryIds.includes(i.id)).length === 0 && (
+                            <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--crm-text-muted)' }}>
+                              {t('industryNoMatch')}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div style={{ marginBottom: 12 }}>
                       <label style={S.label}>{t('headcount')}</label>
@@ -777,7 +852,14 @@ export function BridgeClient() {
                           </a>
                         )}
                       </div>
-                      {group.items.slice(0, 3).map(c => {
+                      {/* Three per company by default, but the rest must be
+                          REACHABLE. Before this, a company with 8 contacts
+                          rendered 3 and the other 5 had no affordance at all —
+                          the page reported "9 candidates found" while showing
+                          4 rows, which reads as a broken counter rather than a
+                          deliberate cap, and hides candidates the org paid to
+                          scrape. */}
+                      {(expandedGroups.has(group.key) ? group.items : group.items.slice(0, 3)).map(c => {
                     const sc = STATUS_COLORS[c.verification_status] ?? STATUS_COLORS.pending
                     const busy = updating === c.id
                     const isRejected = c.verification_status === 'rejected'
@@ -885,6 +967,24 @@ export function BridgeClient() {
                       </div>
                     )
                       })}
+                      {group.items.length > 3 && (
+                        <button
+                          onClick={() => setExpandedGroups(prev => {
+                            const next = new Set(prev)
+                            if (next.has(group.key)) next.delete(group.key)
+                            else next.add(group.key)
+                            return next
+                          })}
+                          style={{
+                            alignSelf: 'flex-start', background: 'none', border: 'none', cursor: 'pointer',
+                            color: 'var(--crm-accent)', fontSize: 12, fontWeight: 600, padding: '2px 0',
+                          }}
+                        >
+                          {expandedGroups.has(group.key)
+                            ? t('showFewer')
+                            : t('showAllContacts', { count: group.items.length - 3 })}
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -391,7 +391,8 @@
     "noActiveSdrsInArea": "Không có SDR nào đang hoạt động trong khu vực này",
     "selected": "Đã chọn {count}",
     "leadsCount": "{count} khách hàng",
-    "flagTomorrow": "Đã đánh dấu cho ngày mai"
+    "flagTomorrow": "Đã đánh dấu cho ngày mai",
+    "remove": "Xóa"
   },
   "export": {
     "title": "Xuất CSV",
@@ -570,7 +571,10 @@
     "alreadyThere": "{count} đã có sẵn",
     "skippedNoName": "{count} đã bỏ qua (không có tên)",
     "editSeedListTooltip": "Chỉnh sửa danh sách này",
-    "editingSeedList": "ĐANG SỬA · {name}"
+    "editingSeedList": "ĐANG SỬA · {name}",
+    "showAllContacts": "Xem thêm {count}",
+    "showFewer": "Thu gọn",
+    "industryNoMatch": "Không có ngành nào khớp"
   },
   "settings": {
     "title": "Cài Đặt",

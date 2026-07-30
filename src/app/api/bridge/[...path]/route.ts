@@ -127,7 +127,11 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
       const hasCriteria = 'criteria' in body
 
       const companies = Array.isArray(body.companies) ? (body.companies as string[]) : []
-      const criteria = (body.criteria ?? {}) as { industry?: string | null; headcounts?: string[]; market?: string | null }
+      const criteria = (body.criteria ?? {}) as {
+        industry_ids?: number[]
+        headcounts?: string[]
+        market?: string | null
+      }
 
       let geoCodes: number[] = []
       if (criteria.market) {
@@ -148,11 +152,14 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
       if (!isPatch || hasCriteria) {
         body.company_headcounts = criteria.headcounts ?? []
         body.geo_codes = geoCodes
-        // No industry-name -> industry-code mapping exists anywhere in this
-        // project yet (checked: no table, no constant). Sending [] rather than
-        // guessing a code — criteria.industry is a known, documented gap until
-        // that mapping is built as its own task.
-        body.industry_codes = []
+        // Real LinkedIn industry ids now, from src/lib/industry-codes.ts. This
+        // was hardcoded to [] because no name -> code mapping existed, which
+        // made the form's Industry field decorative: it accepted text, counted
+        // toward "this seed list has criteria", and then filtered nothing.
+        // The picker sends ids, so there is nothing left to resolve here.
+        body.industry_codes = Array.isArray(criteria.industry_ids)
+          ? criteria.industry_ids.filter(n => typeof n === 'number')
+          : []
       }
 
       delete body.companies
