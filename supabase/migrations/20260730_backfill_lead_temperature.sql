@@ -43,8 +43,10 @@ UPDATE public.scraper_leads
 --    puede estar en Cold porque alguien lo puso así a mano, y eso es un dato
 --    legítimo que no hay que pisar.
 --
---    Se limita a los que HOY dicen 'Cold': si alguien ya corrigió un lead a
---    mano a Hot/Warm, esa decisión humana gana sobre el score.
+--    Se limita a los que HOY dicen 'Cold' o están en NULL: si alguien ya
+--    corrigió un lead a mano a Hot/Warm, esa decisión humana gana sobre el
+--    score. Un NULL tampoco es una decisión — son 189 filas que el bug dejó
+--    sin ningún valor, y excluirlas las habría dejado rotas para siempre.
 UPDATE public.prospects
    SET lead_temperature = CASE
          WHEN icp_score >= 70 THEN 'Hot'
@@ -53,7 +55,14 @@ UPDATE public.prospects
        END
  WHERE source = 'scraper'
    AND icp_score IS NOT NULL
-   AND lead_temperature = 'Cold';
+   AND (lead_temperature = 'Cold' OR lead_temperature IS NULL);
+
+-- APLICADA en producción el 30/07/2026. Resultado medido:
+--   prospects  antes: 1236 Cold / 189 NULL / 5 Hot / 5 Warm
+--              después: 657 Hot / 480 Warm / 298 Cold / 0 NULL
+--   scraper_leads antes: 1789 NULL
+--              después: 840 HOT / 607 WARM / 364 COLD
+-- Es decir, 1137 leads calientes o templados estaban marcados como fríos.
 
 -- Verificación — el reparto debería dejar de ser 100% Cold:
 --   select lead_temperature, count(*) from public.prospects

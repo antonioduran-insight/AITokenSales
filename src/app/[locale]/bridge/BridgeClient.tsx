@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import {
   bridgeApi, CHANNEL_FAMILIES, HEADCOUNTS,
-  type SeedList, type BridgeRun, type BridgeCandidate, type BridgeLog, type VerificationStatus,
+  type SeedList, type BridgeRun, type BridgeCandidate, type VerificationStatus,
 } from '@/lib/bridge-api'
 import { Plus, X, ExternalLink, Check, Ban, RotateCcw, AlertCircle, Handshake, Building2, Trash2, Pencil } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -59,6 +59,30 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   pending: { bg: 'var(--crm-surface-raised)', color: 'var(--crm-text-muted)' },
 }
 
+// Anything in this list means the message came from a layer the operator has
+// no business seeing — the scraping vendor's validation errors, our own actor
+// ids, Python exception reprs, raw JSON payloads. Real examples that reached
+// this UI: `InvalidRequestError('Input is not valid: Field
+// input.profileScraperMode must be equal to one of ...')`, which publishes the
+// vendor's schema, and tracebacks naming internal modules.
+const INTERNAL_ERROR_MARKERS = [
+  'apify', 'harvestapi', 'actor', 'pydantic', 'traceback', 'input.',
+  'profileScraperMode', 'InvalidRequestError', '{"', 'Field input',
+]
+
+/** Message safe to show; anything implementation-shaped becomes generic.
+ *  The full text always goes to the console, so support can still see it. */
+function safeErrorMessage(raw: unknown, fallback: string): string {
+  const text = raw instanceof Error ? raw.message : String(raw ?? '')
+  console.error('[bridge] error:', raw)
+  if (!text.trim()) return fallback
+  const lower = text.toLowerCase()
+  if (INTERNAL_ERROR_MARKERS.some(m => lower.includes(m.toLowerCase()))) return fallback
+  // Long messages are almost always dumps rather than prose.
+  if (text.length > 180) return fallback
+  return text
+}
+
 export function BridgeClient() {
   const t = useTranslations('bridge')
   const tc = useTranslations('common')
@@ -97,7 +121,6 @@ export function BridgeClient() {
   const [starting, setStarting] = useState(false)
   const [runId, setRunId] = useState<string | null>(null)
   const [run, setRun] = useState<BridgeRun | null>(null)
-  const [logs, setLogs] = useState<BridgeLog[]>([])
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // ── Candidates ──
@@ -131,7 +154,7 @@ export function BridgeClient() {
   const loadSeedLists = useCallback(async () => {
     setLoadingSeeds(true)
     try { setSeedLists(await bridgeApi.listSeedLists()) }
-    catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    catch (e) { setError(safeErrorMessage(e, t('genericError'))) }
     finally { setLoadingSeeds(false) }
   }, [])
 
@@ -149,7 +172,7 @@ export function BridgeClient() {
       setDeleteTarget(null)
       await loadSeedLists()
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(safeErrorMessage(e, t('genericError')))
     } finally {
       setDeletingSeed(false)
     }
@@ -168,14 +191,14 @@ export function BridgeClient() {
   const loadCandidates = useCallback(async (id: string) => {
     setLoadingCandidates(true)
     try { setCandidates(await bridgeApi.listCandidates(id)) }
-    catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    catch (e) { setError(safeErrorMessage(e, t('genericError'))) }
     finally { setLoadingCandidates(false) }
   }, [])
 
   const loadRuns = useCallback(async () => {
     setLoadingRuns(true)
     try { setRuns(await bridgeApi.listRuns()) }
-    catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    catch (e) { setError(safeErrorMessage(e, t('genericError'))) }
     finally { setLoadingRuns(false) }
   }, [])
 
@@ -184,12 +207,12 @@ export function BridgeClient() {
   // ── Poll the active run ──
   const poll = useCallback(async (id: string) => {
     try {
-      const [r, l] = await Promise.all([
-        bridgeApi.getRun(id),
-        bridgeApi.getLogs(id).catch(() => [] as BridgeLog[]),
-      ])
+      // Logs are no longer fetched. They only ever fed the raw terminal that
+      // has since been removed, so polling for them doubled every request in
+      // this loop — two round-trips per tick, one payload discarded — to
+      // retrieve output we deliberately do not show any more.
+      const r = await bridgeApi.getRun(id)
       setRun(r)
-      setLogs(l)
       if (!ACTIVE.has(r.status)) {
         if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
         if (r.status === 'completed') loadCandidates(id)
@@ -288,7 +311,7 @@ export function BridgeClient() {
       closeSeedForm()
       await loadSeedLists()
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(safeErrorMessage(e, t('genericError')))
     } finally { setSavingSeed(false) }
   }
 
@@ -299,10 +322,10 @@ export function BridgeClient() {
       const res = await bridgeApi.createRun(selectedSeedId)
       const id = res.id ?? res.run_id
       if (!id) throw new Error(t('errorNoRunId'))
-      setCandidates([]); setLogs([]); setRun(null)
+      setCandidates([]); setRun(null)
       setRunId(id)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(safeErrorMessage(e, t('genericError')))
     } finally { setStarting(false) }
   }
 
@@ -312,7 +335,7 @@ export function BridgeClient() {
       await bridgeApi.setCandidateStatus(c.id, status)
       setCandidates(prev => prev.map(x => x.id === c.id ? { ...x, verification_status: status } : x))
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(safeErrorMessage(e, t('genericError')))
     } finally { setUpdating(null) }
   }
 
@@ -371,7 +394,7 @@ export function BridgeClient() {
       // Re-read so the confirmed rows show their generated messages.
       if (runId) await loadCandidates(runId)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(safeErrorMessage(e, t('genericError')))
     } finally {
       setConfirming(false)
     }
@@ -731,15 +754,19 @@ export function BridgeClient() {
                 <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', textAlign: 'center', maxWidth: 400, lineHeight: 1.6 }}>
                   {t('progressHint')}
                 </p>
-                {logs.length > 0 && (
-                  <div style={{ marginTop: 14, width: '100%', maxWidth: 560, maxHeight: 160, overflowY: 'auto', backgroundColor: '#0D1117', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '10px 12px', fontFamily: 'monospace', fontSize: 11, lineHeight: 1.7 }}>
-                    {logs.map((l, i) => (
-                      <div key={l.id ?? i} style={{ color: '#C9D1D9' }}>
-                        <span style={{ color: '#52526A', marginRight: 8 }}>{new Date(l.created_at).toLocaleTimeString()}</span>
-                        {l.message}
-                      </div>
-                    ))}
-                  </div>
+                {/* The raw log terminal that used to sit here has been removed.
+                    It rendered the backend's own debug output verbatim —
+                    actor ids, full request payloads, internal field names,
+                    stack-trace fragments on failure. None of that means
+                    anything to an admin, and all of it is implementation
+                    detail we shouldn't be publishing into the product.
+                    Diagnostics still exist in full on the server side; this
+                    surface now reports progress, which is what the operator
+                    actually needs. Mirrors New Run's screen. */}
+                {typeof run?.candidates_found === 'number' && run.candidates_found > 0 && (
+                  <p style={{ marginTop: 12, fontSize: 13, fontWeight: 600, color: 'var(--crm-accent)' }}>
+                    {t('candidatesSoFar', { count: run.candidates_found })}
+                  </p>
                 )}
               </div>
             )}

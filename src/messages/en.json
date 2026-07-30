@@ -574,7 +574,9 @@
     "editingSeedList": "EDITING · {name}",
     "showAllContacts": "Show {count} more",
     "showFewer": "Show fewer",
-    "industryNoMatch": "No industry matches that search"
+    "industryNoMatch": "No industry matches that search",
+    "candidatesSoFar": "{count} contacts found so far",
+    "genericError": "Something went wrong. Try again, and contact support if it keeps happening."
   },
   "settings": {
     "title": "Settings",

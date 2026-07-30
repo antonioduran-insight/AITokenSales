@@ -574,7 +574,9 @@
     "editingSeedList": "ĐANG SỬA · {name}",
     "showAllContacts": "Xem thêm {count}",
     "showFewer": "Thu gọn",
-    "industryNoMatch": "Không có ngành nào khớp"
+    "industryNoMatch": "Không có ngành nào khớp",
+    "candidatesSoFar": "Đã tìm thấy {count} liên hệ",
+    "genericError": "Đã xảy ra lỗi. Hãy thử lại và liên hệ hỗ trợ nếu vẫn tiếp diễn."
   },
   "settings": {
     "title": "Cài Đặt",

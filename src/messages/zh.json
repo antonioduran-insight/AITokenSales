@@ -574,7 +574,9 @@
     "editingSeedList": "編輯中 · {name}",
     "showAllContacts": "顯示其他 {count} 位",
     "showFewer": "收合",
-    "industryNoMatch": "沒有符合的產業"
+    "industryNoMatch": "沒有符合的產業",
+    "candidatesSoFar": "目前已找到 {count} 位聯絡人",
+    "genericError": "發生錯誤。請重試，若持續發生請聯絡支援團隊。"
   },
   "settings": {
     "title": "設定",

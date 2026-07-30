@@ -574,7 +574,9 @@
     "editingSeedList": "EDITANDO · {name}",
     "showAllContacts": "Ver {count} más",
     "showFewer": "Ver menos",
-    "industryNoMatch": "Ninguna industria coincide con esa búsqueda"
+    "industryNoMatch": "Ninguna industria coincide con esa búsqueda",
+    "candidatesSoFar": "{count} contactos encontrados hasta ahora",
+    "genericError": "Algo salió mal. Probá de nuevo y contactá a soporte si sigue pasando."
   },
   "settings": {
     "title": "Configuración",
