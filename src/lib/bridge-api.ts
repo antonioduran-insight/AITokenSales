@@ -19,16 +19,27 @@ export const CHANNEL_FAMILIES: { value: ChannelFamily; label: string }[] = [
 
 export const HEADCOUNTS = ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001+']
 
+/** A saved seed list, as the BACKEND actually returns it.
+ *
+ * This previously declared `companies` and `criteria` — the shape the CRM's
+ * FORM speaks, not the shape the API answers with. Those keys are never
+ * present on a response, so every consumer reading them got `undefined`: the
+ * seed-list rows on the Bridge page have been rendering "—" for their company
+ * and criteria counts since the feature shipped, with no error to notice.
+ *
+ * It is the read-side twin of the already-documented write-side bug where the
+ * form's field names were silently dropped by the backend's Pydantic model.
+ * The proxy translates form shape -> backend shape on the way out; this type
+ * describes what comes back, and nothing else should be invented here.
+ */
 export interface SeedList {
   id: string
   name: string
   channel_family: ChannelFamily | string
-  companies?: string[]
-  criteria?: {
-    industry?: string | null
-    headcounts?: string[]
-    market?: string | null
-  } | null
+  company_names?: string[]
+  company_headcounts?: string[]
+  geo_codes?: number[]
+  industry_codes?: number[]
   created_at?: string
 }
 

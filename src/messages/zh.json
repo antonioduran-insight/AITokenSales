@@ -568,7 +568,9 @@
     "confirmedForSdr": "已為 {name} 確認 {count} 位候選人。",
     "addedToBoard": "已將 {created}/{total} 位加入 {name} 的看板",
     "alreadyThere": "{count} 位已存在",
-    "skippedNoName": "{count} 位已略過（無姓名）"
+    "skippedNoName": "{count} 位已略過（無姓名）",
+    "editSeedListTooltip": "編輯此種子清單",
+    "editingSeedList": "編輯中 · {name}"
   },
   "settings": {
     "title": "設定",

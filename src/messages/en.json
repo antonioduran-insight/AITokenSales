@@ -568,7 +568,9 @@
     "confirmedForSdr": "{count, plural, one {# candidate} other {# candidates}} confirmed for {name}.",
     "addedToBoard": "{created} of {total} added to {name}'s board",
     "alreadyThere": "{count} already there",
-    "skippedNoName": "{count} skipped (no name)"
+    "skippedNoName": "{count} skipped (no name)",
+    "editSeedListTooltip": "Edit this seed list",
+    "editingSeedList": "EDITING · {name}"
   },
   "settings": {
     "title": "Settings",

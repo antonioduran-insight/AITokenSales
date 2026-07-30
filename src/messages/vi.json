@@ -568,7 +568,9 @@
     "confirmedForSdr": "Đã xác nhận {count} ứng viên cho {name}.",
     "addedToBoard": "{created} trên {total} đã được thêm vào bảng của {name}",
     "alreadyThere": "{count} đã có sẵn",
-    "skippedNoName": "{count} đã bỏ qua (không có tên)"
+    "skippedNoName": "{count} đã bỏ qua (không có tên)",
+    "editSeedListTooltip": "Chỉnh sửa danh sách này",
+    "editingSeedList": "ĐANG SỬA · {name}"
   },
   "settings": {
     "title": "Cài Đặt",

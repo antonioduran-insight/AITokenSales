@@ -111,7 +111,21 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
     // erroring, so every seed list ever created (including the two that
     // already exist) has empty company_names/company_headcounts/geo_codes/
     // industry_codes. Transform to the backend's real field names here.
-    if (pathStr === '/bridge/seed-lists' && req.method === 'POST') {
+    // Applies to CREATE (POST /bridge/seed-lists) and EDIT
+    // (PATCH /bridge/seed-lists/{id}) alike. Both must go through it: the edit
+    // form sends the same shape the create form does, and a PATCH carrying
+    // `companies`/`criteria` would be silently discarded by Pydantic exactly
+    // as the original creates were — the same bug, reintroduced through a
+    // different verb.
+    const isSeedListWrite =
+      (pathStr === '/bridge/seed-lists' && req.method === 'POST') ||
+      (/^\/bridge\/seed-lists\/[^/]+$/.test(pathStr) && req.method === 'PATCH')
+
+    if (isSeedListWrite) {
+      const isPatch = req.method === 'PATCH'
+      const hasCompanies = 'companies' in body
+      const hasCriteria = 'criteria' in body
+
       const companies = Array.isArray(body.companies) ? (body.companies as string[]) : []
       const criteria = (body.criteria ?? {}) as { industry?: string | null; headcounts?: string[]; market?: string | null }
 
@@ -126,14 +140,20 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
           .filter((c): c is number => typeof c === 'number')
       }
 
-      body.company_names = companies
-      body.company_headcounts = criteria.headcounts ?? []
-      body.geo_codes = geoCodes
-      // No industry-name -> industry-code mapping exists anywhere in this
-      // project yet (checked: no table, no constant). Sending [] rather than
-      // guessing a code — criteria.industry is a known, documented gap until
-      // that mapping is built as its own task.
-      body.industry_codes = []
+      // On PATCH, only translate what the client actually sent. The backend
+      // distinguishes "absent" (leave alone) from "empty" (clear), and writing
+      // a default [] for an untouched key would erase filters the user never
+      // opened — renaming a list would wipe its companies.
+      if (!isPatch || hasCompanies) body.company_names = companies
+      if (!isPatch || hasCriteria) {
+        body.company_headcounts = criteria.headcounts ?? []
+        body.geo_codes = geoCodes
+        // No industry-name -> industry-code mapping exists anywhere in this
+        // project yet (checked: no table, no constant). Sending [] rather than
+        // guessing a code — criteria.industry is a known, documented gap until
+        // that mapping is built as its own task.
+        body.industry_codes = []
+      }
 
       delete body.companies
       delete body.criteria

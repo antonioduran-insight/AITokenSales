@@ -6,7 +6,7 @@ import {
   bridgeApi, CHANNEL_FAMILIES, HEADCOUNTS,
   type SeedList, type BridgeRun, type BridgeCandidate, type BridgeLog, type VerificationStatus,
 } from '@/lib/bridge-api'
-import { Plus, X, ExternalLink, Check, Ban, RotateCcw, AlertCircle, Handshake, Building2, Trash2 } from 'lucide-react'
+import { Plus, X, ExternalLink, Check, Ban, RotateCcw, AlertCircle, Handshake, Building2, Trash2, Pencil } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useOrgMarkets } from '@/lib/hooks/useOrgMarkets'
 import { MarketSelect } from '@/components/markets/MarketSelect'
@@ -70,6 +70,11 @@ export function BridgeClient() {
   const [loadingSeeds, setLoadingSeeds] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [savingSeed, setSavingSeed] = useState(false)
+  // null = the form is creating; an id = it is editing that list in place.
+  // One form serves both so the two paths can never drift apart in what they
+  // send — which is how the original create ended up silently dropping every
+  // filter it submitted.
+  const [editingSeedId, setEditingSeedId] = useState<string | null>(null)
 
   // Seed list form — both modes can be combined
   const [name, setName] = useState('')
@@ -208,21 +213,69 @@ export function BridgeClient() {
     && (!useCompanies || companies.length > 0)
     && (!useCriteria || !!industry.trim() || headcounts.length > 0 || !!market)
 
+  // Load an existing list into the same form the create flow uses, rather than
+  // building a second one. The backend stores its own field names
+  // (company_names / company_headcounts / geo_codes), so this is the inverse of
+  // the proxy's transform: back into the shape the form speaks.
+  function startEditSeedList(sl: SeedList) {
+    const seedCompanies = (sl.company_names ?? []) as string[]
+    const seedHeadcounts = (sl.company_headcounts ?? []) as string[]
+
+    setEditingSeedId(sl.id)
+    setName(sl.name ?? '')
+    setChannelFamily((sl.channel_family as typeof channelFamily) ?? CHANNEL_FAMILIES[0].value)
+    setCompaniesText(seedCompanies.join('\n'))
+    setHeadcounts(seedHeadcounts)
+    // Industry has no code->name mapping in either direction yet (the proxy
+    // sends industry_codes: [] on the way out for the same reason), so it can't
+    // be round-tripped and starts blank on every edit.
+    setIndustry('')
+    // Market is stored as geo_codes, and resolving those back to a market name
+    // would need a lookup this form doesn't do. Left unset: the user re-picks
+    // it only if they open the criteria section, and an untouched section is
+    // never sent, so the stored value survives.
+    setMarket(null)
+    setUseCompanies(seedCompanies.length > 0)
+    setUseCriteria(seedHeadcounts.length > 0)
+    setShowForm(true)
+  }
+
+  function closeSeedForm() {
+    resetForm()
+    setEditingSeedId(null)
+    setShowForm(false)
+  }
+
   async function saveSeedList() {
     if (!canSaveSeed || savingSeed) return
     setSavingSeed(true); setError(null)
     try {
-      await bridgeApi.createSeedList({
-        name: name.trim(),
-        channel_family: channelFamily,
-        companies: useCompanies ? companies : [],
-        criteria: useCriteria ? {
-          industry: industry.trim() || null,
-          headcounts,
-          market,
-        } : null,
-      })
-      resetForm(); setShowForm(false)
+      if (editingSeedId) {
+        // PATCH sends only the sections the user actually enabled. The backend
+        // leaves an omitted field untouched, so editing just the name cannot
+        // blank out the filters — see the proxy's seed-list transform.
+        const changes: Record<string, unknown> = {
+          name: name.trim(),
+          channel_family: channelFamily,
+        }
+        if (useCompanies) changes.companies = companies
+        if (useCriteria) {
+          changes.criteria = { industry: industry.trim() || null, headcounts, market }
+        }
+        await bridgeApi.updateSeedList(editingSeedId, changes)
+      } else {
+        await bridgeApi.createSeedList({
+          name: name.trim(),
+          channel_family: channelFamily,
+          companies: useCompanies ? companies : [],
+          criteria: useCriteria ? {
+            industry: industry.trim() || null,
+            headcounts,
+            market,
+          } : null,
+        })
+      }
+      closeSeedForm()
       await loadSeedLists()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -422,7 +475,7 @@ export function BridgeClient() {
           <div style={S.card}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <span style={{ ...S.label, marginBottom: 0 }}>{t('seedLists')}</span>
-              <button onClick={() => setShowForm(v => !v)} style={{
+              <button onClick={() => { if (showForm) { closeSeedForm() } else { resetForm(); setEditingSeedId(null); setShowForm(true) } }} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600,
                 color: '#FFF', backgroundColor: 'var(--crm-accent)', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer',
               }}>
@@ -437,9 +490,15 @@ export function BridgeClient() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {seedLists.map(sl => {
-                  const nCompanies = sl.companies?.length ?? 0
-                  const crit = sl.criteria
-                  const nCriteria = crit ? [crit.industry, crit.market, ...(crit.headcounts ?? [])].filter(Boolean).length : 0
+                  // Counted from the fields the backend actually returns.
+                  // Reading `sl.companies` / `sl.criteria` here — the form's
+                  // names, never present on a response — is why every row
+                  // showed "—" regardless of what the list contained.
+                  const nCompanies = sl.company_names?.length ?? 0
+                  const nCriteria =
+                    (sl.company_headcounts?.length ?? 0) +
+                    (sl.geo_codes?.length ?? 0) +
+                    (sl.industry_codes?.length ?? 0)
                   return (
                     <div key={sl.id} style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', rowGap: 6, gap: 12, padding: '11px 14px', borderRadius: 8, backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)' }}>
                       <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{sl.name}</span>
@@ -453,6 +512,13 @@ export function BridgeClient() {
                         {nCompanies === 0 && nCriteria === 0 && '—'}
                       </span>
                       <button
+                        onClick={() => startEditSeedList(sl)}
+                        title={t('editSeedListTooltip')}
+                        style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', padding: 4, flexShrink: 0 }}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
                         onClick={() => setDeleteTarget(sl)}
                         title={t('deleteSeedListTooltip')}
                         style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', padding: 4, flexShrink: 0 }}
@@ -465,9 +531,16 @@ export function BridgeClient() {
               </div>
             )}
 
-            {/* New seed list form */}
+            {/* Seed list form — creates when editingSeedId is null, edits in
+                place otherwise. Header states which, so a preloaded form is
+                never mistaken for a blank one. */}
             {showForm && (
               <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--crm-border)' }}>
+                {editingSeedId && (
+                  <div style={{ marginBottom: 12, fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: 'var(--crm-accent)' }}>
+                    {t('editingSeedList', { name: name || '—' })}
+                  </div>
+                )}
                 <div style={{ marginBottom: 14 }}>
                   <label style={S.label}>{t('fieldName')}</label>
                   <input value={name} onChange={e => setName(e.target.value)} placeholder={t('namePlaceholder')} style={S.input} />
@@ -539,7 +612,7 @@ export function BridgeClient() {
                   }}>
                     {savingSeed ? t('saving') : t('saveSeedList')}
                   </button>
-                  <button onClick={() => { setShowForm(false); resetForm() }} style={{
+                  <button onClick={closeSeedForm} style={{
                     fontSize: 13, fontWeight: 600, color: 'var(--crm-text-muted)', background: 'none',
                     border: '1px solid var(--crm-border)', borderRadius: 8, padding: '10px 18px', cursor: 'pointer',
                   }}>
