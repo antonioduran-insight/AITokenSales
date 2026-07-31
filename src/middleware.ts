@@ -4,6 +4,12 @@ import { createServerClient } from '@supabase/ssr'
 
 const locales = ['zh', 'en', 'vi', 'es']
 const defaultLocale = 'zh'
+// Deliberately separate from `defaultLocale`: that one governs the app itself
+// (login, deactivated-user redirects, etc.) and stays 'zh' for the existing
+// user base. The bare-root landing redirect below is the front door for
+// anonymous, international traffic, where English is the safer default —
+// visitors can still switch language from the landing page's own switcher.
+const landingLocale = 'en'
 // Locale-aware and unauthenticated: /zh/landing, /en/landing, ...
 // The landing moved under [locale] so it can be translated like everything
 // else; while it lived at a bare /landing it could only ever be English.
@@ -33,7 +39,7 @@ export async function middleware(request: NextRequest) {
   // /{locale}/landing below: it's the public marketing entry point, not an
   // app route.
   if (pathname === '/') {
-    return NextResponse.redirect(new URL(`/${defaultLocale}/landing`, request.url))
+    return NextResponse.redirect(new URL(`/${landingLocale}/landing`, request.url))
   }
 
   const pathnameHasLocale = locales.some(

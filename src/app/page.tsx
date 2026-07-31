@@ -6,5 +6,5 @@ import { redirect } from 'next/navigation'
 // (e.g. disabled locally), so a stray hit here still lands somewhere
 // sensible instead of a 404.
 export default function RootPage() {
-  redirect('/zh/landing')
+  redirect('/en/landing')
 }
