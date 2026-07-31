@@ -190,7 +190,6 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
             <Link
               key={item.href}
               href={linkHref}
-              prefetch={false}
               onClick={onCloseMobile}
               title={isIconOnly ? item.label : undefined}
               style={{
@@ -236,7 +235,6 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
                 <Link
                   key={item.href}
                   href={`/${locale}${item.href}`}
-                  prefetch={false}
                   onClick={onCloseMobile}
                   title={isIconOnly ? item.label : undefined}
                   style={{
@@ -271,7 +269,6 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
               </div>
               <Link
                 href={fullHref}
-                prefetch={false}
                 onClick={onCloseMobile}
                 title={isIconOnly ? t('partnerships') : undefined}
                 style={{

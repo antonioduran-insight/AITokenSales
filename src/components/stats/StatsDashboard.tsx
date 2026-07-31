@@ -87,10 +87,42 @@ const STATS_SELECT = 'id, outreach_status, lead_temperature, area_id, assigned_t
 // areas, temperatures and the conversion denominator all summed to 1000).
 // Page through explicitly instead of relying on one unbounded request.
 const PAGE_SIZE = 1000
-// Pages are fetched sequentially (never N unbounded parallel requests), and this
-// hard cap stops a pathological org — or a future paging bug — from looping
-// forever: 200k prospects is far beyond any real plan's lead quota.
+// This hard cap stops a pathological org — or a future paging bug — from
+// looping forever: 200k prospects is far beyond any real plan's lead quota.
 const MAX_PAGES = 200
+
+// Page 1 asks for an exact count, then every remaining page fires in
+// parallel (same fix applied to Kanban's fetchAllProspects) instead of one
+// sequential round trip at a time — this is the Dashboard, so it used to pay
+// that wait on every single admin login for any org past PAGE_SIZE prospects.
+async function fetchAllPages<T>(
+  fetchPage: (offset: number, limit: number) => Promise<{ data: T[]; count?: number | null }>
+): Promise<T[]> {
+  const first = await fetchPage(0, PAGE_SIZE)
+  const all: T[] = [...first.data]
+
+  if (first.count != null) {
+    const total = Math.min(first.count, PAGE_SIZE * MAX_PAGES)
+    const remainingOffsets: number[] = []
+    for (let offset = PAGE_SIZE; offset < total; offset += PAGE_SIZE) remainingOffsets.push(offset)
+    if (remainingOffsets.length > 0) {
+      const pages = await Promise.all(remainingOffsets.map(offset => fetchPage(offset, PAGE_SIZE)))
+      pages.forEach(p => all.push(...p.data))
+    }
+    return all
+  }
+
+  // Fallback for a fetcher that couldn't report a count: page sequentially
+  // until a short batch signals the end.
+  if (first.data.length === PAGE_SIZE) {
+    for (let page = 1; page < MAX_PAGES; page++) {
+      const batch = await fetchPage(page * PAGE_SIZE, PAGE_SIZE)
+      all.push(...batch.data)
+      if (batch.data.length < PAGE_SIZE) break
+    }
+  }
+  return all
+}
 
 function errorMessage(e: unknown): string {
   if (e instanceof Error) return e.message
@@ -118,13 +150,12 @@ export function StatsDashboard() {
     // key) keeps offset paging deterministic; ordering by a non-unique column
     // like created_at can duplicate or skip rows across page boundaries.
     async function fetchImpersonated(orgId: string): Promise<ProspectRow[]> {
-      const all: ProspectRow[] = []
-      for (let page = 0; page < MAX_PAGES; page++) {
+      return fetchAllPages<ProspectRow>(async (offset, limit) => {
         const params = new URLSearchParams({
           impersonate_org_id: orgId,
           select: STATS_SELECT,
-          limit: String(PAGE_SIZE),
-          offset: String(page * PAGE_SIZE),
+          limit: String(limit),
+          offset: String(offset),
           order: 'id',
           order_dir: 'asc',
         })
@@ -136,12 +167,8 @@ export function StatsDashboard() {
             (typeof err === 'string' ? err : err?.message) || `Request failed (${res.status})`
           )
         }
-        const batch = (json?.data ?? []) as ProspectRow[]
-        all.push(...batch)
-        // A short page means we've reached the end.
-        if (batch.length < PAGE_SIZE) return all
-      }
-      return all
+        return { data: (json?.data ?? []) as ProspectRow[], count: json?.count ?? null }
+      })
     }
 
     async function fetchDirect(): Promise<ProspectRow[]> {
@@ -171,26 +198,21 @@ export function StatsDashboard() {
         // just make Stats report 0 while the Kanban shows their real leads.
       }
 
-      const all: ProspectRow[] = []
-      for (let page = 0; page < MAX_PAGES; page++) {
-        const from = page * PAGE_SIZE
+      return fetchAllPages<ProspectRow>(async (offset, limit) => {
         // Fresh builder per page (they're mutable, so reusing one would stack up
         // `order` params), and filters go on before .order()/.range().
         // Ordering by `id` — a unique key — keeps offset paging deterministic.
-        let query = supabase.from('prospects').select(STATS_SELECT)
+        let query = supabase.from('prospects').select(STATS_SELECT, { count: 'exact' })
         if (areaIds.length === 1) query = query.eq('area_id', areaIds[0])
         else if (areaIds.length > 1) query = query.in('area_id', areaIds)
-        const { data, error } = await query
+        const { data, error, count } = await query
           .order('id', { ascending: true })
-          .range(from, from + PAGE_SIZE - 1)
+          .range(offset, offset + limit - 1)
         // The error was never checked before, so any failure rendered a fully
         // populated dashboard of zeroes that looked like real data.
         if (error) throw new Error(error.message)
-        const batch = (data ?? []) as unknown as ProspectRow[]
-        all.push(...batch)
-        if (batch.length < PAGE_SIZE) return all
-      }
-      return all
+        return { data: (data ?? []) as unknown as ProspectRow[], count: count ?? null }
+      })
     }
 
     async function load() {
