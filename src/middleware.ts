@@ -20,6 +20,22 @@ const intlMiddleware = createMiddleware({
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // Bare, locale-less root: this is the front door for organic/typed traffic.
+  // A redirect (not a rewrite) on purpose — `AppShell` decides whether to
+  // render the CRM chrome by reading the browser's *actual* pathname via
+  // `usePathname()`, which a rewrite would never update (the browser stays
+  // on "/", none the wiser). A redirect lands the visitor on the real
+  // /{locale}/landing URL, so that check — and next-intl's own locale
+  // resolution — see the same path the server rendered. Every other locale
+  // keeps its own explicit, shareable URL (/en/landing, /es/landing, ...);
+  // this only covers the truly bare case. Skips auth entirely, same as
+  // /{locale}/landing below: it's the public marketing entry point, not an
+  // app route.
+  if (pathname === '/') {
+    return NextResponse.redirect(new URL(`/${defaultLocale}/landing`, request.url))
+  }
+
   const pathnameHasLocale = locales.some(
     locale => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
   )
