@@ -34,19 +34,41 @@ const FETCH_PAGE = 1000
 const FETCH_HARD_CAP = 20000
 
 async function fetchAllProspects(
-  fetchPage: (offset: number, limit: number) => Promise<Prospect[]>
+  fetchPage: (offset: number, limit: number) => Promise<{ data: Prospect[]; count?: number | null }>
 ): Promise<Prospect[]> {
-  const all: Prospect[] = []
-  for (let offset = 0; ; offset += FETCH_PAGE) {
-    const batch = await fetchPage(offset, FETCH_PAGE)
-    all.push(...batch)
-    // A short batch means the end of the data.
-    if (batch.length < FETCH_PAGE) break
-    // Safety valve: if a backend ever ignores the range params, a full batch
-    // would come back forever. Bail rather than hang the tab.
-    if (all.length >= FETCH_HARD_CAP) {
+  const first = await fetchPage(0, FETCH_PAGE)
+  const all: Prospect[] = [...first.data]
+
+  // Every call site now asks for an exact count on page 1, so once an org
+  // crosses FETCH_PAGE prospects (already true here — 1033), the remaining
+  // pages can fire in parallel instead of one sequential round trip at a
+  // time. That sequential wait used to sit directly in front of the first
+  // paint of the board.
+  if (first.count != null) {
+    const total = Math.min(first.count, FETCH_HARD_CAP)
+    const remainingOffsets: number[] = []
+    for (let offset = FETCH_PAGE; offset < total; offset += FETCH_PAGE) remainingOffsets.push(offset)
+    if (remainingOffsets.length > 0) {
+      const pages = await Promise.all(remainingOffsets.map(offset => fetchPage(offset, FETCH_PAGE)))
+      pages.forEach(p => all.push(...p.data))
+    }
+    if (first.count > FETCH_HARD_CAP) {
       console.warn(`[Kanban] stopped at ${FETCH_HARD_CAP} prospects — the board is showing a partial set.`)
-      break
+    }
+    return all
+  }
+
+  // Fallback for a fetcher that couldn't report a count: page sequentially
+  // until a short batch signals the end, same as before.
+  if (first.data.length === FETCH_PAGE) {
+    for (let offset = FETCH_PAGE; ; offset += FETCH_PAGE) {
+      const batch = await fetchPage(offset, FETCH_PAGE)
+      all.push(...batch.data)
+      if (batch.data.length < FETCH_PAGE) break
+      if (all.length >= FETCH_HARD_CAP) {
+        console.warn(`[Kanban] stopped at ${FETCH_HARD_CAP} prospects — the board is showing a partial set.`)
+        break
+      }
     }
   }
   return all
@@ -189,13 +211,13 @@ export function KanbanBoard() {
               `/api/crm/prospects?impersonate_org_id=${impersonateOrgId}&select=${encodeURIComponent(PROSPECT_SELECT)}&limit=${limit}&offset=${offset}`
             )
             const json = await res.json()
-            return (json.data ?? []) as Prospect[]
+            return { data: (json.data ?? []) as Prospect[], count: json.count ?? null }
           })
         } else {
           data = await fetchAllProspects(async (offset, limit) => {
             let query = supabase
               .from('prospects')
-              .select(PROSPECT_SELECT)
+              .select(PROSPECT_SELECT, { count: 'exact' })
               .order('created_at', { ascending: false })
               .range(offset, offset + limit - 1)
             if (user?.role === 'sdr') {
@@ -204,8 +226,8 @@ export function KanbanBoard() {
               else if (ids.length > 1) query = query.in('area_id', ids)
               else if (user.area_id) query = query.eq('area_id', user.area_id)
             }
-            const { data: rows } = await query
-            return (rows ?? []) as unknown as Prospect[]
+            const { data: rows, count } = await query
+            return { data: (rows ?? []) as unknown as Prospect[], count: count ?? null }
           })
         }
         setProspects(data)
@@ -230,14 +252,14 @@ export function KanbanBoard() {
             `/api/crm/prospects?impersonate_org_id=${impersonateOrgId}&select=${encodeURIComponent(PROSPECT_SELECT)}&limit=${limit}&offset=${offset}`
           )
           const json = await res.json()
-          return (json.data ?? []) as Prospect[]
+          return { data: (json.data ?? []) as Prospect[], count: json.count ?? null }
         })
       } else {
         const supabase = createClient()
         data = await fetchAllProspects(async (offset, limit) => {
           let query = supabase
             .from('prospects')
-            .select(PROSPECT_SELECT)
+            .select(PROSPECT_SELECT, { count: 'exact' })
             .order('created_at', { ascending: false })
             .range(offset, offset + limit - 1)
           if (isAdmin) {
@@ -248,8 +270,8 @@ export function KanbanBoard() {
             else if (filterIds.length > 1) query = query.in('area_id', filterIds)
             else if (user?.area_id) query = query.eq('area_id', user.area_id)
           }
-          const { data: rows } = await query
-          return (rows ?? []) as unknown as Prospect[]
+          const { data: rows, count } = await query
+          return { data: (rows ?? []) as unknown as Prospect[], count: count ?? null }
         })
       }
       setProspects(data)

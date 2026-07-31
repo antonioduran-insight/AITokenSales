@@ -545,13 +545,22 @@ export function ProspectsTable() {
             </tr>
           </thead>
           <tbody>
-            {loading && (
-              <tr>
-                <td colSpan={isAdmin ? 14 : 12} style={{ ...S.td, textAlign: 'center', color: 'var(--crm-text-muted)', padding: 40 }}>
-                  {t('common.loading')}
-                </td>
+            {loading && Array.from({ length: Math.min(pageSize, 25) }).map((_, i) => (
+              // Skeleton rows sized to the requested page size, not a single
+              // "Loading..." row — that one short row was the whole cause of
+              // this page's CLS: real content (up to 25-250 rows) landing on
+              // top of it forced a huge, sudden layout jump every load.
+              // Capped at 25 rows even when pageSize is larger so the
+              // skeleton itself doesn't force a long empty scroll area.
+              <tr key={i}>
+                {isAdmin && <td style={{ ...S.td, width: 40 }} />}
+                {Array.from({ length: isAdmin ? 13 : 11 }).map((_, j) => (
+                  <td key={j} style={S.td}>
+                    <div style={{ height: 12, borderRadius: 4, background: 'var(--crm-surface-raised)', opacity: 0.6 }} />
+                  </td>
+                ))}
               </tr>
-            )}
+            ))}
             {!loading && prospects.length === 0 && (
               <tr>
                 <td colSpan={isAdmin ? 14 : 12} style={{ ...S.td, textAlign: 'center', color: 'var(--crm-text-muted)', padding: 40 }}>
