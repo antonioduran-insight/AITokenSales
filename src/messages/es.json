@@ -721,7 +721,7 @@
     "problemTitle": "La prospección manual no escala entre mercados",
     "problemLead": "Crecer hacia nuevos mercados significa nuevos idiomas, nuevos criterios sobre a quién vale la pena contactar, y ninguna forma de saber si está funcionando.",
     "problem1": "Cada SDR busca en LinkedIn a mano, así que la calidad depende de quién esté buscando ese día.",
-    "problem2": "Los mensajes de prospección se copian y pegan entre mercados, y se nota.",
+    "problem2": "Las plantillas genéricas no convierten — los prospectos notan de inmediato si el mensaje fue realmente escrito para ellos.",
     "problem3": "Sin un pipeline compartido, nadie puede decir qué mercados o mensajes realmente convierten.",
     "productTitle": "Mirá el pipeline, no solo una presentación",
     "productLead": "Este es un sandbox en vivo con datos de ejemplo — tocá las mismas pantallas que usaría tu equipo.",
@@ -758,8 +758,6 @@
     "planPremiumFor": "Para equipos que escalan en varios mercados",
     "planEnterpriseName": "Enterprise",
     "planEnterpriseFor": "Para equipos grandes con regiones dedicadas",
-    "planUltraName": "Ultra",
-    "planUltraFor": "Para equipos sin techo de volumen",
     "planPopular": "Más elegido",
     "planSeats": "Asientos",
     "planLeads": "Leads / mes",
@@ -855,6 +853,7 @@
     "demoChartTempTitle": "Distribución de temperatura",
     "demoStatus_closed": "Cerrado",
     "demoStatus_nurture": "Nutrición",
-    "demoConvNote": "Cada hilo está escrito en el idioma propio del prospecto — no traducido a máquina desde una sola plantilla. Estos cuatro son ejemplos reales, sin editar, en chino tradicional, español, vietnamita e inglés."
+    "demoConvNote": "Cada hilo está escrito en el idioma propio del prospecto — no traducido a máquina desde una sola plantilla. Estos cuatro son ejemplos reales, sin editar, en chino tradicional, español, vietnamita e inglés.",
+    "howStepCta": "Verlo en vivo ↓"
   }
 }

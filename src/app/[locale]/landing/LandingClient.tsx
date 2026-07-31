@@ -6,9 +6,9 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Sun, Moon, Globe, ArrowRight, Check, Target, Languages,
   Gauge, Users2, ShieldCheck, Zap, Loader2,
-  UserCog, Upload, Archive, ClipboardList, MapPin, Settings2,
+  UserCog, Upload, Archive, ClipboardList, MapPin, Settings2, MonitorPlay,
 } from 'lucide-react'
-import { ProductDemo } from './ProductDemo'
+import { ProductDemo, type Screen } from './ProductDemo'
 import './theme.css'
 
 const LOCALES = [
@@ -49,6 +49,17 @@ export function LandingClient() {
     router.push(`/${code}${rest ? `/${rest}` : ''}`)
   }
 
+  // Which screen the embedded product demo is on. Lifted up here (rather
+  // than kept as ProductDemo's own internal state) so "How it works" can
+  // drive it: clicking a step jumps the live demo to the screen that step
+  // is actually describing, instead of a static GIF that goes stale the
+  // moment the UI changes.
+  const [demoScreen, setDemoScreen] = useState<Screen>('kanban')
+  function jumpToDemo(screen: Screen) {
+    setDemoScreen(screen)
+    document.getElementById('product')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
     <div className="landing-root" data-landing-theme={theme}>
       <Nav
@@ -57,10 +68,10 @@ export function LandingClient() {
       />
       <Hero t={t} />
       <Problem t={t} />
-      <DemoSection t={t} />
+      <DemoSection t={t} screen={demoScreen} onScreenChange={setDemoScreen} />
       <Differentiators t={t} />
       <AlsoIncluded t={t} />
-      <HowItWorks t={t} />
+      <HowItWorks t={t} onStepClick={jumpToDemo} />
       <Plans t={t} />
       <DemoForm t={t} locale={locale} />
       <Footer t={t} />
@@ -205,14 +216,18 @@ function Problem({ t }: { t: T }) {
 
 /* ── Interactive demo ────────────────────────────────────────────────── */
 
-function DemoSection({ t }: { t: T }) {
+function DemoSection({
+  t, screen, onScreenChange,
+}: {
+  t: T; screen: Screen; onScreenChange: (s: Screen) => void
+}) {
   return (
     <Section id="product" soft>
       <div style={{ maxWidth: 700, margin: '0 auto 30px', textAlign: 'center' }}>
         <SectionTitle>{t('productTitle')}</SectionTitle>
         <p style={lead}>{t('productLead')}</p>
       </div>
-      <ProductDemo />
+      <ProductDemo screen={screen} onScreenChange={onScreenChange} />
       <p style={{ textAlign: 'center', marginTop: 14, fontSize: 12, color: 'var(--ld-text-muted)' }}>
         {t('productNote')}
       </p>
@@ -299,7 +314,14 @@ function AlsoIncluded({ t }: { t: T }) {
 
 /* ── How it works ────────────────────────────────────────────────────── */
 
-function HowItWorks({ t }: { t: T }) {
+// Each step maps to the screen of the live demo above that actually shows
+// it — clicking a step scrolls up and switches the demo there, instead of a
+// static GIF that would need re-recording every time the product changes.
+const STEP_SCREEN: Record<string, Screen> = {
+  step1: 'run', step2: 'leads', step3: 'conversations', step4: 'kanban',
+}
+
+function HowItWorks({ t, onStepClick }: { t: T; onStepClick: (s: Screen) => void }) {
   const steps = ['step1', 'step2', 'step3', 'step4'] as const
   return (
     <Section soft>
@@ -312,17 +334,33 @@ function HowItWorks({ t }: { t: T }) {
         gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px, 100%), 1fr))',
       }}>
         {steps.map((k, i) => (
-          <div key={k} style={{ ...card, position: 'relative' }}>
+          <button
+            key={k}
+            onClick={() => onStepClick(STEP_SCREEN[k])}
+            style={{
+              ...card, position: 'relative', textAlign: 'left', cursor: 'pointer',
+              font: 'inherit', color: 'inherit', width: '100%', display: 'block', margin: 0,
+              transition: 'border-color .15s, transform .15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--ld-accent)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--ld-border)'; e.currentTarget.style.transform = 'none' }}
+          >
             <span style={{
               display: 'inline-flex', width: 26, height: 26, borderRadius: '50%',
               alignItems: 'center', justifyContent: 'center', marginBottom: 11,
               background: 'var(--ld-accent)', color: '#FFF', fontSize: 12, fontWeight: 800,
             }}>{i + 1}</span>
             <h3 style={{ margin: '0 0 6px', fontSize: 14.5, fontWeight: 700 }}>{t(`${k}Title`)}</h3>
-            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: 'var(--ld-text-soft)' }}>
+            <p style={{ margin: '0 0 12px', fontSize: 13, lineHeight: 1.6, color: 'var(--ld-text-soft)' }}>
               {t(`${k}Body`)}
             </p>
-          </div>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5,
+              fontWeight: 700, color: 'var(--ld-accent)',
+            }}>
+              <MonitorPlay size={13} /> {t('howStepCta')}
+            </span>
+          </button>
         ))}
       </div>
     </Section>
@@ -340,7 +378,6 @@ function Plans({ t }: { t: T }) {
     { k: 'planBasic', seats: 3, leads: '1,000' },
     { k: 'planPremium', seats: 7, leads: '3,000', featured: true },
     { k: 'planEnterprise', seats: 15, leads: '10,000' },
-    { k: 'planUltra', seats: '∞', leads: '∞' },
   ] as const
 
   return (

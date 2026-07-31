@@ -29,7 +29,7 @@ import {
  * that does not exist.
  */
 
-type Screen = 'kanban' | 'leads' | 'conversations' | 'run' | 'bridge' | 'analytics'
+export type Screen = 'kanban' | 'leads' | 'conversations' | 'run' | 'bridge' | 'analytics'
 
 type Demo = {
   id: string
@@ -145,9 +145,20 @@ const BRIDGE_COMPANIES: Array<{ company: string; contacts: BridgeContact[] }> = 
   },
 ]
 
-export function ProductDemo() {
+export function ProductDemo({
+  screen: controlledScreen, onScreenChange,
+}: {
+  // Both optional: the "How it works" steps below the demo drive it from
+  // outside (clicking "Personalized messages" jumps straight to the
+  // Messages screen), but the component still works standalone with no
+  // props — same fallback-to-internal-state pattern as a controlled <input>.
+  screen?: Screen
+  onScreenChange?: (s: Screen) => void
+} = {}) {
   const t = useTranslations('landing')
-  const [screen, setScreen] = useState<Screen>('kanban')
+  const [internalScreen, setInternalScreen] = useState<Screen>('kanban')
+  const screen = controlledScreen ?? internalScreen
+  const setScreen = onScreenChange ?? setInternalScreen
 
   // ── New Run simulation ────────────────────────────────────────────────
   const [picked, setPicked] = useState<string[]>(['Taiwan', 'Japan', 'Singapore'])

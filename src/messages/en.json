@@ -721,7 +721,7 @@
     "problemTitle": "Manual outreach doesn't scale across markets",
     "problemLead": "Growing into new regions means new languages, new judgment calls on who's worth reaching, and no way to see if it's working.",
     "problem1": "Every SDR searches LinkedIn by hand, so quality depends on who's doing the searching that day.",
-    "problem2": "Outreach messages get copy-pasted across markets, and prospects can tell.",
+    "problem2": "Generic templates don't convert — prospects can tell in one line whether a message was actually written for them.",
     "problem3": "Without a shared pipeline, nobody can say which markets or messages are actually converting.",
     "productTitle": "See the pipeline, not just a pitch",
     "productLead": "This is a live sandbox with sample data — click around the same screens your team would use.",
@@ -758,8 +758,6 @@
     "planPremiumFor": "For teams scaling across multiple markets",
     "planEnterpriseName": "Enterprise",
     "planEnterpriseFor": "For larger teams with dedicated regions",
-    "planUltraName": "Ultra",
-    "planUltraFor": "For teams with no ceiling on volume",
     "planPopular": "Most popular",
     "planSeats": "Seats",
     "planLeads": "Leads / month",
@@ -855,6 +853,7 @@
     "demoChartTempTitle": "Temperature breakdown",
     "demoStatus_closed": "Closed",
     "demoStatus_nurture": "Nurture",
-    "demoConvNote": "Each thread is written in the prospect's own language — not machine-translated from a single template. These four are real, unedited examples in Traditional Chinese, Spanish, Vietnamese, and English."
+    "demoConvNote": "Each thread is written in the prospect's own language — not machine-translated from a single template. These four are real, unedited examples in Traditional Chinese, Spanish, Vietnamese, and English.",
+    "howStepCta": "See it live ↓"
   }
 }

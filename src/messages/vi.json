@@ -721,7 +721,7 @@
     "problemTitle": "Tiếp cận thủ công không thể mở rộng đa thị trường",
     "problemLead": "Mở rộng sang thị trường mới đồng nghĩa với ngôn ngữ mới, tiêu chí mới để đánh giá ai đáng tiếp cận, và không có cách nào biết liệu nó có hiệu quả hay không.",
     "problem1": "Mỗi SDR tự tìm kiếm trên LinkedIn bằng tay, nên chất lượng phụ thuộc vào người tìm hôm đó.",
-    "problem2": "Tin nhắn tiếp cận bị copy-paste giữa các thị trường, và khách hàng nhận ra ngay.",
+    "problem2": "Mẫu tin nhắn chung không hiệu quả — khách hàng tiềm năng nhận ra ngay liệu tin nhắn có thực sự được viết riêng cho họ hay không.",
     "problem3": "Không có pipeline chung, không ai biết thị trường hay tin nhắn nào thực sự chuyển đổi.",
     "productTitle": "Xem pipeline thật, không chỉ là bài thuyết trình",
     "productLead": "Đây là môi trường thử nghiệm trực tiếp với dữ liệu mẫu — hãy thử các màn hình mà đội của bạn sẽ dùng.",
@@ -758,8 +758,6 @@
     "planPremiumFor": "Cho đội đang mở rộng trên nhiều thị trường",
     "planEnterpriseName": "Enterprise",
     "planEnterpriseFor": "Cho đội lớn với các khu vực chuyên trách",
-    "planUltraName": "Ultra",
-    "planUltraFor": "Cho đội không giới hạn khối lượng",
     "planPopular": "Phổ biến nhất",
     "planSeats": "Tài khoản",
     "planLeads": "Khách hàng tiềm năng / tháng",
@@ -855,6 +853,7 @@
     "demoChartTempTitle": "Phân bổ nhiệt độ",
     "demoStatus_closed": "Đã chốt",
     "demoStatus_nurture": "Nuôi dưỡng",
-    "demoConvNote": "Mỗi cuộc hội thoại được viết bằng chính ngôn ngữ của khách hàng tiềm năng — không phải dịch máy từ một mẫu duy nhất. Bốn ví dụ dưới đây là thật, chưa chỉnh sửa, bằng tiếng Trung phồn thể, tiếng Tây Ban Nha, tiếng Việt và tiếng Anh."
+    "demoConvNote": "Mỗi cuộc hội thoại được viết bằng chính ngôn ngữ của khách hàng tiềm năng — không phải dịch máy từ một mẫu duy nhất. Bốn ví dụ dưới đây là thật, chưa chỉnh sửa, bằng tiếng Trung phồn thể, tiếng Tây Ban Nha, tiếng Việt và tiếng Anh.",
+    "howStepCta": "Xem trực tiếp ↓"
   }
 }

@@ -721,7 +721,7 @@
     "problemTitle": "人工開發無法跨市場擴展",
     "problemLead": "拓展新市場代表新的語言、判斷誰值得聯繫的新標準，還有完全看不出成效的黑箱。",
     "problem1": "每位 SDR 都靠自己手動搜尋 LinkedIn，品質全看當天是誰在找。",
-    "problem2": "開發訊息在不同市場之間複製貼上，對方一眼就看得出來。",
+    "problem2": "通用範本沒有效果——潛在客戶一眼就能看出這則訊息是不是真的為他們而寫。",
     "problem3": "沒有共用的管線，沒人說得出哪個市場、哪種訊息真的有效。",
     "productTitle": "看管線運作，而不只是聽簡報",
     "productLead": "這是一個載入範例資料的即時沙盒——你可以直接點選團隊會用到的畫面。",
@@ -758,8 +758,6 @@
     "planPremiumFor": "適合正在跨多個市場擴張的團隊",
     "planEnterpriseName": "Enterprise",
     "planEnterpriseFor": "適合擁有專責區域的大型團隊",
-    "planUltraName": "Ultra",
-    "planUltraFor": "適合不設量能上限的團隊",
     "planPopular": "最受歡迎",
     "planSeats": "席位數",
     "planLeads": "每月潛在客戶",
@@ -855,6 +853,7 @@
     "demoChartTempTitle": "溫度分布",
     "demoStatus_closed": "已成交",
     "demoStatus_nurture": "培育中",
-    "demoConvNote": "每一則對話都是用該潛在客戶自己的語言撰寫——不是從單一範本機器翻譯出來的。以下四個是繁體中文、西班牙文、越南文與英文的真實範例，未經編輯。"
+    "demoConvNote": "每一則對話都是用該潛在客戶自己的語言撰寫——不是從單一範本機器翻譯出來的。以下四個是繁體中文、西班牙文、越南文與英文的真實範例，未經編輯。",
+    "howStepCta": "立即查看 ↓"
   }
 }
