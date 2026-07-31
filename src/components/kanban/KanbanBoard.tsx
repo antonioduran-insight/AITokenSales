@@ -17,6 +17,7 @@ import { Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Prospect, OutreachStatus, Area } from '@/lib/types'
 import { OUTREACH_STATUSES } from '@/lib/types'
+import { getCachedEntry, setCached } from '@/lib/utils/pageCache'
 
 const PROSPECT_SELECT = '*, area:areas(*), assigned_user:users!assigned_to(id, full_name, email, role, area_id, is_active, created_at)'
 
@@ -202,8 +203,23 @@ export function KanbanBoard() {
         setStageMap(map)
       }
 
-      // Phase 2 — prospects (uses resolved SDR areas, no extra round-trip)
+      // Phase 2 — prospects (uses resolved SDR areas, no extra round-trip).
+      // Cache key mirrors fetchProspects' below so a plain page load and a
+      // "clear the area filter" both land on the same entry when they mean
+      // the same query.
+      const prospectsCacheKey = [
+        'kanban', isImpersonating ? impersonateOrgId : user?.organization_id,
+        isAdmin ? 'admin' : 'sdr', selectedAreaId ?? '',
+      ].join('|')
       try {
+        const cached = getCachedEntry<Prospect[]>(prospectsCacheKey)
+        if (cached) {
+          // Already have this org's board from earlier this session — show it
+          // now instead of an empty board while the network round trip runs.
+          setProspects(cached.data)
+          if (cached.isFresh) return // recent enough to skip the round trip
+        }
+
         let data: Prospect[] = []
         if (isImpersonating && impersonateOrgId) {
           data = await fetchAllProspects(async (offset, limit) => {
@@ -231,6 +247,7 @@ export function KanbanBoard() {
           })
         }
         setProspects(data)
+        setCached(prospectsCacheKey, data)
       } finally {
         setLoading(false)
       }
@@ -240,10 +257,30 @@ export function KanbanBoard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, isAdmin, isImpersonating, impersonateOrgId])
 
-  // fetchProspects used for manual refresh and area filter changes
-  const fetchProspects = useCallback(async () => {
+  // fetchProspects used for manual refresh and area filter changes.
+  // `force` skips the cache entirely — a click on the refresh button, or a
+  // refetch right after creating a prospect, must always hit the network,
+  // never silently no-op because a fresh cache entry happened to exist.
+  const fetchProspects = useCallback(async (force = false) => {
     if (!isAdmin && !isSdr && !isImpersonating) return
-    setLoading(true)
+
+    const cacheKey = [
+      'kanban', isImpersonating ? impersonateOrgId : user?.organization_id,
+      isAdmin ? 'admin' : 'sdr', selectedAreaId ?? '',
+    ].join('|')
+    if (!force) {
+      const cached = getCachedEntry<Prospect[]>(cacheKey)
+      if (cached) {
+        setProspects(cached.data)
+        setLoading(false)
+        if (cached.isFresh) return
+      } else {
+        setLoading(true)
+      }
+    } else {
+      setLoading(true)
+    }
+
     try {
       let data: Prospect[] = []
       if (isImpersonating && impersonateOrgId) {
@@ -275,6 +312,7 @@ export function KanbanBoard() {
         })
       }
       setProspects(data)
+      setCached(cacheKey, data)
     } finally {
       setLoading(false)
     }
@@ -285,6 +323,21 @@ export function KanbanBoard() {
     if (isInitialMount.current) { isInitialMount.current = false; return }
     fetchProspects().catch(console.error)
   }, [selectedAreaId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Every drag/status-change/edit below patches `prospects` state optimistically
+  // rather than re-fetching — cheap and instant, but it means the cache entry
+  // for this exact view is left holding the pre-edit row. Without mirroring the
+  // same patch into the cache, leaving the board and coming back inside the
+  // freshness window would show that one card revert briefly. Same cache key
+  // formula as fetchProspects/init above.
+  function patchCachedProspect(id: string, patch: (p: Prospect) => Prospect) {
+    const cacheKey = [
+      'kanban', isImpersonating ? impersonateOrgId : user?.organization_id,
+      isAdmin ? 'admin' : 'sdr', selectedAreaId ?? '',
+    ].join('|')
+    const cached = getCachedEntry<Prospect[]>(cacheKey)
+    if (cached) setCached(cacheKey, cached.data.map(p => p.id === id ? patch(p) : p))
+  }
 
   // Chat counts for closed prospects — drives the "Missing conversation" badge.
   const closedIds = prospects.filter(p => p.outreach_status === 'closed').map(p => p.id).sort().join(',')
@@ -317,6 +370,7 @@ export function KanbanBoard() {
     if (isReadOnly) return false
 
     setProspects(prev => prev.map(p => p.id === prospect.id ? { ...p, outreach_status: newStatus } : p))
+    patchCachedProspect(prospect.id, p => ({ ...p, outreach_status: newStatus }))
 
     const supabase = createClient()
     const { error } = await supabase
@@ -326,6 +380,7 @@ export function KanbanBoard() {
 
     if (error) {
       setProspects(prev => prev.map(p => p.id === prospect.id ? { ...p, outreach_status: prevStatus } : p))
+      patchCachedProspect(prospect.id, p => ({ ...p, outreach_status: prevStatus }))
       return false
     }
 
@@ -426,12 +481,13 @@ export function KanbanBoard() {
 
   function handleProspectUpdated(updated: Prospect) {
     setProspects(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p))
+    patchCachedProspect(updated.id, p => ({ ...p, ...updated }))
     setActiveProspect(updated)
   }
 
   function handleProspectCreated() {
     setFormOpen(false)
-    fetchProspects()
+    fetchProspects(true)
   }
 
   const draggingProspect = draggingId ? prospects.find(p => p.id === draggingId) : null
@@ -524,7 +580,7 @@ export function KanbanBoard() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
-            onClick={fetchProspects}
+            onClick={() => fetchProspects(true)}
             disabled={loading}
             style={{
               padding: '6px 8px', borderRadius: 6, border: '1px solid var(--crm-border)',

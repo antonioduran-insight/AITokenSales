@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/contexts/UserContext'
@@ -10,6 +10,7 @@ import { PremiumFeature } from '@/components/ui/PremiumFeature'
 import { format, startOfWeek, endOfWeek } from 'date-fns'
 import type { OutreachStatus, AreaName } from '@/lib/types'
 import { OUTREACH_STATUSES } from '@/lib/types'
+import { getCachedEntry, setCached } from '@/lib/utils/pageCache'
 
 interface ProspectRow {
   id: string
@@ -140,9 +141,15 @@ export function StatsDashboard() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  // Only "Try again" after an error bumps reloadKey — that's the one case
+  // that must force a real fetch. Every other reason this effect re-runs
+  // (org/impersonation context settling in) should still check the cache.
+  const lastReloadKey = useRef(0)
 
   useEffect(() => {
     if (!user && !isImpersonating) return
+    const forceRefresh = reloadKey !== lastReloadKey.current
+    lastReloadKey.current = reloadKey
 
     // Impersonation path: /api/crm/prospects clamps `limit` to 2000 server-side
     // (so the old `limit: '5000'` was truncating too), but it does accept
@@ -215,14 +222,29 @@ export function StatsDashboard() {
       })
     }
 
+    const cacheKey = ['stats', isImpersonating ? impersonateOrgId : user?.id, isAdmin ? 'admin' : 'sdr'].join('|')
+
     async function load() {
-      setLoading(true)
+      if (!forceRefresh) {
+        const cached = getCachedEntry<ProspectRow[]>(cacheKey)
+        if (cached) {
+          setProspects(cached.data)
+          setLoadError(null)
+          setLoading(false)
+          if (cached.isFresh) return // recent enough to skip the round trip
+        } else {
+          setLoading(true)
+        }
+      } else {
+        setLoading(true)
+      }
       setLoadError(null)
       try {
         const rows = isImpersonating && impersonateOrgId
           ? await fetchImpersonated(impersonateOrgId)
           : await fetchDirect()
         setProspects(rows)
+        setCached(cacheKey, rows)
       } catch (e) {
         setProspects([])
         setLoadError(errorMessage(e))

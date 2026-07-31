@@ -15,6 +15,7 @@ import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, Area, User, LeadTemperature } from '@/lib/types'
 import { OUTREACH_STATUSES, LEAD_TEMPERATURES } from '@/lib/types'
 import { useComboLabels } from '@/lib/hooks/useComboLabels'
+import { getCachedEntry, setCached } from '@/lib/utils/pageCache'
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250]
 
@@ -178,9 +179,38 @@ export function ProspectsTable() {
   // request in flight when it resolves, otherwise it's discarded.
   const fetchSeq = useRef(0)
 
-  const fetchProspects = useCallback(async () => {
+  // `force` skips the cache entirely — the refresh button must always hit
+  // the network, never silently no-op because a fresh cache entry happened
+  // to exist from loading the page moments ago.
+  const fetchProspects = useCallback(async (force = false) => {
     const seq = ++fetchSeq.current
-    setLoading(true)
+
+    // Cache key covers every input that changes what this query returns.
+    // A hit means this exact view (org, page, filters) was already loaded
+    // this session — render it immediately instead of a blank/skeleton
+    // table, same as reopening a browser tab you never closed.
+    const cacheKey = [
+      'prospects', isImpersonating ? impersonateOrgId : user?.organization_id,
+      page, pageSize, search, filterArea, filterSdr, filterStatus, filterTemp,
+    ].join('|')
+    if (!force) {
+      const cached = getCachedEntry<{ prospects: Prospect[]; total: number }>(cacheKey)
+      if (cached) {
+        setProspects(cached.data.prospects)
+        setTotal(cached.data.total)
+        setLoading(false)
+        // Recent enough to trust outright — skip the round trip entirely.
+        // Otherwise fall through and revalidate in the background: `loading`
+        // deliberately stays false below so the table that's already on
+        // screen doesn't flash back to a skeleton while this refreshes.
+        if (cached.isFresh) return
+      } else {
+        setLoading(true)
+      }
+    } else {
+      setLoading(true)
+    }
+
     try {
       if (isImpersonating && impersonateOrgId) {
         const params = new URLSearchParams({
@@ -210,7 +240,9 @@ export function ProspectsTable() {
 
         setTotal(rows.length)
         const start = page * pageSize
-        setProspects(rows.slice(start, start + pageSize))
+        const pageRows = rows.slice(start, start + pageSize)
+        setProspects(pageRows)
+        setCached(cacheKey, { prospects: pageRows, total: rows.length })
       } else {
         const supabase = createClient()
         let query = supabase
@@ -240,13 +272,15 @@ export function ProspectsTable() {
 
         const { data, count } = await query
         if (seq !== fetchSeq.current) return // superseded by a newer request
-        if (data) setProspects(data as unknown as Prospect[])
+        const rows = (data ?? []) as unknown as Prospect[]
+        if (data) setProspects(rows)
         if (count !== null) setTotal(count)
+        setCached(cacheKey, { prospects: rows, total: count ?? 0 })
       }
     } finally {
       if (seq === fetchSeq.current) setLoading(false)
     }
-  }, [page, pageSize, search, filterArea, filterSdr, filterStatus, filterTemp, isAdmin, user?.area_id, sdrAreaIds, isImpersonating, impersonateOrgId])
+  }, [page, pageSize, search, filterArea, filterSdr, filterStatus, filterTemp, isAdmin, user?.area_id, user?.organization_id, sdrAreaIds, isImpersonating, impersonateOrgId])
 
   useEffect(() => {
     // Wait for the SDR's areas to resolve before the first fetch — see the
@@ -330,7 +364,7 @@ export function ProspectsTable() {
       setSdrReassignLimit('')
       setReassignToast(`${data.reassigned} lead${data.reassigned !== 1 ? 's' : ''} reassigned to ${data.sdr_name}`)
       setTimeout(() => setReassignToast(null), 3500)
-      fetchProspects()
+      fetchProspects(true)
     } finally {
       setSdrReassigning(false)
     }
@@ -374,7 +408,7 @@ export function ProspectsTable() {
       setSelected(new Set())
       setReassignToast(`${data.reassigned} lead${data.reassigned !== 1 ? 's' : ''} reassigned to ${data.sdr_name}`)
       setTimeout(() => setReassignToast(null), 3500)
-      fetchProspects()
+      fetchProspects(true)
     } finally {
       setSelectedReassigning(false)
     }
@@ -399,7 +433,7 @@ export function ProspectsTable() {
       }
       setSelected(new Set())
       setConfirmDelete(false)
-      fetchProspects()
+      fetchProspects(true)
     } catch (e) {
       setDeleteError(e instanceof Error ? e.message : 'Error de red')
     } finally {
@@ -505,7 +539,7 @@ export function ProspectsTable() {
             </button>
           )}
 
-          <button onClick={fetchProspects} disabled={loading} style={{ padding: '7px 8px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          <button onClick={() => fetchProspects(true)} disabled={loading} style={{ padding: '7px 8px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
             <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
           </button>
 
@@ -697,6 +731,21 @@ export function ProspectsTable() {
           onUpdated={updated => {
             setProspects(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p))
             setDrawerProspect(updated)
+            // This is an optimistic local patch, not a refetch — mirror it
+            // into the cache too, or leaving this page and coming back
+            // inside the freshness window would briefly show the
+            // pre-edit row again.
+            const cacheKey = [
+              'prospects', isImpersonating ? impersonateOrgId : user?.organization_id,
+              page, pageSize, search, filterArea, filterSdr, filterStatus, filterTemp,
+            ].join('|')
+            const cached = getCachedEntry<{ prospects: Prospect[]; total: number }>(cacheKey)
+            if (cached) {
+              setCached(cacheKey, {
+                ...cached.data,
+                prospects: cached.data.prospects.map(p => p.id === updated.id ? { ...p, ...updated } : p),
+              })
+            }
           }}
         />
       )}
