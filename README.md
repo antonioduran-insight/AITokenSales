@@ -9,14 +9,14 @@ Multi-tenant CRM platform for managing LinkedIn outreach campaigns across geogra
 | What | Link |
 |---|---|
 | **Production App** | https://ai-token-sales.vercel.app |
-| **Landing Page** | https://ai-token-sales.vercel.app/landing |
+| **Landing Page** | https://ai-token-sales.vercel.app/en/landing (also /zh, /es, /vi) |
 | **GitHub Repository** | https://github.com/antonioduran-insight/AITokenSales |
 | **Vercel Dashboard** | https://vercel.com (login with org account) |
 | **Supabase Dashboard** | https://supabase.com/dashboard/project/cyhfwixemswyusvcbmrn |
 | **Scraper Backend** | https://pwa-aitokensales-production.up.railway.app |
 | **Railway Dashboard** | https://railway.app (scraper backend deployment) |
 
-> **For Antonio (Project Manager):** Production deploys automatically when code is pushed to `main`. The landing page at `/landing` is public — no login required. The CRM at the root requires authentication.
+> **For Antonio (Project Manager):** Production deploys automatically when code is pushed to `main`. The landing page at `/{locale}/landing` is public — no login required, available in all 4 languages. The CRM at the root requires authentication.
 
 ---
 
@@ -214,7 +214,7 @@ Plan limits apply immediately on selection. Seats and leads stored as `int4`; Ul
 - Auth handled by Supabase Auth via cookie-based SSR sessions
 - `src/middleware.ts` validates every request server-side and sets `user_role` / `user_org_id` cookies
 - Unauthenticated users are redirected to `/{locale}/login`
-- `/landing` is exempt from auth (public marketing page)
+- `/{locale}/landing` is exempt from auth (public marketing page, translated, light/dark theme toggle)
 - A `public.users` table mirrors `auth.users` with `role`, `area_id`, `organization_id`, and `is_active`
 
 ### Three Supabase Client Types
@@ -299,7 +299,7 @@ VALUES ('<auth-user-uuid>', 'Admin Name', 'admin@aitokenking.com', 'admin_global
 ```bash
 npm run dev
 # CRM:     http://localhost:3000
-# Landing: http://localhost:3000/landing
+# Landing: http://localhost:3000/en/landing (or /zh, /es, /vi)
 ```
 
 ---
@@ -383,8 +383,9 @@ scraper_leads        -- Raw scraped leads before import into prospects
 ```
 src/
 ├── app/
-│   ├── landing/                # Public marketing page + demo modal
+│   ├── api/demo-request/       # Public endpoint behind the landing's demo form
 │   ├── [locale]/
+│   │   ├── landing/            # Public marketing page + interactive product demo (translated, light/dark)
 │   │   ├── (scraper)/          # Scraper module (dashboard, run, history, export)
 │   │   ├── bridge/             # Bridge partnerships (add-on gated)
 │   │   ├── admin/              # Admin-only: import, user management

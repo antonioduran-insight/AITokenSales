@@ -1,0 +1,92 @@
+/* ===========================================================================
+   Landing theme tokens
+   ===========================================================================
+   Scoped to `.landing-root` on purpose.
+
+   The CRM is dark-only by design: its light theme and toggle were deliberately
+   removed, and CLAUDE.md is explicit that `data-theme`, `crm_theme` and
+   light-mode `--crm-*` variables must not come back. A public marketing page
+   does want both modes, so it gets its OWN token set under its own prefix and
+   its own attribute. Nothing here can leak into the app: no `--crm-*` name is
+   redefined, and no rule targets :root or [data-theme].
+   =========================================================================== */
+
+.landing-root {
+  /* Dark is the default — it matches the product and is what most visitors
+     will see first. */
+  --ld-bg: #0A0A0F;
+  --ld-bg-soft: #101018;
+  --ld-surface: #13131A;
+  --ld-surface-raised: #1C1C27;
+  --ld-border: #2A2A3A;
+  --ld-text: #F4F4F8;
+  --ld-text-soft: #A8A8BE;
+  --ld-text-muted: #6E6E88;
+  --ld-accent: #6C63FF;
+  --ld-accent-soft: #8B84FF;
+  --ld-accent-wash: rgba(108, 99, 255, 0.12);
+  --ld-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --ld-glow: radial-gradient(60% 60% at 50% 0%, rgba(108, 99, 255, 0.22), transparent 70%);
+
+  background: var(--ld-bg);
+  color: var(--ld-text);
+  min-height: 100vh;
+  transition: background-color .25s ease, color .25s ease;
+}
+
+.landing-root[data-landing-theme='light'] {
+  --ld-bg: #FFFFFF;
+  --ld-bg-soft: #F6F6FB;
+  --ld-surface: #FFFFFF;
+  --ld-surface-raised: #F2F2F8;
+  --ld-border: #E2E2EC;
+  --ld-text: #12121A;
+  --ld-text-soft: #4A4A60;
+  --ld-text-muted: #7C7C94;
+  --ld-accent: #5A50F0;
+  --ld-accent-soft: #4840D8;
+  --ld-accent-wash: rgba(90, 80, 240, 0.08);
+  --ld-shadow: 0 24px 60px rgba(24, 24, 48, 0.10);
+  --ld-glow: radial-gradient(60% 60% at 50% 0%, rgba(90, 80, 240, 0.10), transparent 70%);
+}
+
+/* The embedded product mockup stays dark in BOTH modes.
+   It stands in for a screenshot, and the product it depicts has no light
+   theme — rendering it light would advertise an interface that does not
+   exist. These are fixed values, not tokens, so the light theme cannot
+   reach them. */
+.landing-root .ld-app {
+  --ld-app-bg: #0A0A0F;
+  --ld-app-surface: #13131A;
+  --ld-app-raised: #1C1C27;
+  --ld-app-border: #2A2A3A;
+  --ld-app-text: #F4F4F8;
+  --ld-app-soft: #8B8BA0;
+  --ld-app-muted: #52526A;
+  --ld-app-accent: #6C63FF;
+  color: var(--ld-app-text);
+  background: var(--ld-app-bg);
+}
+
+@keyframes ld-fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes ld-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .45; }
+}
+@keyframes ld-spin { to { transform: rotate(360deg); } }
+
+.ld-in { animation: ld-fade-up .5s ease both; }
+
+/* Respect the OS setting for people who ask not to see motion. */
+@media (prefers-reduced-motion: reduce) {
+  .landing-root *,
+  .landing-root *::before,
+  .landing-root *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}

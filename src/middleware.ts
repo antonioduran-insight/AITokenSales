@@ -4,8 +4,13 @@ import { createServerClient } from '@supabase/ssr'
 
 const locales = ['zh', 'en', 'vi', 'es']
 const defaultLocale = 'zh'
-const publicPages = ['/login']
-const publicPaths = ['/landing']
+// Locale-aware and unauthenticated: /zh/landing, /en/landing, ...
+// The landing moved under [locale] so it can be translated like everything
+// else; while it lived at a bare /landing it could only ever be English.
+const publicPages = ['/login', '/landing']
+// Fully public and locale-free. Empty now, kept because the check below is
+// still the right shape for anything that must bypass the locale prefix.
+const publicPaths: string[] = []
 
 const intlMiddleware = createMiddleware({
   locales,

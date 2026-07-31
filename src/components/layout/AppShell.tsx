@@ -64,10 +64,14 @@ function ImpersonateBanner() {
 export function AppShell({ children, initialUser, orgPlan }: Props) {
   const pathname = usePathname()
   const isLoginPage = /\/login$/.test(pathname)
+  // The public landing must not inherit the CRM chrome — no sidebar, no user
+  // menu, no org context. Same escape hatch /login already uses.
+  const isLandingPage = /\/landing$/.test(pathname)
   const isGlobalAdminPage = pathname.includes('/global-admin')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   if (isLoginPage) return <>{children}</>
+  if (isLandingPage) return <>{children}</>
   if (isGlobalAdminPage) return <>{children}</>
 
   return (
