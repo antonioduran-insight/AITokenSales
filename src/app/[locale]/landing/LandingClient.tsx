@@ -6,9 +6,9 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Sun, Moon, Globe, ArrowRight, Check, Target, Languages,
   Gauge, Users2, ShieldCheck, Zap, Loader2,
-  UserCog, Upload, Archive, ClipboardList, MapPin, Settings2, MonitorPlay,
+  UserCog, Upload, Archive, ClipboardList, MapPin, Settings2,
 } from 'lucide-react'
-import { ProductDemo, type Screen } from './ProductDemo'
+import { ProductDemo, ProductDemoContent, type Screen } from './ProductDemo'
 import './theme.css'
 
 const LOCALES = [
@@ -49,17 +49,6 @@ export function LandingClient() {
     router.push(`/${code}${rest ? `/${rest}` : ''}`)
   }
 
-  // Which screen the embedded product demo is on. Lifted up here (rather
-  // than kept as ProductDemo's own internal state) so "How it works" can
-  // drive it: clicking a step jumps the live demo to the screen that step
-  // is actually describing, instead of a static GIF that goes stale the
-  // moment the UI changes.
-  const [demoScreen, setDemoScreen] = useState<Screen>('kanban')
-  function jumpToDemo(screen: Screen) {
-    setDemoScreen(screen)
-    document.getElementById('product')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
   return (
     <div className="landing-root" data-landing-theme={theme}>
       <Nav
@@ -68,10 +57,10 @@ export function LandingClient() {
       />
       <Hero t={t} />
       <Problem t={t} />
-      <DemoSection t={t} screen={demoScreen} onScreenChange={setDemoScreen} />
+      <DemoSection t={t} />
       <Differentiators t={t} />
       <AlsoIncluded t={t} />
-      <HowItWorks t={t} onStepClick={jumpToDemo} />
+      <HowItWorks t={t} />
       <Plans t={t} />
       <DemoForm t={t} locale={locale} />
       <Footer t={t} />
@@ -97,10 +86,10 @@ function Nav({
       background: 'color-mix(in srgb, var(--ld-bg) 82%, transparent)',
       borderBottom: '1px solid var(--ld-border)',
     }}>
-      <div style={{ ...wrap, display: 'flex', alignItems: 'center', gap: 16, height: 62 }}>
+      <div className="ld-nav-inner" style={{ ...wrap, display: 'flex', alignItems: 'center', gap: 16, height: 62 }}>
         <span style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.4px', flexShrink: 0 }}>
           {t('brand')}
-          <span style={{
+          <span className="ld-nav-tag" style={{
             marginLeft: 7, fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
             background: 'var(--ld-accent-wash)', color: 'var(--ld-accent)',
             verticalAlign: 'middle', letterSpacing: '.04em',
@@ -216,18 +205,14 @@ function Problem({ t }: { t: T }) {
 
 /* ── Interactive demo ────────────────────────────────────────────────── */
 
-function DemoSection({
-  t, screen, onScreenChange,
-}: {
-  t: T; screen: Screen; onScreenChange: (s: Screen) => void
-}) {
+function DemoSection({ t }: { t: T }) {
   return (
     <Section id="product" soft>
       <div style={{ maxWidth: 700, margin: '0 auto 30px', textAlign: 'center' }}>
         <SectionTitle>{t('productTitle')}</SectionTitle>
         <p style={lead}>{t('productLead')}</p>
       </div>
-      <ProductDemo screen={screen} onScreenChange={onScreenChange} />
+      <ProductDemo />
       <p style={{ textAlign: 'center', marginTop: 14, fontSize: 12, color: 'var(--ld-text-muted)' }}>
         {t('productNote')}
       </p>
@@ -314,54 +299,81 @@ function AlsoIncluded({ t }: { t: T }) {
 
 /* ── How it works ────────────────────────────────────────────────────── */
 
-// Each step maps to the screen of the live demo above that actually shows
-// it — clicking a step scrolls up and switches the demo there, instead of a
-// static GIF that would need re-recording every time the product changes.
+// Which live-demo screen actually shows each step. Reusing the real,
+// interactive ProductDemoContent here — instead of a screenshot or GIF —
+// means this panel can never go stale: it's the same component and the same
+// sample data as the full demo above, just without the sidebar around it.
 const STEP_SCREEN: Record<string, Screen> = {
   step1: 'run', step2: 'leads', step3: 'conversations', step4: 'kanban',
 }
 
-function HowItWorks({ t, onStepClick }: { t: T; onStepClick: (s: Screen) => void }) {
+function HowItWorks({ t }: { t: T }) {
   const steps = ['step1', 'step2', 'step3', 'step4'] as const
+  const [active, setActive] = useState(0)
+
   return (
     <Section soft>
       <div style={{ maxWidth: 700, margin: '0 auto', textAlign: 'center' }}>
         <SectionTitle>{t('howTitle')}</SectionTitle>
         <p style={lead}>{t('howLead')}</p>
       </div>
-      <div style={{
-        marginTop: 34, display: 'grid', gap: 16,
-        gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px, 100%), 1fr))',
-      }}>
-        {steps.map((k, i) => (
-          <button
-            key={k}
-            onClick={() => onStepClick(STEP_SCREEN[k])}
-            style={{
-              ...card, position: 'relative', textAlign: 'left', cursor: 'pointer',
-              font: 'inherit', color: 'inherit', width: '100%', display: 'block', margin: 0,
-              transition: 'border-color .15s, transform .15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--ld-accent)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--ld-border)'; e.currentTarget.style.transform = 'none' }}
-          >
-            <span style={{
-              display: 'inline-flex', width: 26, height: 26, borderRadius: '50%',
-              alignItems: 'center', justifyContent: 'center', marginBottom: 11,
-              background: 'var(--ld-accent)', color: '#FFF', fontSize: 12, fontWeight: 800,
-            }}>{i + 1}</span>
-            <h3 style={{ margin: '0 0 6px', fontSize: 14.5, fontWeight: 700 }}>{t(`${k}Title`)}</h3>
-            <p style={{ margin: '0 0 12px', fontSize: 13, lineHeight: 1.6, color: 'var(--ld-text-soft)' }}>
-              {t(`${k}Body`)}
-            </p>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5,
-              fontWeight: 700, color: 'var(--ld-accent)',
-            }}>
-              <MonitorPlay size={13} /> {t('howStepCta')}
-            </span>
-          </button>
-        ))}
+
+      <div className="ld-how-grid" style={{ marginTop: 34 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {steps.map((k, i) => {
+            const on = i === active
+            return (
+              <button
+                key={k}
+                onClick={() => setActive(i)}
+                style={{
+                  display: 'flex', gap: 14, alignItems: 'flex-start', textAlign: 'left',
+                  padding: '16px 18px', borderRadius: 12, cursor: 'pointer', width: '100%',
+                  font: 'inherit', color: 'inherit',
+                  border: `1px solid ${on ? 'var(--ld-accent)' : 'var(--ld-border)'}`,
+                  background: on ? 'var(--ld-accent-wash)' : 'var(--ld-surface)',
+                  transition: 'border-color .15s, background .15s',
+                }}
+              >
+                <span style={{
+                  display: 'inline-flex', width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                  alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800,
+                  background: on ? 'var(--ld-accent)' : 'var(--ld-surface-raised)',
+                  color: on ? '#FFF' : 'var(--ld-text-muted)',
+                }}>{i + 1}</span>
+                <div>
+                  <h3 style={{ margin: '0 0 5px', fontSize: 14.5, fontWeight: 700 }}>{t(`${k}Title`)}</h3>
+                  <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: 'var(--ld-text-soft)' }}>
+                    {t(`${k}Body`)}
+                  </p>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
+        <div
+          className="ld-app"
+          style={{
+            border: '1px solid var(--ld-app-border, var(--ld-border))', borderRadius: 14, overflow: 'hidden',
+            boxShadow: 'var(--ld-shadow)', alignSelf: 'start', minHeight: 460, display: 'flex', flexDirection: 'column',
+          }}
+        >
+          <div style={{
+            padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 7,
+            borderBottom: '1px solid var(--ld-app-border)', background: 'var(--ld-app-surface)', flexShrink: 0,
+          }}>
+            {['#EF4444', '#F59E0B', '#22C55E'].map(c => (
+              <span key={c} style={{ width: 9, height: 9, borderRadius: '50%', background: c, display: 'inline-block' }} />
+            ))}
+          </div>
+          {/* The real, interactive screen for this step — not a screenshot.
+              Keyed by step so switching steps mounts a fresh instance instead
+              of reusing state from whichever step was open before (e.g. a
+              Bridge confirm/reject choice shouldn't survive a jump to
+              another step). */}
+          <ProductDemoContent key={active} screen={STEP_SCREEN[steps[active]]} />
+        </div>
       </div>
     </Section>
   )

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import {
   LayoutGrid, Users, PlayCircle, Handshake, MessageSquare, BarChart3,
-  Loader2, Check, X, ChevronRight, Building2,
+  Loader2, Check, X, ChevronRight, Building2, Menu,
 } from 'lucide-react'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
@@ -145,20 +145,121 @@ const BRIDGE_COMPANIES: Array<{ company: string; contacts: BridgeContact[] }> = 
   },
 ]
 
-export function ProductDemo({
-  screen: controlledScreen, onScreenChange,
-}: {
-  // Both optional: the "How it works" steps below the demo drive it from
-  // outside (clicking "Personalized messages" jumps straight to the
-  // Messages screen), but the component still works standalone with no
-  // props — same fallback-to-internal-state pattern as a controlled <input>.
-  screen?: Screen
-  onScreenChange?: (s: Screen) => void
-} = {}) {
+export function ProductDemo() {
   const t = useTranslations('landing')
-  const [internalScreen, setInternalScreen] = useState<Screen>('kanban')
-  const screen = controlledScreen ?? internalScreen
-  const setScreen = onScreenChange ?? setInternalScreen
+  const [screen, setScreen] = useState<Screen>('kanban')
+
+  // Sidebar-as-drawer on narrow viewports (see theme.css, .ld-app-sidebar).
+  // Closed by default even on first mobile paint — a demo box that opens
+  // pre-expanded over its own content on load reads as broken, not helpful.
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  const NAV: Array<{ key: Screen; icon: typeof LayoutGrid; label: string }> = [
+    { key: 'kanban', icon: LayoutGrid, label: t('demoNavPipeline') },
+    { key: 'leads', icon: Users, label: t('demoNavLeads') },
+    { key: 'conversations', icon: MessageSquare, label: t('demoNavConversations') },
+    { key: 'run', icon: PlayCircle, label: t('demoNavRun') },
+    { key: 'bridge', icon: Handshake, label: t('demoNavBridge') },
+    { key: 'analytics', icon: BarChart3, label: t('demoNavAnalytics') },
+  ]
+
+  function pick(key: Screen) {
+    setScreen(key)
+    setMobileOpen(false) // same as the CRM's own Sidebar: navigating closes the drawer
+  }
+
+  return (
+    <div
+      className="ld-app"
+      style={{
+        border: '1px solid var(--ld-app-border)', borderRadius: 14, overflow: 'hidden',
+        boxShadow: 'var(--ld-shadow)', display: 'flex', minHeight: 560, fontSize: 13,
+      }}
+    >
+      {/* Mobile-only top bar (hidden on tablet/desktop via CSS) — the
+          sidebar becomes an off-canvas drawer below 640px, so something
+          still has to trigger it and say where you are. */}
+      <div className="ld-app-topbar" style={{
+        alignItems: 'center', gap: 10, padding: '10px 12px',
+        borderBottom: '1px solid var(--ld-app-border)', background: 'var(--ld-app-surface)',
+        flexShrink: 0, width: '100%',
+      }}>
+        <button
+          onClick={() => setMobileOpen(v => !v)}
+          aria-label={t('demoMobileMenu')}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 30, height: 30, borderRadius: 7, border: '1px solid var(--ld-app-border)',
+            background: 'var(--ld-app-raised)', color: 'var(--ld-app-text)', cursor: 'pointer', flexShrink: 0,
+          }}
+        >
+          {mobileOpen ? <X size={15} /> : <Menu size={15} />}
+        </button>
+        <span style={{ fontSize: 12.5, fontWeight: 700 }}>
+          {NAV.find(n => n.key === screen)?.label}
+        </span>
+      </div>
+
+      {/* ── Sidebar ─────────────────────────────────────────────────── */}
+      <aside className="ld-app-sidebar" data-open={mobileOpen} style={{
+        width: 184, flexShrink: 0, borderRight: '1px solid var(--ld-app-border)',
+        background: 'var(--ld-app-surface)', padding: '14px 10px', height: '100%',
+        display: 'flex', flexDirection: 'column', gap: 4,
+      }}>
+        <div style={{ padding: '0 8px 14px', fontSize: 13, fontWeight: 800, letterSpacing: '-0.3px' }}>
+          <span style={{ color: 'var(--ld-app-text)' }}>Your</span>
+          <span style={{ color: 'var(--ld-app-accent)' }}>CRM</span>
+        </div>
+
+        {NAV.map(item => {
+          const active = screen === item.key
+          const Icon = item.icon
+          return (
+            <button
+              key={item.key}
+              onClick={() => pick(item.key)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 9, width: '100%',
+                padding: '8px 10px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: active ? 'var(--ld-app-accent)' : 'transparent',
+                color: active ? '#FFF' : 'var(--ld-app-soft)',
+                fontSize: 12.5, fontWeight: active ? 600 : 500, textAlign: 'left',
+                transition: 'background .15s, color .15s',
+              }}
+            >
+              <Icon size={15} />
+              {item.label}
+            </button>
+          )
+        })}
+
+        <div style={{ marginTop: 'auto', padding: '10px 8px 0', borderTop: '1px solid var(--ld-app-border)' }}>
+          <div style={{ fontSize: 11, color: 'var(--ld-app-soft)', fontWeight: 600 }}>{t('demoUser')}</div>
+          <div style={{ fontSize: 10, color: 'var(--ld-app-muted)' }}>{t('demoUserRole')}</div>
+        </div>
+      </aside>
+
+      {/* Click-to-close backdrop, mobile only — see .ld-app-backdrop. */}
+      <div className="ld-app-backdrop" data-open={mobileOpen} onClick={() => setMobileOpen(false)} />
+
+      {/* ── Content ─────────────────────────────────────────────────── */}
+      <ProductDemoContent screen={screen} />
+    </div>
+  )
+}
+
+/**
+ * Just the content pane — no sidebar, no nav. Split out from `ProductDemo`
+ * so "How it works" can reveal a single screen on its own (what a step
+ * "would look like" in the product) without dragging the whole app chrome
+ * into a section that isn't the main demo. Owns all the screen-specific
+ * interactive state itself (Run's picked markets/progress, which
+ * Conversations thread is open, Bridge's confirm/reject), so every mount of
+ * this component — the sidebar demo above and each "How it works" reveal —
+ * gets its own independent instance; nothing is shared or reset between them.
+ */
+export function ProductDemoContent({ screen }: { screen: Screen }) {
+  const t = useTranslations('landing')
 
   // ── New Run simulation ────────────────────────────────────────────────
   const [picked, setPicked] = useState<string[]>(['Taiwan', 'Japan', 'Singapore'])
@@ -197,80 +298,23 @@ export function ProductDemo({
   // ── Bridge ────────────────────────────────────────────────────────────
   const [bridgeStatus, setBridgeStatus] = useState<Record<string, BridgeStatus>>({})
 
-  const NAV: Array<{ key: Screen; icon: typeof LayoutGrid; label: string }> = [
-    { key: 'kanban', icon: LayoutGrid, label: t('demoNavPipeline') },
-    { key: 'leads', icon: Users, label: t('demoNavLeads') },
-    { key: 'conversations', icon: MessageSquare, label: t('demoNavConversations') },
-    { key: 'run', icon: PlayCircle, label: t('demoNavRun') },
-    { key: 'bridge', icon: Handshake, label: t('demoNavBridge') },
-    { key: 'analytics', icon: BarChart3, label: t('demoNavAnalytics') },
-  ]
-
   return (
-    <div
-      className="ld-app"
-      style={{
-        border: '1px solid var(--ld-app-border)', borderRadius: 14, overflow: 'hidden',
-        boxShadow: 'var(--ld-shadow)', display: 'flex', minHeight: 560, fontSize: 13,
-      }}
-    >
-      {/* ── Sidebar ─────────────────────────────────────────────────── */}
-      <aside style={{
-        width: 184, flexShrink: 0, borderRight: '1px solid var(--ld-app-border)',
-        background: 'var(--ld-app-surface)', padding: '14px 10px',
-        display: 'flex', flexDirection: 'column', gap: 4,
-      }}>
-        <div style={{ padding: '0 8px 14px', fontSize: 13, fontWeight: 800, letterSpacing: '-0.3px' }}>
-          <span style={{ color: 'var(--ld-app-text)' }}>Your</span>
-          <span style={{ color: 'var(--ld-app-accent)' }}>CRM</span>
-        </div>
-
-        {NAV.map(item => {
-          const active = screen === item.key
-          const Icon = item.icon
-          return (
-            <button
-              key={item.key}
-              onClick={() => setScreen(item.key)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 9, width: '100%',
-                padding: '8px 10px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                background: active ? 'var(--ld-app-accent)' : 'transparent',
-                color: active ? '#FFF' : 'var(--ld-app-soft)',
-                fontSize: 12.5, fontWeight: active ? 600 : 500, textAlign: 'left',
-                transition: 'background .15s, color .15s',
-              }}
-            >
-              <Icon size={15} />
-              {item.label}
-            </button>
-          )
-        })}
-
-        <div style={{ marginTop: 'auto', padding: '10px 8px 0', borderTop: '1px solid var(--ld-app-border)' }}>
-          <div style={{ fontSize: 11, color: 'var(--ld-app-soft)', fontWeight: 600 }}>{t('demoUser')}</div>
-          <div style={{ fontSize: 10, color: 'var(--ld-app-muted)' }}>{t('demoUserRole')}</div>
-        </div>
-      </aside>
-
-      {/* ── Content ─────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, minWidth: 0, background: 'var(--ld-app-bg)', padding: 16, overflow: 'hidden' }}>
-        {screen === 'kanban' && <KanbanView t={t} />}
-        {screen === 'leads' && <LeadsView t={t} />}
-        {screen === 'conversations' && (
-          <ConversationsView t={t} activeThread={activeThread} setActiveThread={setActiveThread} />
-        )}
-        {screen === 'run' && (
-          <RunView
-            t={t} picked={picked} setPicked={setPicked}
-            runState={runState} found={found} startRun={startRun} resetRun={resetRun}
-          />
-        )}
-        {screen === 'bridge' && (
-          <BridgeView t={t} status={bridgeStatus} setStatus={setBridgeStatus} />
-        )}
-        {screen === 'analytics' && <AnalyticsView t={t} />}
-      </div>
+    <div style={{ flex: 1, minWidth: 0, background: 'var(--ld-app-bg)', padding: 16, overflow: 'hidden' }}>
+      {screen === 'kanban' && <KanbanView t={t} />}
+      {screen === 'leads' && <LeadsView t={t} />}
+      {screen === 'conversations' && (
+        <ConversationsView t={t} activeThread={activeThread} setActiveThread={setActiveThread} />
+      )}
+      {screen === 'run' && (
+        <RunView
+          t={t} picked={picked} setPicked={setPicked}
+          runState={runState} found={found} startRun={startRun} resetRun={resetRun}
+        />
+      )}
+      {screen === 'bridge' && (
+        <BridgeView t={t} status={bridgeStatus} setStatus={setBridgeStatus} />
+      )}
+      {screen === 'analytics' && <AnalyticsView t={t} />}
     </div>
   )
 }
@@ -394,8 +438,8 @@ function ConversationsView({
       <p style={{ fontSize: 11.5, color: 'var(--ld-app-soft)', lineHeight: 1.55, marginTop: -6, marginBottom: 14, maxWidth: 560 }}>
         {t('demoConvNote')}
       </p>
-      <div style={{ display: 'flex', gap: 12, height: 360 }}>
-        <div style={{ width: 168, flexShrink: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div className="ld-conv-grid" style={{ display: 'flex', gap: 12, height: 360 }}>
+        <div className="ld-conv-list" style={{ width: 168, flexShrink: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
           {THREAD_LEAD_IDS.map(id => {
             const lead = DEMO.find(d => d.id === id)!
             const on = id === activeThread
@@ -427,7 +471,7 @@ function ConversationsView({
           })}
         </div>
 
-        <div style={{
+        <div className="ld-conv-thread" style={{
           flex: 1, minWidth: 0, border: '1px solid var(--ld-app-border)', borderRadius: 10,
           background: 'var(--ld-app-surface)', padding: 14, overflowY: 'auto',
           display: 'flex', flexDirection: 'column', gap: 10,
@@ -759,7 +803,7 @@ function AnalyticsView({ t }: { t: T }) {
     <>
       <Head title={t('demoAnalyticsTitle')} subtitle={t('demoAnalyticsSubtitle')} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 18 }}>
+      <div className="ld-analytics-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 18 }}>
         {[
           { label: t('demoStatTotalLeads'), value: total, color: 'var(--ld-app-accent)' },
           { label: t('demoStatReplyRate'), value: `${replyRate}%`, color: '#F59E0B' },
@@ -775,7 +819,7 @@ function AnalyticsView({ t }: { t: T }) {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 14 }}>
+      <div className="ld-analytics-charts" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 14 }}>
         <div style={{ padding: '12px 14px 4px', borderRadius: 10, background: 'var(--ld-app-surface)', border: '1px solid var(--ld-app-border)' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ld-app-soft)', marginBottom: 6 }}>
             {t('demoChartFunnelTitle')}

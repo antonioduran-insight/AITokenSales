@@ -80,6 +80,90 @@
 
 .ld-in { animation: ld-fade-up .5s ease both; }
 
+/* "How it works": steps stacked on the left, live sandbox preview on the
+   right. Asymmetric column widths aren't expressible with the auto-fit/
+   minmax trick used elsewhere in this file (that only works for equal-ish
+   columns), so this one gets an explicit media query instead. */
+.ld-how-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 28px;
+  align-items: start;
+}
+@media (max-width: 760px) {
+  .ld-how-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===========================================================================
+   Responsive
+   ===========================================================================
+   Same breakpoints CLAUDE.md documents for the CRM itself (mobile <= 767px,
+   tablet 768–1024px, desktop >= 1025px untouched) — the landing has its own
+   stylesheet but there's no reason to invent different cutoffs. Most of the
+   page already collapses on its own: every card grid in LandingClient.tsx
+   uses `repeat(auto-fit, minmax(min(Npx, 100%), 1fr))`, which drops to one
+   column by itself once the viewport can't fit the floor width, no media
+   query needed (same trick documented in CLAUDE.md for the CRM's own grids).
+   What's here is only the handful of layouts that DON'T self-collapse:
+   fixed-column grids and the product-mockup sidebar.
+   =========================================================================== */
+
+@media (max-width: 640px) {
+  /* Nav: the brand badge is decorative, and language label + CTA fighting
+     for space in one ~360px row was the tightest spot on the page. */
+  .ld-nav-tag { display: none; }
+  .ld-nav-inner { gap: 8px !important; }
+
+  /* Analytics: 3 stat cards and a 1.5fr/1fr chart pair both assume desktop
+     width. Stat cards go 2-up (three would be unreadably thin on a phone);
+     the charts stack, same reasoning as `crm-grid-1-mobile` in the main
+     app's globals.css — a grid's `minmax`/fraction floor doesn't shrink
+     itself, someone has to tell it to. */
+  .ld-analytics-stats { grid-template-columns: repeat(2, 1fr) !important; }
+  .ld-analytics-charts { grid-template-columns: 1fr !important; }
+
+  /* Conversations: a 168px thread list beside the message pane leaves next
+     to nothing for the messages themselves on a phone. Stack instead —
+     list on top (its own scroll region), thread below. */
+  .ld-conv-grid { flex-direction: column !important; height: auto !important; }
+  .ld-conv-list { width: 100% !important; flex-direction: row !important; overflow-x: auto !important; }
+  .ld-conv-thread { height: 320px; }
+}
+
+/* Product-mockup sidebar: a static 184px column works down to tablet width,
+   but on a phone it eats most of the box and leaves the actual screen
+   unreadable. Below 640px it becomes a closeable drawer — same idea as the
+   CRM's own Sidebar (hamburger trigger, slide-in panel, backdrop to close),
+   just scoped to this component's own box instead of the full viewport. */
+@media (max-width: 640px) {
+  .ld-app { position: relative; flex-direction: column; }
+  .ld-app-topbar { display: flex !important; }
+  .ld-app-sidebar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 5;
+    width: 200px;
+    transform: translateX(-100%);
+    transition: transform .2s ease;
+    box-shadow: 16px 0 32px rgba(0, 0, 0, 0.35);
+  }
+  .ld-app-sidebar[data-open='true'] { transform: translateX(0); }
+  .ld-app-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    background: rgba(0, 0, 0, 0.5);
+  }
+  .ld-app-backdrop[data-open='true'] { display: block; }
+}
+/* Both default to hidden outside the mobile query above, where they're the
+   only rules that ever turn them on — without this, an unstyled div still
+   participates in `.ld-app`'s flex row at every other breakpoint. */
+.ld-app-topbar,
+.ld-app-backdrop { display: none; }
+
 /* Respect the OS setting for people who ask not to see motion. */
 @media (prefers-reduced-motion: reduce) {
   .landing-root *,
