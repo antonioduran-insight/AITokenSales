@@ -834,70 +834,78 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
                         </div>
                       </div>
                     ) : prospect[field] ? (
-                      <>
-                        <div style={{ backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '12px 14px', fontSize: 13, color: 'var(--crm-text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                          {showingTranslation[field] && translation ? translation.text : prospect[field]}
-                        </div>
-                        {translation && (
-                          <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 4 }}>
-                            {showingTranslation[field]
-                              ? translation.lang
-                              : t('prospect.showTranslation')}
-                          </div>
-                        )}
-                        {!isReadOnly && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                            {translation && (
-                              <button
-                                onClick={() => setShowingTranslation(prev => ({ ...prev, [field]: !prev[field] }))}
-                                style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)', color: 'var(--crm-text-secondary)', fontSize: 12, cursor: 'pointer' }}
-                              >
-                                {showingTranslation[field] ? t('prospect.showOriginal') : t('prospect.showTranslation')}
-                              </button>
-                            )}
-                            <div style={{ position: 'relative' }}>
-                              <select
-                                value={translateLang[field] ?? ''}
-                                onChange={e => setTranslateLang(prev => ({ ...prev, [field]: e.target.value }))}
-                                style={{ ...selectStyle, width: 'auto', minWidth: 140, padding: '5px 24px 5px 8px', fontSize: 12 }}
-                              >
-                                <option value="">{t('prospect.translateLanguagePlaceholder')}</option>
-                                {TRANSLATE_LANGUAGE_OPTIONS.map(lang => (
-                                  <option key={lang} value={lang}>{lang}</option>
-                                ))}
-                                <option value={OTHER_LANGUAGE_VALUE}>{t('prospect.translateLanguageOther')}</option>
-                              </select>
-                              <ChevronDown size={11} style={{ position: 'absolute', right: 7, top: '50%', transform: 'translateY(-50%)', color: 'var(--crm-text-muted)', pointerEvents: 'none' }} />
+                      // Default is "show translation" whenever one exists — `showingTranslation[field]`
+                      // starts undefined (nobody's toggled yet this session), so `?? true` is what makes
+                      // a cached translation the default view instead of something you have to opt into
+                      // every time you reopen the drawer. Explicitly toggling to `false` (the "show
+                      // original" button) is preserved as false, not treated as "unset".
+                      (() => {
+                        const showTranslation = !!translation && (showingTranslation[field] ?? true)
+                        return (
+                          <>
+                            <div style={{ backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '12px 14px', fontSize: 13, color: 'var(--crm-text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                              {showTranslation ? translation!.text : prospect[field]}
                             </div>
-                            {translateLang[field] === OTHER_LANGUAGE_VALUE && (
-                              <input
-                                value={translateCustomLang[field] ?? ''}
-                                onChange={e => setTranslateCustomLang(prev => ({ ...prev, [field]: e.target.value }))}
-                                placeholder={t('prospect.translateLanguageOtherPlaceholder')}
-                                style={{ ...textInputStyle, width: 180, padding: '5px 8px', fontSize: 12 }}
-                              />
+                            {translation && showTranslation && (
+                              <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 4 }}>
+                                {translation.lang}
+                              </div>
                             )}
-                            <button
-                              onClick={() => handleTranslate(field)}
-                              disabled={
-                                translating === field ||
-                                !(translateLang[field] && (translateLang[field] !== OTHER_LANGUAGE_VALUE || (translateCustomLang[field] ?? '').trim()))
-                              }
-                              style={{
-                                display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6,
-                                border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)',
-                                color: 'var(--crm-text-secondary)', fontSize: 12,
-                                cursor: translating === field ? 'default' : 'pointer', opacity: translating === field ? 0.6 : 1,
-                              }}
-                            >
-                              <Languages size={12} /> {translating === field ? t('prospect.translating') : t('prospect.translate')}
-                            </button>
-                          </div>
-                        )}
-                        {translateError[field] && (
-                          <p style={{ fontSize: 11, color: '#F87171', marginTop: 6 }}>{translateError[field]}</p>
-                        )}
-                      </>
+                            {!isReadOnly && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                                {translation && (
+                                  <button
+                                    onClick={() => setShowingTranslation(prev => ({ ...prev, [field]: !showTranslation }))}
+                                    style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)', color: 'var(--crm-text-secondary)', fontSize: 12, cursor: 'pointer' }}
+                                  >
+                                    {showTranslation ? t('prospect.showOriginal') : t('prospect.showTranslation')}
+                                  </button>
+                                )}
+                                <div style={{ position: 'relative' }}>
+                                  <select
+                                    value={translateLang[field] ?? ''}
+                                    onChange={e => setTranslateLang(prev => ({ ...prev, [field]: e.target.value }))}
+                                    style={{ ...selectStyle, width: 'auto', minWidth: 140, padding: '5px 24px 5px 8px', fontSize: 12 }}
+                                  >
+                                    <option value="">{t('prospect.translateLanguagePlaceholder')}</option>
+                                    {TRANSLATE_LANGUAGE_OPTIONS.map(lang => (
+                                      <option key={lang} value={lang}>{lang}</option>
+                                    ))}
+                                    <option value={OTHER_LANGUAGE_VALUE}>{t('prospect.translateLanguageOther')}</option>
+                                  </select>
+                                  <ChevronDown size={11} style={{ position: 'absolute', right: 7, top: '50%', transform: 'translateY(-50%)', color: 'var(--crm-text-muted)', pointerEvents: 'none' }} />
+                                </div>
+                                {translateLang[field] === OTHER_LANGUAGE_VALUE && (
+                                  <input
+                                    value={translateCustomLang[field] ?? ''}
+                                    onChange={e => setTranslateCustomLang(prev => ({ ...prev, [field]: e.target.value }))}
+                                    placeholder={t('prospect.translateLanguageOtherPlaceholder')}
+                                    style={{ ...textInputStyle, width: 180, padding: '5px 8px', fontSize: 12 }}
+                                  />
+                                )}
+                                <button
+                                  onClick={() => handleTranslate(field)}
+                                  disabled={
+                                    translating === field ||
+                                    !(translateLang[field] && (translateLang[field] !== OTHER_LANGUAGE_VALUE || (translateCustomLang[field] ?? '').trim()))
+                                  }
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6,
+                                    border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)',
+                                    color: 'var(--crm-text-secondary)', fontSize: 12,
+                                    cursor: translating === field ? 'default' : 'pointer', opacity: translating === field ? 0.6 : 1,
+                                  }}
+                                >
+                                  <Languages size={12} /> {translating === field ? t('prospect.translating') : t('prospect.translate')}
+                                </button>
+                              </div>
+                            )}
+                            {translateError[field] && (
+                              <p style={{ fontSize: 11, color: '#F87171', marginTop: 6 }}>{translateError[field]}</p>
+                            )}
+                          </>
+                        )
+                      })()
                     ) : (
                       <p style={{ color: 'var(--crm-text-muted)', fontSize: 13 }}>{t('prospect.noMessage')}</p>
                     )}
