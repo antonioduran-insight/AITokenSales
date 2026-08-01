@@ -134,12 +134,21 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
   const [editValue, setEditValue] = useState('')
   // Translate panel state, keyed by field so custom1/custom2 operate
   // independently — a translation for one never clears/blocks the other.
+  // The translation itself is NOT kept here — it's cached server-side on
+  // the prospect row (custom1_translation/custom1_translation_lang etc.,
+  // same for custom2) and read straight off `prospect`, so it survives a
+  // drawer close/reopen instead of living only in this component's state.
   const [translateLang, setTranslateLang] = useState<Partial<Record<'custom1' | 'custom2', string>>>({})
   const [translateCustomLang, setTranslateCustomLang] = useState<Partial<Record<'custom1' | 'custom2', string>>>({})
   const [translating, setTranslating] = useState<'custom1' | 'custom2' | null>(null)
-  const [translations, setTranslations] = useState<Partial<Record<'custom1' | 'custom2', { lang: string; text: string }>>>({})
   const [translateError, setTranslateError] = useState<Partial<Record<'custom1' | 'custom2', string>>>({})
   const [showingTranslation, setShowingTranslation] = useState<Partial<Record<'custom1' | 'custom2', boolean>>>({})
+
+  function getCachedTranslation(field: 'custom1' | 'custom2'): { text: string; lang: string } | null {
+    const text = field === 'custom1' ? prospect.custom1_translation : prospect.custom2_translation
+    const lang = field === 'custom1' ? prospect.custom1_translation_lang : prospect.custom2_translation_lang
+    return text && lang ? { text, lang } : null
+  }
   // Local drafts for the plain-text editable fields (company/title) so the
   // input stays responsive while typing — committed to the DB on blur,
   // rather than on every keystroke like the select-based fields below.
@@ -437,7 +446,16 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
         }))
         return
       }
-      setTranslations(prev => ({ ...prev, [field]: { lang: json.targetLanguage, text: json.translated } }))
+      // The API route already persisted this to the prospect row — mirror it
+      // into local state (and up to the parent list/board) so it's there
+      // immediately, without waiting on a refetch.
+      const dbPatch =
+        field === 'custom1'
+          ? { custom1_translation: json.translated as string, custom1_translation_lang: json.targetLanguage as string }
+          : { custom2_translation: json.translated as string, custom2_translation_lang: json.targetLanguage as string }
+      const updated = { ...prospect, ...dbPatch }
+      setProspect(updated)
+      onUpdated(updated)
       setShowingTranslation(prev => ({ ...prev, [field]: true }))
     } catch {
       setTranslateError(prev => ({ ...prev, [field]: t('prospect.translationFailed') }))
@@ -770,6 +788,7 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {(['custom1', 'custom2'] as const).map(field => {
                 const isEditing = editingField === field
+                const translation = getCachedTranslation(field)
                 return (
                   <div key={field}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -817,18 +836,18 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
                     ) : prospect[field] ? (
                       <>
                         <div style={{ backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '12px 14px', fontSize: 13, color: 'var(--crm-text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                          {showingTranslation[field] && translations[field] ? translations[field]!.text : prospect[field]}
+                          {showingTranslation[field] && translation ? translation.text : prospect[field]}
                         </div>
-                        {translations[field] && (
+                        {translation && (
                           <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 4 }}>
                             {showingTranslation[field]
-                              ? `${translations[field]!.lang}`
+                              ? translation.lang
                               : t('prospect.showTranslation')}
                           </div>
                         )}
                         {!isReadOnly && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                            {translations[field] && (
+                            {translation && (
                               <button
                                 onClick={() => setShowingTranslation(prev => ({ ...prev, [field]: !prev[field] }))}
                                 style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)', color: 'var(--crm-text-secondary)', fontSize: 12, cursor: 'pointer' }}

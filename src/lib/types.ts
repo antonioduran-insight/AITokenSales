@@ -87,6 +87,13 @@ export interface Prospect {
   custom1: string | null
   custom2: string | null
   custom3: string | null
+  // Cached translation of custom1/custom2 — one language "slot" per field,
+  // overwritten by the next translate call. Kept alongside the original so
+  // the drawer can toggle between them without re-calling the API.
+  custom1_translation: string | null
+  custom1_translation_lang: string | null
+  custom2_translation: string | null
+  custom2_translation_lang: string | null
   // CRM fields
   outreach_status: OutreachStatus
   market: string | null

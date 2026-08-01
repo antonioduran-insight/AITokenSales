@@ -149,5 +149,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'translation_failed' }, { status: 502 })
   }
 
-  return NextResponse.json({ translated: translated.trim(), targetLanguage: targetLanguage.trim() })
+  const translatedText = translated.trim()
+  const lang = targetLanguage.trim()
+
+  // Cache it — one slot per field, overwritten by this call. A failure here
+  // shouldn't fail the request: the caller already has the text and can see
+  // it now, it just won't survive a drawer close/reopen this one time.
+  const { error: cacheErr } = await db
+    .from('prospects')
+    .update(
+      field === 'custom1'
+        ? { custom1_translation: translatedText, custom1_translation_lang: lang }
+        : { custom2_translation: translatedText, custom2_translation_lang: lang }
+    )
+    .eq('id', id)
+  if (cacheErr) console.error(`[translate] failed to cache translation for prospect ${id}: ${cacheErr.message}`)
+
+  return NextResponse.json({ translated: translatedText, targetLanguage: lang })
 }
