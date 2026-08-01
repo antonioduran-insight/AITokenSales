@@ -16,7 +16,7 @@ import { useComboLabels } from '@/lib/hooks/useComboLabels'
 import { useOrgMarkets } from '@/lib/hooks/useOrgMarkets'
 import { useMarketAreaMap } from '@/lib/hooks/useMarketAreaMap'
 import { inferAreaFromCountry } from '@/lib/utils/area-inference'
-import { ExternalLink, Copy, Check, Star, ChevronDown, CheckCircle, AlertTriangle, X, Pencil } from 'lucide-react'
+import { ExternalLink, Copy, Check, Star, ChevronDown, CheckCircle, AlertTriangle, X, Pencil, Languages } from 'lucide-react'
 import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, LeadTemperature, User } from '@/lib/types'
 import { OUTREACH_STATUSES, LEAD_TEMPERATURES } from '@/lib/types'
@@ -77,6 +77,25 @@ const textInputStyle: React.CSSProperties = {
   borderRadius: 6, color: 'var(--crm-text-primary)', fontSize: 13, outline: 'none',
 }
 
+// A starting set of common languages, biased toward the ones relevant to
+// this org's markets — but deliberately NOT the whole feature. Diaspora
+// cases (a Vietnamese speaker settled in Taiwan, a Punjabi speaker in the
+// UK, etc.) are exactly why "Other" always stays available: the target
+// language is whatever the SDR types, sent straight to the model, not
+// limited to a fixed list.
+const TRANSLATE_LANGUAGE_OPTIONS = [
+  'Spanish', 'English', 'Portuguese', 'French', 'German', 'Italian', 'Dutch',
+  'Vietnamese', 'Thai', 'Indonesian', 'Filipino (Tagalog)', 'Khmer', 'Burmese', 'Malay',
+  'Chinese (Simplified)', 'Chinese (Traditional)', 'Japanese', 'Korean',
+  'Hindi', 'Bengali', 'Urdu', 'Punjabi', 'Tamil',
+  'Arabic', 'Turkish', 'Persian (Farsi)', 'Hebrew',
+  'Russian', 'Polish', 'Ukrainian', 'Romanian', 'Greek',
+  'Swedish', 'Norwegian', 'Danish', 'Finnish',
+  'Swahili', 'Amharic', 'Hausa',
+] as const
+
+const OTHER_LANGUAGE_VALUE = '__other__'
+
 type ToastVariant = 'success' | 'warning' | 'error'
 
 const TOAST_STYLE: Record<ToastVariant, React.CSSProperties> = {
@@ -113,6 +132,14 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
   const [closingSaving, setClosingSaving] = useState(false)
   const [editingField, setEditingField] = useState<'custom1' | 'custom2' | null>(null)
   const [editValue, setEditValue] = useState('')
+  // Translate panel state, keyed by field so custom1/custom2 operate
+  // independently — a translation for one never clears/blocks the other.
+  const [translateLang, setTranslateLang] = useState<Partial<Record<'custom1' | 'custom2', string>>>({})
+  const [translateCustomLang, setTranslateCustomLang] = useState<Partial<Record<'custom1' | 'custom2', string>>>({})
+  const [translating, setTranslating] = useState<'custom1' | 'custom2' | null>(null)
+  const [translations, setTranslations] = useState<Partial<Record<'custom1' | 'custom2', { lang: string; text: string }>>>({})
+  const [translateError, setTranslateError] = useState<Partial<Record<'custom1' | 'custom2', string>>>({})
+  const [showingTranslation, setShowingTranslation] = useState<Partial<Record<'custom1' | 'custom2', boolean>>>({})
   // Local drafts for the plain-text editable fields (company/title) so the
   // input stays responsive while typing — committed to the DB on blur,
   // rather than on every keystroke like the select-based fields below.
@@ -387,6 +414,36 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
     if (!ok) return
     setEditingField(null)
     setEditValue('')
+  }
+
+  async function handleTranslate(field: 'custom1' | 'custom2') {
+    const selected = translateLang[field]
+    const targetLanguage = selected === OTHER_LANGUAGE_VALUE ? (translateCustomLang[field] ?? '').trim() : (selected ?? '')
+    if (!targetLanguage) return
+
+    setTranslating(field)
+    setTranslateError(prev => ({ ...prev, [field]: undefined }))
+    try {
+      const res = await fetch(`/api/prospects/${prospect.id}/translate`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ field, targetLanguage }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setTranslateError(prev => ({
+          ...prev,
+          [field]: json.error === 'not_configured' ? t('prospect.translationNotConfigured') : t('prospect.translationFailed'),
+        }))
+        return
+      }
+      setTranslations(prev => ({ ...prev, [field]: { lang: json.targetLanguage, text: json.translated } }))
+      setShowingTranslation(prev => ({ ...prev, [field]: true }))
+    } catch {
+      setTranslateError(prev => ({ ...prev, [field]: t('prospect.translationFailed') }))
+    } finally {
+      setTranslating(null)
+    }
   }
 
   async function commitStatusChange(newStatus: OutreachStatus): Promise<boolean> {
@@ -758,9 +815,70 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
                         </div>
                       </div>
                     ) : prospect[field] ? (
-                      <div style={{ backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '12px 14px', fontSize: 13, color: 'var(--crm-text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                        {prospect[field]}
-                      </div>
+                      <>
+                        <div style={{ backgroundColor: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)', borderRadius: 8, padding: '12px 14px', fontSize: 13, color: 'var(--crm-text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                          {showingTranslation[field] && translations[field] ? translations[field]!.text : prospect[field]}
+                        </div>
+                        {translations[field] && (
+                          <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 4 }}>
+                            {showingTranslation[field]
+                              ? `${translations[field]!.lang}`
+                              : t('prospect.showTranslation')}
+                          </div>
+                        )}
+                        {!isReadOnly && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                            {translations[field] && (
+                              <button
+                                onClick={() => setShowingTranslation(prev => ({ ...prev, [field]: !prev[field] }))}
+                                style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)', color: 'var(--crm-text-secondary)', fontSize: 12, cursor: 'pointer' }}
+                              >
+                                {showingTranslation[field] ? t('prospect.showOriginal') : t('prospect.showTranslation')}
+                              </button>
+                            )}
+                            <div style={{ position: 'relative' }}>
+                              <select
+                                value={translateLang[field] ?? ''}
+                                onChange={e => setTranslateLang(prev => ({ ...prev, [field]: e.target.value }))}
+                                style={{ ...selectStyle, width: 'auto', minWidth: 140, padding: '5px 24px 5px 8px', fontSize: 12 }}
+                              >
+                                <option value="">{t('prospect.translateLanguagePlaceholder')}</option>
+                                {TRANSLATE_LANGUAGE_OPTIONS.map(lang => (
+                                  <option key={lang} value={lang}>{lang}</option>
+                                ))}
+                                <option value={OTHER_LANGUAGE_VALUE}>{t('prospect.translateLanguageOther')}</option>
+                              </select>
+                              <ChevronDown size={11} style={{ position: 'absolute', right: 7, top: '50%', transform: 'translateY(-50%)', color: 'var(--crm-text-muted)', pointerEvents: 'none' }} />
+                            </div>
+                            {translateLang[field] === OTHER_LANGUAGE_VALUE && (
+                              <input
+                                value={translateCustomLang[field] ?? ''}
+                                onChange={e => setTranslateCustomLang(prev => ({ ...prev, [field]: e.target.value }))}
+                                placeholder={t('prospect.translateLanguageOtherPlaceholder')}
+                                style={{ ...textInputStyle, width: 180, padding: '5px 8px', fontSize: 12 }}
+                              />
+                            )}
+                            <button
+                              onClick={() => handleTranslate(field)}
+                              disabled={
+                                translating === field ||
+                                !(translateLang[field] && (translateLang[field] !== OTHER_LANGUAGE_VALUE || (translateCustomLang[field] ?? '').trim()))
+                              }
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6,
+                                border: '1px solid var(--crm-border)', backgroundColor: 'var(--crm-surface-raised)',
+                                color: 'var(--crm-text-secondary)', fontSize: 12,
+                                cursor: translating === field ? 'default' : 'pointer', opacity: translating === field ? 0.6 : 1,
+                              }}
+                            >
+                              <Languages size={12} /> {translating === field ? t('prospect.translating') : t('prospect.translate')}
+                            </button>
+                          </div>
+                        )}
+                        {translateError[field] && (
+                          <p style={{ fontSize: 11, color: '#F87171', marginTop: 6 }}>{translateError[field]}</p>
+                        )}
+                      </>
                     ) : (
                       <p style={{ color: 'var(--crm-text-muted)', fontSize: 13 }}>{t('prospect.noMessage')}</p>
                     )}

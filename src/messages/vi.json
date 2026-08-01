@@ -149,7 +149,17 @@
     "ownerOutsideArea": "Khách hàng này được phân công cho người không phải là SDR đang hoạt động trong khu vực của họ. Việc phân công vẫn có hiệu lực — chỉ chọn tên khác nếu bạn thực sự muốn phân công lại.",
     "ownerUnknown": "Người phụ trách hiện tại",
     "fromBridge": "Liên hệ này đến từ Bridge (đối tác), không phải từ công cụ thu thập",
-    "bridgeBadge": "BRIDGE"
+    "bridgeBadge": "BRIDGE",
+    "translate": "Dịch",
+    "translateTo": "Dịch sang",
+    "translateLanguagePlaceholder": "Chọn ngôn ngữ...",
+    "translateLanguageOther": "Khác (nhập ngôn ngữ)",
+    "translateLanguageOtherPlaceholder": "vd: tiếng Việt, tiếng Khmer, tiếng Swahili...",
+    "translating": "Đang dịch...",
+    "translationFailed": "Không thể dịch — vui lòng thử lại.",
+    "translationNotConfigured": "Tổ chức này chưa cấu hình tính năng dịch — hãy thêm khóa Anthropic trong Cài đặt → Scraper.",
+    "showOriginal": "Xem bản gốc",
+    "showTranslation": "Xem bản dịch"
   },
   "import": {
     "title": "Nhập CSV",

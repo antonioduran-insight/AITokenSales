@@ -149,7 +149,17 @@
     "ownerOutsideArea": "此潛在客戶指派給的人員並不是其所屬地區的活躍銷售代表。指派仍然有效 — 只有在確定要重新分配時才選擇其他人。",
     "ownerUnknown": "目前負責人",
     "fromBridge": "此聯絡人來自 Bridge（合作夥伴），非抓取工具",
-    "bridgeBadge": "合作"
+    "bridgeBadge": "合作",
+    "translate": "翻譯",
+    "translateTo": "翻譯成",
+    "translateLanguagePlaceholder": "選擇語言...",
+    "translateLanguageOther": "其他（輸入語言）",
+    "translateLanguageOtherPlaceholder": "例如：越南語、高棉語、斯瓦希里語...",
+    "translating": "翻譯中...",
+    "translationFailed": "翻譯失敗 — 請再試一次。",
+    "translationNotConfigured": "此組織尚未設定翻譯功能 — 請至「設定 → Scraper」新增 Anthropic 金鑰。",
+    "showOriginal": "顯示原文",
+    "showTranslation": "顯示翻譯"
   },
   "import": {
     "title": "匯入 CSV",

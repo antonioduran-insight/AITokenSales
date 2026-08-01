@@ -149,7 +149,17 @@
     "ownerOutsideArea": "This lead is assigned to someone who is not an active SDR in its area. The assignment still stands — only pick another name if you mean to reassign.",
     "ownerUnknown": "Current owner",
     "fromBridge": "This contact came from Bridge (partnerships), not from the scraper",
-    "bridgeBadge": "BRIDGE"
+    "bridgeBadge": "BRIDGE",
+    "translate": "Translate",
+    "translateTo": "Translate to",
+    "translateLanguagePlaceholder": "Select a language...",
+    "translateLanguageOther": "Other (type a language)",
+    "translateLanguageOtherPlaceholder": "e.g. Vietnamese, Khmer, Swahili...",
+    "translating": "Translating...",
+    "translationFailed": "Could not translate — try again.",
+    "translationNotConfigured": "Translation isn't set up for this organization yet — add an Anthropic key in Settings → Scraper.",
+    "showOriginal": "Show original",
+    "showTranslation": "Show translation"
   },
   "import": {
     "title": "Import CSV",
