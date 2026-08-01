@@ -4,15 +4,11 @@ import { createServerClient } from '@supabase/ssr'
 
 const locales = ['zh', 'en', 'vi', 'es']
 const defaultLocale = 'zh'
-// Deliberately separate from `defaultLocale`: that one governs the app itself
-// (login, deactivated-user redirects, etc.) and stays 'zh' for the existing
-// user base. The bare-root landing redirect below is the front door for
-// anonymous, international traffic, where English is the safer default —
-// visitors can still switch language from the landing page's own switcher.
-const landingLocale = 'en'
 // Locale-aware and unauthenticated: /zh/landing, /en/landing, ...
 // The landing moved under [locale] so it can be translated like everything
 // else; while it lived at a bare /landing it could only ever be English.
+// It's a standalone destination now, not where bare "/" goes (see below) —
+// reached only via its own explicit URL (shared link, ad, etc.).
 const publicPages = ['/login', '/landing']
 // Fully public and locale-free. Empty now, kept because the check below is
 // still the right shape for anything that must bypass the locale prefix.
@@ -27,21 +23,11 @@ const intlMiddleware = createMiddleware({
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Bare, locale-less root: this is the front door for organic/typed traffic.
-  // A redirect (not a rewrite) on purpose — `AppShell` decides whether to
-  // render the CRM chrome by reading the browser's *actual* pathname via
-  // `usePathname()`, which a rewrite would never update (the browser stays
-  // on "/", none the wiser). A redirect lands the visitor on the real
-  // /{locale}/landing URL, so that check — and next-intl's own locale
-  // resolution — see the same path the server rendered. Every other locale
-  // keeps its own explicit, shareable URL (/en/landing, /es/landing, ...);
-  // this only covers the truly bare case. Skips auth entirely, same as
-  // /{locale}/landing below: it's the public marketing entry point, not an
-  // app route.
-  if (pathname === '/') {
-    return NextResponse.redirect(new URL(`/${landingLocale}/landing`, request.url))
-  }
-
+  // Bare, locale-less root goes straight to login (in the default locale,
+  // 'zh') — same as any other unauthenticated app route, handled by the
+  // normal auth check below. The landing page is a separate, explicit
+  // destination now (/{locale}/landing) — it no longer lives at "/", so
+  // this file has nothing special to do for the bare-root case.
   const pathnameHasLocale = locales.some(
     locale => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
   )
