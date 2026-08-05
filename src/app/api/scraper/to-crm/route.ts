@@ -27,6 +27,27 @@ export async function POST(req: NextRequest) {
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (caller.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  // The role check above is NOT enough. `isGlobalAdmin()` in
+  // src/lib/supabase/server.ts defines a legacy global admin as
+  // `role === 'admin' && organization_id == null` — so an org-less admin
+  // passes line 28 and used to reach the insert below, which wrote
+  // `organization_id: caller.organization_id ?? null`.
+  //
+  // A prospect with a NULL organization_id is unreachable by EVERY RLS policy
+  // on the table: both the admin branch and the SDR branch compare
+  // `organization_id = my_org_id()`, and NULL never equals anything. The rows
+  // are inserted, counted as imported, assigned to a real SDR — and then
+  // never appear on anyone's board, with no error raised anywhere. 20 leads
+  // were lost this way between 18–29 July 2026 before it was noticed.
+  //
+  // Refusing is the only safe answer: there is no correct org to guess.
+  if (!caller.organization_id) {
+    return NextResponse.json(
+      { error: 'This account is not attached to an organization, so leads have no owner to import into.' },
+      { status: 403 }
+    )
+  }
+
   const { run_id, area_id, assigned_to } = await req.json()
   if (!run_id || !area_id) return NextResponse.json({ error: 'run_id y area_id requeridos' }, { status: 400 })
 
@@ -34,6 +55,22 @@ export async function POST(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
+
+  // The site the leads land in follows the rep receiving them, read off their
+  // own row rather than accepted from the request body — the same rule
+  // `area_id` follows, and for the same reason: it decides who can see the
+  // lead. Scoped to the caller's org so a foreign user id resolves to nothing
+  // instead of placing leads in another organization's site.
+  let targetWorkspaceId: string | null = null
+  if (assigned_to) {
+    const { data: assignee } = await admin
+      .from('users')
+      .select('workspace_id')
+      .eq('id', assigned_to)
+      .eq('organization_id', caller.organization_id)
+      .maybeSingle()
+    targetWorkspaceId = assignee?.workspace_id ?? null
+  }
 
   // Fetch leads from Supabase scraper_leads table
   const { data: leads, error: leadsError } = await admin
@@ -95,7 +132,11 @@ export async function POST(req: NextRequest) {
       outreach_status: 'new',
       area_id,
       assigned_to: assigned_to || null,
-      organization_id: caller.organization_id ?? null,
+      workspace_id: targetWorkspaceId,
+      // No `?? null` fallback: the guard at the top of this handler already
+      // rejected an org-less caller, and re-introducing a fallback here would
+      // quietly restore the orphaned-prospect bug it exists to prevent.
+      organization_id: caller.organization_id,
       flag_tomorrow: false,
     })
     importedLeadIds.push(lead.id)

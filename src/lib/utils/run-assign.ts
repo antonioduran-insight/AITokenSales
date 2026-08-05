@@ -52,7 +52,19 @@ export async function assignRunLeads({
     .eq('id', runId)
     .single()
 
-  if (!run || run.organization_id !== organizationId) {
+  // The emptiness checks are not redundant with the comparison: `null !== null`
+  // is FALSE, so a run whose organization_id is NULL, reconciled with an
+  // organizationId that is also NULL (the cron passes `run.organization_id`
+  // straight back in, so it satisfies itself), used to sail through this guard
+  // and then write `organization_id: null` onto every prospect below.
+  //
+  // A prospect with a NULL organization_id is invisible to every RLS policy on
+  // the table — both the admin branch and the SDR branch compare
+  // `organization_id = my_org_id()`, and NULL equals nothing. The leads are
+  // inserted, counted, assigned to a real SDR, and never appear on any board,
+  // with no error anywhere. See 20260805_repair_orphaned_prospects.sql for the
+  // 20 rows this produced in July 2026.
+  if (!run || !run.organization_id || !organizationId || run.organization_id !== organizationId) {
     return { ok: false, status: 404, error: 'Run not found' }
   }
 
@@ -77,7 +89,7 @@ export async function assignRunLeads({
   // Fetch the SDR's primary area so the prospects land in their kanban
   const { data: sdrRow } = await admin
     .from('users')
-    .select('id, area_id, organization_id')
+    .select('id, area_id, organization_id, workspace_id')
     .eq('id', sdrId)
     .eq('organization_id', organizationId)
     .maybeSingle()
@@ -180,6 +192,12 @@ export async function assignRunLeads({
       area_id: sdrAreaId,
       assigned_to: sdrId,
       organization_id: organizationId,
+      // The lead lands in whichever site its rep works at. Inherited rather
+      // than derived from the market, because sites and markets are
+      // independent — a Taiwan office and a Hong Kong office can both work
+      // Taiwan. NULL when the rep has no site (the normal case for an org that
+      // never bought the add-on), which keeps the lead org-wide.
+      workspace_id: sdrRow.workspace_id ?? null,
       flag_tomorrow: false,
     })
   }
