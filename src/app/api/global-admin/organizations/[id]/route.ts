@@ -186,44 +186,51 @@ export async function DELETE(
   const { data: orgUsers } = await admin.from('users').select('id').eq('organization_id', id)
   const userIds = (orgUsers ?? []).map((u: { id: string }) => u.id)
 
-  // Delete in FK-safe order
-  // 1. run_sdr_assignments (references runs and users)
-  const { data: orgRuns } = await admin.from('runs').select('id').eq('organization_id', id)
-  if (orgRuns && orgRuns.length > 0) {
-    const runIds = orgRuns.map((r: { id: string }) => r.id)
-    await admin.from('run_sdr_assignments').delete().in('run_id', runIds)
+  // Everything in the database goes in ONE transaction.
+  //
+  // This used to be fifteen sequential deletes over HTTP, ending with the
+  // organization itself. Six tables that reference `organizations` with
+  // ON DELETE NO ACTION were missing from that list (prospects, audit_log,
+  // conversations, notes, areas, csv_import_sessions), so any org with a
+  // single lead failed on the very last statement — by which point its users
+  // and their auth accounts had already been deleted three steps earlier.
+  //
+  // The result was a half-destroyed organization: leads intact, nobody left
+  // who could log in and reach them. `testorg` was left in exactly that state
+  // on 05/08/2026. Separate HTTP calls cannot be rolled back; a function can.
+  const { error: rpcError } = await admin.rpc('delete_organization', { p_org_id: id })
+  if (rpcError) {
+    return NextResponse.json(
+      { error: `Nothing was deleted. ${rpcError.message}` },
+      { status: 400 }
+    )
   }
 
-  // 2. runs
-  await admin.from('runs').delete().eq('organization_id', id)
-
-  // 3. sender_profiles (by organization_id or user_id)
-  await admin.from('sender_profiles').delete().eq('organization_id', id)
-
-  // 4. org_combos
-  await admin.from('org_combos').delete().eq('organization_id', id)
-
-  // 5. monthly_lead_counts
-  await admin.from('monthly_lead_counts').delete().eq('organization_id', id)
-
-  // 6. organization_addons
-  await admin.from('organization_addons').delete().eq('organization_id', id)
-
-  // 7. support_tickets (may not exist)
-  try { await admin.from('support_tickets').delete().eq('organization_id', id) } catch { /* table may not exist */ }
-
-  // 8. public users row
-  if (userIds.length > 0) {
-    await admin.from('users').delete().in('id', userIds)
-  }
-
-  // 9. auth users
+  // Auth accounts last, and only once the transaction above has committed.
+  //
+  // The Supabase Auth admin API can't join that transaction, so one of the two
+  // has to go first. This order is the safe one: an auth account left behind
+  // for an org that no longer exists is an inert orphan, while the reverse —
+  // deleted logins for an org that still exists — is precisely the failure
+  // being fixed here.
+  //
+  // Individual failures are collected rather than thrown: the organization is
+  // already gone, so aborting here would just hide which accounts survived.
+  const orphanedAuthAccounts: string[] = []
   for (const uid of userIds) {
-    try { await admin.auth.admin.deleteUser(uid) } catch { /* ignore individual failures */ }
+    const { error: authErr } = await admin.auth.admin.deleteUser(uid)
+    if (authErr) orphanedAuthAccounts.push(uid)
   }
 
-  // 10. delete organization
-  const { error } = await admin.from('organizations').delete().eq('id', id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  return NextResponse.json({ ok: true })
+  if (orphanedAuthAccounts.length > 0) {
+    // Loud, because a surviving auth account permanently burns its email
+    // address — Supabase refuses to register an address that already exists,
+    // so the person could never be re-invited under it.
+    console.error(
+      `[delete-org] org ${id} deleted, but ${orphanedAuthAccounts.length} auth account(s) ` +
+      `could not be removed and now block their email addresses: ${orphanedAuthAccounts.join(', ')}`
+    )
+  }
+
+  return NextResponse.json({ ok: true, orphaned_auth_accounts: orphanedAuthAccounts.length })
 }
