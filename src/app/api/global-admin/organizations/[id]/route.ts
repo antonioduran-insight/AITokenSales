@@ -50,10 +50,16 @@ export async function GET(
 
   if (error || !org) return NextResponse.json({ error: error?.message ?? 'Not found' }, { status: 404 })
 
-  const [adminsRes, sdrsRes, addonsRes] = await Promise.all([
+  const [adminsRes, sdrsRes, addonsRes, addonHistoryRes] = await Promise.all([
     admin.from('users').select('email').eq('organization_id', id).eq('role', 'admin').eq('is_active', true).limit(1).single(),
     admin.from('users').select('id', { count: 'exact', head: true }).eq('organization_id', id).eq('role', 'sdr').eq('is_active', true),
     admin.from('organization_addons').select('*').eq('organization_id', id).eq('is_active', true),
+    // Internal-only trail of who turned each add-on on/off and when.
+    // `organization_addons` above is current state only, so without this a
+    // billing question about a past period has no answer. Capped because this
+    // is a sidebar-sized panel, not a full log viewer.
+    admin.from('addon_audit_log').select('*').eq('organization_id', id)
+      .order('created_at', { ascending: false }).limit(50),
   ])
 
   const now = new Date()
@@ -71,6 +77,9 @@ export async function GET(
     admin_email: adminsRes.data?.email ?? null,
     sdr_count: sdrsRes.count ?? 0,
     addons: addonsRes.data ?? [],
+    // Empty rather than absent when the migration hasn't been run yet, so the
+    // panel renders "no history" instead of the page failing to load.
+    addon_history: addonHistoryRes.data ?? [],
     leads_this_month: leadsThisMonth,
   })
 }

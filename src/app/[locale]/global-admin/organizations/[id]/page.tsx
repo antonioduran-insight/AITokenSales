@@ -20,14 +20,31 @@ const PLAN_COLORS: Record<string, string> = {
 // until this lives in a single shared constant.
 const DEFAULT_ANTHROPIC_MODEL = 'claude-sonnet-5'
 
+type AddonHistoryEntry = {
+  id: string
+  addon_type: string
+  action: 'activated' | 'deactivated'
+  actor_name: string | null
+  price_monthly: number | null
+  created_at: string
+}
+
 type OrgDetail = Organization & {
   admin_email: string | null
   sdr_count: number
   addons: OrganizationAddon[]
+  addon_history: AddonHistoryEntry[]
   leads_this_month: number
 }
 
 type AddonType = typeof ADDON_LIST[number]['type']
+
+// Derived from ADDON_LIST rather than written out again, so a new add-on gets
+// its history label for free. A hardcoded copy of this exact mapping is what
+// left `bridge` showing as a raw string in the customer's Settings page.
+const ADDON_LABEL_KEY: Record<string, string> = Object.fromEntries(
+  ADDON_LIST.map(a => [a.type, a.labelKey])
+)
 
 function generateSlug(name: string) {
   return name.toLowerCase().trim()
@@ -45,6 +62,7 @@ export default function OrgDetailPage() {
   const { colors, t } = useGlobalAdminTheme()
 
   const [org, setOrg] = useState<OrgDetail | null>(null)
+  const [addonHistory, setAddonHistory] = useState<AddonHistoryEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -115,6 +133,10 @@ export default function OrgDetailPage() {
       setAnthropicBaseUrl(data.anthropic_base_url ?? 'https://api.aitokenking.com.tw/api/v1')
       setAnthropicModel(data.anthropic_model ?? DEFAULT_ANTHROPIC_MODEL)
       setActiveAddons(new Set(data.addons.map((a: OrganizationAddon) => a.addon_type)))
+      // `?? []` is load-bearing: until the addon_audit_log migration is run by
+      // hand, the API can't return this key and the panel must simply not
+      // render rather than crashing the whole org page.
+      setAddonHistory(data.addon_history ?? [])
 
       // QA-F28: Vendor used to be free text, risking silent duplicates from
       // a typo (e.g. "testvendor" vs "TestVendor") that split revenue
@@ -244,14 +266,24 @@ export default function OrgDetailPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ addon_type: addonType }),
         })
-        if (res.ok) setActiveAddons(prev => { const s = new Set(prev); s.delete(addonType); return s })
+        if (res.ok) {
+          setActiveAddons(prev => { const s = new Set(prev); s.delete(addonType); return s })
+          // Refetch rather than optimistically prepending: the history panel
+          // must show what was actually recorded. The audit write is
+          // deliberately non-blocking server-side, so inventing a row here
+          // could display an event that never made it into the table.
+          load()
+        }
       } else {
         const res = await fetch(`/api/global-admin/organizations/${id}/addons`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ addon_type: addonType }),
         })
-        if (res.ok) setActiveAddons(prev => new Set([...prev, addonType]))
+        if (res.ok) {
+          setActiveAddons(prev => new Set([...prev, addonType]))
+          load()
+        }
       }
     } catch { /* network error */ } finally { setTogglingAddon(null) }
   }
@@ -555,6 +587,46 @@ export default function OrgDetailPage() {
                 )
               })}
             </div>
+
+            {/* Internal-only history. `organization_addons` holds current state
+                only — flipping a toggle twice erases what happened — so this is
+                the only place that answers "who enabled this, and when" for a
+                paid add-on. Never shown to the customer: it lives in Global
+                Admin and its table's RLS is admin_global-only. */}
+            {addonHistory.length > 0 && (
+              <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${colors.border}` }}>
+                <p style={{
+                  fontSize: 10, fontWeight: 700, color: colors.textMuted, margin: '0 0 9px',
+                  textTransform: 'uppercase', letterSpacing: '0.07em',
+                }}>{t('addOnHistory')}</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto' }}>
+                  {addonHistory.map(h => {
+                    const on = h.action === 'activated'
+                    return (
+                      <div key={h.id} style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 12 }}>
+                        <span style={{
+                          fontSize: 9.5, fontWeight: 700, padding: '1px 6px', borderRadius: 4, flexShrink: 0,
+                          backgroundColor: on ? '#22C55E20' : `${colors.textMuted}25`,
+                          color: on ? '#22C55E' : colors.textMuted,
+                        }}>{on ? t('addOnOn') : t('addOnOff')}</span>
+                        {/* Unbounded label beside fixed-width date: the text side
+                            has to be allowed to shrink or it pushes the date off. */}
+                        <span style={{
+                          flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap', color: colors.textSecondary,
+                        }}>
+                          {ADDON_LABEL_KEY[h.addon_type] ? t(ADDON_LABEL_KEY[h.addon_type]) : h.addon_type}
+                          {h.actor_name && <span style={{ color: colors.textMuted }}> · {h.actor_name}</span>}
+                        </span>
+                        <span style={{ fontSize: 11, color: colors.textMuted, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                          {new Date(h.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Danger Zone */}
