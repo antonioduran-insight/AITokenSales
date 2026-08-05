@@ -8,7 +8,7 @@ import { PLAN_PRICES, ADDON_MONTHLY_PRICE, type Organization, type Vendor } from
 import { quarterDef, billingForQuarter, type FiscalQuarter } from '@/lib/utils/quarter'
 import { Download } from 'lucide-react'
 
-type OrgWithAddons = Organization & { addons: string[] }
+type OrgWithAddons = Organization & { addons: string[]; workspace_count?: number }
 
 const SETUP_FEE = 1000
 const PARTNERS = { frank: 'Frank Kao', nicolas: 'Nicolás Nicoli' }
@@ -52,8 +52,28 @@ function planMonthly(org: Organization): number {
   return PLAN_PRICES[org.plan] ?? 0
 }
 
+/**
+ * Monthly run-rate of an org's add-ons.
+ *
+ * Every add-on is a flat monthly fee except Multi-workspace, which the product
+ * brief (Aug 2026) prices at $300 per month PER SITE. The main site is
+ * included with the plan the same way it is on Premium — what the add-on sells
+ * is the ability to have more than one — so only the additional sites are
+ * charged. Three sites bill $600, not $900.
+ *
+ * `workspace_count` is computed server-side by counting active rows, so this
+ * cannot drift away from how many sites the customer actually has. Guarded
+ * with Math.max(0, …) because a count of 0 (an org whose sites were all
+ * deactivated) must bill nothing, never a negative that quietly credits them.
+ */
 function addonsMonthly(org: OrgWithAddons): number {
-  return (org.addons ?? []).reduce((s, a) => s + (ADDON_MONTHLY_PRICE[a] ?? 0), 0)
+  return (org.addons ?? []).reduce((s, a) => {
+    if (a === 'multi_workspace') {
+      const extraSites = Math.max(0, (org.workspace_count ?? 1) - 1)
+      return s + (ADDON_MONTHLY_PRICE.multi_workspace ?? 0) * extraSites
+    }
+    return s + (ADDON_MONTHLY_PRICE[a] ?? 0)
+  }, 0)
 }
 
 interface ReportRow {

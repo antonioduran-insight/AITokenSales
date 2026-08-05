@@ -27,10 +27,16 @@ export async function GET() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  const [orgsRes, addonsRes, vendorsRes] = await Promise.all([
+  const [orgsRes, addonsRes, vendorsRes, workspacesRes] = await Promise.all([
     admin.from('organizations').select('*').order('created_at', { ascending: false }),
     admin.from('organization_addons').select('organization_id, addon_type, is_active').eq('is_active', true),
     admin.from('vendors').select('*').order('name'),
+    // Multi-workspace is billed per site, so the report needs the COUNT, not
+    // just whether the add-on is on. Derived by counting rather than stored as
+    // a quantity column on organization_addons: a stored number goes stale the
+    // first time somebody adds a site without updating it, and then the
+    // invoice and the product disagree with nobody noticing.
+    admin.from('workspaces').select('organization_id').eq('is_active', true),
   ])
 
   if (orgsRes.error) return NextResponse.json({ error: orgsRes.error.message }, { status: 400 })
@@ -42,9 +48,18 @@ export async function GET() {
     addonsByOrg.set(a.organization_id, list)
   }
 
+  const workspaceCount = new Map<string, number>()
+  for (const w of workspacesRes.data ?? []) {
+    workspaceCount.set(w.organization_id, (workspaceCount.get(w.organization_id) ?? 0) + 1)
+  }
+
   const orgs = (orgsRes.data ?? []).map(o => ({
     ...o,
     addons: addonsByOrg.get(o.id) ?? [],
+    // 1 rather than 0 when the table has no row yet: every org conceptually
+    // has its main site, and the billing formula subtracts it. Defaulting to 0
+    // would make the subtraction produce -1 and credit the customer $300.
+    workspace_count: workspaceCount.get(o.id) ?? 1,
   }))
 
   return NextResponse.json({ orgs, vendors: vendorsRes.data ?? [] })
