@@ -675,7 +675,15 @@
       "bridge": "Bridge (Alianzas)"
     },
     "companyContextPlaceholder": "Describí qué hace tu empresa, a quién le vendés y cualquier producto o foco específico que quieras que mencionen tus mensajes de contacto. Ejemplo: vendemos software de CRM con IA a equipos de ventas B2B en Asia. Ahora estamos empujando nuestra nueva función de automatización — mencionala cuando venga al caso.",
-    "bridgeContextPlaceholder": "Describí qué tipo de partnerships buscás a través de Bridge — qué ofrecés como partner, qué buscás a cambio y cualquier tipo de acuerdo específico que quieras priorizar ahora. Ejemplo: buscamos partners revendedores del rubro SaaS que atiendan empresas mid-market. Ofrecemos 20% de comisión y soporte completo de onboarding."
+    "bridgeContextPlaceholder": "Describí qué tipo de partnerships buscás a través de Bridge — qué ofrecés como partner, qué buscás a cambio y cualquier tipo de acuerdo específico que quieras priorizar ahora. Ejemplo: buscamos partners revendedores del rubro SaaS que atiendan empresas mid-market. Ofrecemos 20% de comisión y soporte completo de onboarding.",
+    "sites": "Sedes",
+    "sitesHelp": "Sedes dentro de tu organización. Cada una tiene sus propias personas y leads; un admin de toda la organización las ve todas.",
+    "sitePlaceholder": "Nombre de la sede (ej. Hong Kong)",
+    "siteAdd": "Agregar sede",
+    "siteDeactivate": "Desactivar",
+    "siteActivate": "Activar",
+    "siteInactive": "Inactiva",
+    "siteMembers": "{count, plural, =0 {sin miembros} one {# miembro} other {# miembros}}"
   },
   "run": {
     "title": "Nueva Búsqueda",

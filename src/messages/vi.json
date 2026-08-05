@@ -675,7 +675,15 @@
       "bridge": "Bridge (Đối tác)"
     },
     "companyContextPlaceholder": "Mô tả công ty bạn làm gì, bán cho ai, và bất kỳ sản phẩm hay trọng tâm cụ thể nào bạn muốn tin nhắn tiếp cận đề cập. Ví dụ: Chúng tôi bán phần mềm CRM ứng dụng AI cho các đội bán hàng B2B tại châu Á. Hiện chúng tôi đang đẩy mạnh tính năng tự động hóa mới — hãy đề cập khi phù hợp.",
-    "bridgeContextPlaceholder": "Mô tả loại quan hệ hợp tác bạn đang tìm kiếm qua Bridge — bạn mang lại gì với vai trò đối tác, bạn muốn nhận lại gì, và loại thỏa thuận cụ thể nào bạn muốn ưu tiên ngay bây giờ. Ví dụ: Chúng tôi đang tìm các đối tác phân phối trong lĩnh vực SaaS phục vụ doanh nghiệp tầm trung. Chúng tôi trả 20% hoa hồng và hỗ trợ triển khai đầy đủ."
+    "bridgeContextPlaceholder": "Mô tả loại quan hệ hợp tác bạn đang tìm kiếm qua Bridge — bạn mang lại gì với vai trò đối tác, bạn muốn nhận lại gì, và loại thỏa thuận cụ thể nào bạn muốn ưu tiên ngay bây giờ. Ví dụ: Chúng tôi đang tìm các đối tác phân phối trong lĩnh vực SaaS phục vụ doanh nghiệp tầm trung. Chúng tôi trả 20% hoa hồng và hỗ trợ triển khai đầy đủ.",
+    "sites": "Chi nhánh",
+    "sitesHelp": "Các chi nhánh trong tổ chức của bạn. Mỗi chi nhánh có nhân sự và khách hàng riêng; quản trị viên toàn tổ chức thấy tất cả.",
+    "sitePlaceholder": "Tên chi nhánh (ví dụ: Hong Kong)",
+    "siteAdd": "Thêm chi nhánh",
+    "siteDeactivate": "Vô hiệu hóa",
+    "siteActivate": "Kích hoạt",
+    "siteInactive": "Không hoạt động",
+    "siteMembers": "{count, plural, other {# thành viên}}"
   },
   "run": {
     "title": "Lượt Thu Thập Mới",

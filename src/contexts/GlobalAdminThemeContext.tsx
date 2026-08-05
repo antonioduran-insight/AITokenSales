@@ -44,6 +44,7 @@ const translations = {
     addOn_extended_data_retention: '延長數據保留', addOn_sso: 'SSO 整合',
     addOn_linkedin_auto_messaging: 'LinkedIn 自動發送', addOn_bridge: 'Bridge（合作夥伴探索）',
     addOnHistory: '附加功能異動紀錄', addOnOn: '啟用', addOnOff: '停用',
+    addOnIncludedInPlan: '方案已內含', addOnNotOnPlan: '此方案不適用', addOnPlanMismatch: '與方案不符',
     billingDay: '計費日', save: '保存', saving: '保存中...', saved: '已保存',
     // `deactivate` is generic on purpose (it pairs with `activate` and is
     // reused on the Vendors screen, where "Deactivate Organization" was
@@ -86,6 +87,7 @@ const translations = {
     addOn_extended_data_retention: 'Extended Data Retention', addOn_sso: 'SSO Integration',
     addOn_linkedin_auto_messaging: 'LinkedIn Auto-messaging', addOn_bridge: 'Bridge (Partnerships)',
     addOnHistory: 'Add-on history', addOnOn: 'ON', addOnOff: 'OFF',
+    addOnIncludedInPlan: 'included in plan', addOnNotOnPlan: 'not on this plan', addOnPlanMismatch: 'plan mismatch',
     billingDay: 'Billing Day', save: 'Save Changes', saving: 'Saving...', saved: 'Saved',
     deactivate: 'Deactivate', deactivateOrganization: 'Deactivate Organization',
     changeStatus: 'Change Status',

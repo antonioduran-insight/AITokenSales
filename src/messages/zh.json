@@ -675,7 +675,15 @@
       "bridge": "Bridge（合作夥伴探索）"
     },
     "companyContextPlaceholder": "描述您的公司做什麼、賣給誰，以及您希望外展訊息提到的特定產品或重點。例如：我們向亞洲的 B2B 銷售團隊銷售 AI 驅動的 CRM 軟體。目前我們正在推廣新的自動化功能 — 相關時請提及。",
-    "bridgeContextPlaceholder": "描述您希望透過 Bridge 尋找什麼樣的合作夥伴 — 您作為夥伴能提供什麼、希望換取什麼，以及目前想優先進行的特定合作類型。例如：我們正在尋找 SaaS 領域中服務中型企業的經銷夥伴。我們提供 20% 佣金與完整的導入支援。"
+    "bridgeContextPlaceholder": "描述您希望透過 Bridge 尋找什麼樣的合作夥伴 — 您作為夥伴能提供什麼、希望換取什麼，以及目前想優先進行的特定合作類型。例如：我們正在尋找 SaaS 領域中服務中型企業的經銷夥伴。我們提供 20% 佣金與完整的導入支援。",
+    "sites": "據點",
+    "sitesHelp": "組織內的各個據點。每個據點有自己的成員與名單；組織層級的管理員可以看到全部。",
+    "sitePlaceholder": "據點名稱（例如：香港）",
+    "siteAdd": "新增據點",
+    "siteDeactivate": "停用",
+    "siteActivate": "啟用",
+    "siteInactive": "已停用",
+    "siteMembers": "{count, plural, other {# 位成員}}"
   },
   "run": {
     "title": "新抓取任務",

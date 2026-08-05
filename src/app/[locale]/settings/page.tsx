@@ -7,7 +7,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { useUser } from '@/contexts/UserContext'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import { OrgMarketsSettings } from '@/components/markets/OrgMarketsSettings'
-import type { Organization, OrganizationAddon, ScraperComboMaster, User, SenderProfile } from '@/lib/types'
+import type { Organization, OrganizationAddon, ScraperComboMaster, User, SenderProfile, Workspace } from '@/lib/types'
 
 const PLAN_COLORS: Record<string, string> = {
   basic: '#3B82F6',
@@ -220,6 +220,163 @@ function OrgTab() {
 // ────────────────────────────────────────────────────────────────────────────
 // Tab 2 — Plan & Usage
 // ────────────────────────────────────────────────────────────────────────────
+// Sites (workspaces)
+// ────────────────────────────────────────────────────────────────────────────
+type WorkspaceRow = Workspace & { member_count: number }
+
+/**
+ * Manage the org's sites — branch offices, each with its own people and leads.
+ *
+ * Renders NOTHING at all unless the org has the `multi_workspace` add-on. An
+ * org that will never buy it should not learn the feature exists from an empty
+ * panel it can't use; the API enforces the same gate independently, since UI
+ * gating is never the security boundary.
+ *
+ * Read-only for a site admin (someone whose own `workspace_id` is set). They
+ * can see the layout of the org they work in, but letting them create a site
+ * and move into it would defeat the partition confining them.
+ */
+function WorkspacesSection() {
+  const t = useTranslations('settings')
+  const tc = useTranslations('common')
+  const [rows, setRows] = useState<WorkspaceRow[]>([])
+  const [addonActive, setAddonActive] = useState(false)
+  const [canManage, setCanManage] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+
+  const load = async () => {
+    try {
+      const res = await fetch('/api/workspaces')
+      if (!res.ok) { setLoaded(true); return }
+      const d = await res.json()
+      setRows(d.workspaces ?? [])
+      setAddonActive(!!d.addon_active)
+      setCanManage(!!d.can_manage)
+    } catch { /* leave hidden */ } finally { setLoaded(true) }
+  }
+
+  useEffect(() => { load() }, [])
+
+  // Every mutation reloads instead of patching local state: `member_count` is
+  // computed server-side and a rename can collide, so the server's answer is
+  // the only trustworthy view of what actually happened.
+  const call = async (method: string, body: Record<string, unknown>) => {
+    setBusy(true); setError(null)
+    try {
+      const res = await fetch('/api/workspaces', {
+        method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(d.error ?? tc('error')); return false }
+      await load()
+      return true
+    } catch { setError(tc('error')); return false } finally { setBusy(false) }
+  }
+
+  if (!loaded || !addonActive) return null
+
+  return (
+    <div style={S.card}>
+      <p style={{ ...S.sectionTitle, marginBottom: 6 }}>{t('sites')}</p>
+      <p style={{ fontSize: 12.5, color: 'var(--crm-text-muted)', margin: '0 0 16px' }}>
+        {t('sitesHelp')}
+      </p>
+
+      {error && (
+        <div style={{ padding: '9px 12px', borderRadius: 8, marginBottom: 12, fontSize: 12.5,
+                      background: '#EF444415', border: '1px solid #EF444440', color: '#EF4444' }}>
+          {error}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: canManage ? 16 : 0 }}>
+        {rows.map(w => (
+          <div key={w.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', rowGap: 8,
+                                   padding: '10px 14px', backgroundColor: 'var(--crm-surface-raised)', borderRadius: 8 }}>
+            {editingId === w.id ? (
+              <>
+                <input
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  style={{ ...S.input, flex: 1, minWidth: 0, width: 'auto' }}
+                  autoFocus
+                />
+                <button
+                  disabled={busy}
+                  onClick={async () => { if (await call('PATCH', { id: w.id, name: editName })) setEditingId(null) }}
+                  style={{ ...S.btn, padding: '6px 14px' }}
+                >{tc('save')}</button>
+                <button onClick={() => setEditingId(null)} style={{ ...S.btnGhost, padding: '6px 12px' }}>
+                  {tc('cancel')}
+                </button>
+              </>
+            ) : (
+              <>
+                {/* minWidth:0 so a long site name ellipsizes instead of pushing
+                    the member count and buttons off a narrow screen. */}
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis',
+                               whiteSpace: 'nowrap', fontSize: 13, fontWeight: 500,
+                               color: w.is_active ? 'var(--crm-text-primary)' : 'var(--crm-text-muted)' }}>
+                  {w.name}
+                  {!w.is_active && (
+                    <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--crm-text-muted)',
+                                   border: '1px solid var(--crm-border)', borderRadius: 3, padding: '1px 6px' }}>
+                      {t('siteInactive')}
+                    </span>
+                  )}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--crm-text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {t('siteMembers', { count: w.member_count })}
+                </span>
+                {canManage && (
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button
+                      onClick={() => { setEditingId(w.id); setEditName(w.name) }}
+                      style={{ ...S.btnGhost, padding: '5px 11px', fontSize: 12 }}
+                    >{tc('edit')}</button>
+                    <button
+                      disabled={busy}
+                      onClick={() => call('PATCH', { id: w.id, is_active: !w.is_active })}
+                      style={{ ...S.btnGhost, padding: '5px 11px', fontSize: 12 }}
+                    >{w.is_active ? t('siteDeactivate') : t('siteActivate')}</button>
+                    <button
+                      disabled={busy}
+                      onClick={() => call('DELETE', { id: w.id })}
+                      style={{ ...S.btnGhost, padding: '5px 11px', fontSize: 12, color: '#EF4444', borderColor: '#EF444440' }}
+                    >{tc('delete')}</button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {canManage && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', rowGap: 8 }}>
+          <input
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            placeholder={t('sitePlaceholder')}
+            style={{ ...S.input, flex: 1, minWidth: 180, width: 'auto' }}
+          />
+          <button
+            disabled={busy || !newName.trim()}
+            onClick={async () => { if (await call('POST', { name: newName })) setNewName('') }}
+            style={{ ...S.btn, opacity: busy || !newName.trim() ? 0.5 : 1 }}
+          >{t('siteAdd')}</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 interface PlanData {
   org: Organization & { custom_price?: number | null }
   sdrCount: number
@@ -385,6 +542,8 @@ function PlanTab() {
           </div>
         )}
       </div>
+
+      <WorkspacesSection />
 
       {/* Buy Seats modal */}
       {showBuySeats && (
