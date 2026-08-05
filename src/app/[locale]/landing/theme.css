@@ -174,3 +174,11 @@
     transition-duration: .001ms !important;
   }
 }
+
+/* Nav on a phone already fights for space between the language label and the
+   CTA (see .ld-nav-tag above). "Sign in" is the first thing to drop: a
+   returning customer types the app URL or uses a bookmark, while a prospect
+   needs the CTA visible. */
+@media (max-width: 640px) {
+  .ld-nav-login { display: none; }
+}

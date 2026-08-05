@@ -132,6 +132,20 @@ function Nav({
           )}
         </div>
 
+        {/* A way into the product for anyone who arrives here already a
+            customer — from a shared link, a search result, or once the CRM
+            moves to its own subdomain and this page owns the apex. */}
+        <a
+          href={`/${locale}/login`}
+          className="ld-nav-login"
+          style={{
+            fontSize: 12.5, fontWeight: 600, textDecoration: 'none',
+            color: 'var(--ld-text-soft)', whiteSpace: 'nowrap',
+          }}
+        >
+          {t('navLogin')}
+        </a>
+
         <a href="#demo" style={{ ...primaryBtn, padding: '8px 16px', fontSize: 12.5 }}>
           {t('navCta')}
         </a>
