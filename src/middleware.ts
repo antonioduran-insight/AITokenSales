@@ -63,6 +63,11 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     const locale = pathnameHasLocale ? pathname.split('/')[1] : defaultLocale
+
+    // The bare domain keeps going to the app while the landing is still being
+    // built. The plan is to move the CRM to its own subdomain and give the
+    // apex to marketing; until that split happens, the root belongs to the
+    // product and the landing is reached directly at /landing.
     const redirectResponse = NextResponse.redirect(new URL(`/${locale}/login`, request.url))
     // Relay whatever Supabase wrote to `response` (e.g. clearing an invalid
     // session) so the browser doesn't keep resending stale cookies.
