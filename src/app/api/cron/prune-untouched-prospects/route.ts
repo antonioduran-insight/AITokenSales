@@ -89,6 +89,32 @@ export async function GET(req: NextRequest) {
   const dryRun = req.nextUrl.searchParams.get('dry_run') === '1'
   const admin = adminClient()
 
+  // Sentinel, unrelated to retention but riding along because this is the only
+  // job that already sweeps `prospects` daily.
+  //
+  // A prospect with a NULL organization_id is unreachable by every RLS policy
+  // on the table (both the admin and SDR branches compare
+  // `organization_id = my_org_id()`, and NULL equals nothing), so it is
+  // inserted, counted as imported, assigned to a real rep, and then simply
+  // never appears — with no error raised anywhere. 20 rows sat like that for
+  // weeks in July 2026 before anyone noticed, and by the time they were
+  // repaired there was no trail left to prove which insert path had produced
+  // them. Three candidates were closed; this exists in case a fourth shows up.
+  //
+  // Reported, never deleted: an orphan is a lead somebody paid to acquire, and
+  // the fix is to restore its owner, not to remove the evidence.
+  const { count: orphanCount } = await admin
+    .from('prospects')
+    .select('id', { count: 'exact', head: true })
+    .is('organization_id', null)
+
+  if (orphanCount && orphanCount > 0) {
+    console.error(
+      `[retention] ORPHANS: ${orphanCount} prospect(s) have organization_id = NULL ` +
+      `and are invisible to every user. An insert path is not setting the org.`
+    )
+  }
+
   // Window override, accepted ONLY in dry-run. Without it this logic can't be
   // exercised until the oldest data actually crosses RETENTION_MONTHS, which
   // means shipping a destructive job whose selection has never once been
@@ -144,6 +170,7 @@ export async function GET(req: NextRequest) {
       exempt_orgs: exemptOrgs.size,
       candidates: candidates?.length ?? 0,
       deleted: 0, kept_because_touched: 0, by_org: {},
+      orphaned_prospects: orphanCount ?? 0,
     })
   }
 
@@ -223,6 +250,8 @@ export async function GET(req: NextRequest) {
     capped: deletable.length > MAX_DELETIONS_PER_INVOCATION,
     by_org: byOrg,
     lookup_failures: lookupFailures,
+    // Must always be 0. Anything else means an insert path lost the org.
+    orphaned_prospects: orphanCount ?? 0,
     errors,
   })
 }
