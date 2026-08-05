@@ -362,7 +362,14 @@
     "deactivateSuccess": "SDR deactivated successfully",
     "cannotDeactivateAdmin": "Cannot deactivate admin users",
     "admin": "Admin",
-    "sdr": "SDR"
+    "sdr": "SDR",
+    "accessMethod": "How they sign in",
+    "sendInvite": "Send an invitation",
+    "sendInviteHelp": "They receive an email and choose their own password. Nothing secret is shared.",
+    "setTempPassword": "Set a temporary password",
+    "setTempPasswordHelp": "Use only if invitation emails are not working — you will have to pass the password on yourself.",
+    "pendingInvite": "Invited",
+    "pendingInviteHelp": "Invitation sent, but this person has never signed in."
   },
   "common": {
     "loading": "Loading...",
@@ -875,5 +882,18 @@
     "demoConvNote": "Each thread is written in the prospect's own language — not machine-translated from a single template. These four are real, unedited examples in Traditional Chinese, Spanish, Vietnamese, and English.",
     "demoMobileMenu": "Toggle menu",
     "navLogin": "Sign in"
+  },
+  "setPassword": {
+    "title": "Choose your password",
+    "subtitle": "You are setting up access for {email}.",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm password",
+    "submit": "Set password and continue",
+    "saving": "Saving…",
+    "tooShort": "Use at least 8 characters.",
+    "mismatch": "The two passwords do not match.",
+    "expiredTitle": "This link is no longer valid",
+    "expiredBody": "Invitation links can only be used once, and they expire. Ask your administrator to send a new one.",
+    "backToLogin": "Back to sign in"
   }
 }

@@ -362,7 +362,14 @@
     "deactivateSuccess": "SDR desactivado exitosamente",
     "cannotDeactivateAdmin": "No se puede desactivar al admin",
     "admin": "Admin",
-    "sdr": "SDR"
+    "sdr": "SDR",
+    "accessMethod": "Cómo inicia sesión",
+    "sendInvite": "Enviar invitación",
+    "sendInviteHelp": "Recibe un email y define su propia contraseña. No se comparte nada secreto.",
+    "setTempPassword": "Definir contraseña temporal",
+    "setTempPasswordHelp": "Usalo solo si los emails de invitación no funcionan — vas a tener que pasarle la contraseña vos.",
+    "pendingInvite": "Invitado",
+    "pendingInviteHelp": "Invitación enviada, pero esta persona nunca inició sesión."
   },
   "common": {
     "loading": "Cargando...",
@@ -875,5 +882,18 @@
     "demoConvNote": "Cada hilo está escrito en el idioma propio del prospecto — no traducido a máquina desde una sola plantilla. Estos cuatro son ejemplos reales, sin editar, en chino tradicional, español, vietnamita e inglés.",
     "demoMobileMenu": "Alternar menú",
     "navLogin": "Ingresar"
+  },
+  "setPassword": {
+    "title": "Elegí tu contraseña",
+    "subtitle": "Estás configurando el acceso de {email}.",
+    "newPassword": "Nueva contraseña",
+    "confirmPassword": "Confirmar contraseña",
+    "submit": "Guardar y continuar",
+    "saving": "Guardando…",
+    "tooShort": "Usá al menos 8 caracteres.",
+    "mismatch": "Las contraseñas no coinciden.",
+    "expiredTitle": "Este link ya no es válido",
+    "expiredBody": "Los links de invitación se usan una sola vez y vencen. Pedile a tu administrador que te envíe uno nuevo.",
+    "backToLogin": "Volver al inicio de sesión"
   }
 }

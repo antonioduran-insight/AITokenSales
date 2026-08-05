@@ -135,9 +135,38 @@ export async function GET() {
       .eq('is_active', true),
   ])
 
+  // Who was invited but has never signed in. `public.users` cannot answer
+  // this — the profile row is created immediately, so an invited person looks
+  // identical to an active one until they accept. Only `auth.users` knows, and
+  // only the service role can read it.
+  //
+  // Matters because an admin who invites someone and hears nothing back needs
+  // to tell "the email never arrived" apart from "they're ignoring it".
+  //
+  // `listUsers` returns the whole project's auth users, not just this org's,
+  // so the result is intersected with the org's own ids before anything is
+  // returned. Fine at a few hundred users; if this project ever reaches the
+  // 1000-per-page default, this needs paginating rather than silently
+  // reporting everyone beyond the first page as already active.
+  const pendingIds: string[] = []
+  try {
+    const [{ data: orgUsers }, { data: authList }] = await Promise.all([
+      adminClient.from('users').select('id').eq('organization_id', auth.orgId),
+      adminClient.auth.admin.listUsers({ perPage: 1000 }),
+    ])
+    const orgIds = new Set((orgUsers ?? []).map(u => u.id as string))
+    for (const u of authList?.users ?? []) {
+      if (orgIds.has(u.id) && !u.last_sign_in_at) pendingIds.push(u.id)
+    }
+  } catch {
+    // Never break the page over a badge. An empty list just means no "pending"
+    // markers show, which is the pre-existing behaviour.
+  }
+
   return NextResponse.json({
     max_seats: orgResult.data?.max_seats ?? 999,
     active_sdrs: sdrResult.count ?? 0,
+    pending_ids: pendingIds,
   })
 }
 
@@ -149,7 +178,24 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { full_name, email, password, area_id, area_ids } = body
 
-  if (!full_name || !email || !password) {
+  // Two ways to create someone, and `invite` is the intended one.
+  //
+  // The old flow had the admin generate a temporary password, read it off a
+  // "save these credentials, they won't be shown again" panel, and relay it
+  // over chat — readable by anyone who saw the message and, in practice,
+  // rarely changed afterwards. An invitation lets the person set their own.
+  //
+  // The password path is KEPT, not removed: invitations depend on Supabase
+  // being able to send email, and the built-in SMTP is rate-limited to a
+  // handful per hour and explicitly not for production. If custom SMTP isn't
+  // configured, removing this would leave an org unable to onboard anyone at
+  // all. It is a fallback, not an equal option.
+  const invite = body.invite !== false && !password
+
+  if (!full_name || !email) {
+    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  }
+  if (!invite && !password) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
@@ -176,15 +222,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'seat_limit_reached', max_seats: maxSeats }, { status: 409 })
   }
 
-  // Create auth user
-  const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-  })
+  // Create the auth account, either by invitation or with a temporary password.
+  //
+  // `redirectTo` points at the locale-free /auth/callback because this URL is
+  // frozen into an email the moment it is sent; the locale rides along as a
+  // query parameter so the landing page can speak the right language without
+  // the path itself ever changing.
+  const origin = req.nextUrl.origin
+  const locale = typeof body.locale === 'string' ? body.locale : 'zh'
+  const redirectTo = `${origin}/auth/callback?locale=${encodeURIComponent(locale)}`
+
+  const { data: authData, error: authError } = invite
+    ? await adminClient.auth.admin.inviteUserByEmail(email, { redirectTo })
+    : await adminClient.auth.admin.createUser({ email, password, email_confirm: true })
 
   if (authError || !authData.user) {
-    return NextResponse.json({ error: authError?.message ?? 'Failed to create user' }, { status: 400 })
+    const raw = authError?.message ?? 'Failed to create user'
+    // Email failures are the expected way invitations break, and the generic
+    // message sends the admin hunting in the wrong place. Name the cause and
+    // the way out, since the password fallback is right there in the form.
+    const looksLikeEmail = /smtp|email|mail|rate limit|535|550/i.test(raw)
+    return NextResponse.json(
+      {
+        error: invite && looksLikeEmail
+          ? `The invitation could not be emailed (${raw}). Check the project's SMTP settings, or create the account with a temporary password instead.`
+          : raw,
+      },
+      { status: 400 }
+    )
   }
 
   // Resolve primary area_id: prefer first from area_ids array, then legacy area_id
@@ -219,7 +284,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  return NextResponse.json({ id: authData.user.id })
+  return NextResponse.json({ id: authData.user.id, invited: invite })
 }
 
 // DELETE /api/users — permanently delete an SDR

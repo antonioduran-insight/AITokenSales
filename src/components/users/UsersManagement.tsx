@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
 import { Button } from '@/components/ui/button'
 import { AreaBadge } from '@/components/ui/AreaBadge'
-import { Plus, Eye, EyeOff, Trash2, UserMinus, ShieldAlert, Pencil } from 'lucide-react'
+import { Plus, Eye, EyeOff, Trash2, UserMinus, ShieldAlert, Pencil, Mail, Clock } from 'lucide-react'
 import { format } from 'date-fns'
 import type { User, Area } from '@/lib/types'
 import { MAX_INT } from '@/lib/types'
@@ -52,6 +52,7 @@ const SITE_HELP = 'Someone with no site sees every site in the organization.'
 export function UsersManagement() {
   const t = useTranslations('users')
 
+  const locale = useLocale()
   const [users, setUsers] = useState<UserWithArea[]>([])
   const [areas, setAreas] = useState<Area[]>([])
   // Empty unless the org has the multi_workspace add-on: /api/workspaces
@@ -73,6 +74,14 @@ export function UsersManagement() {
   // it maps straight onto a <select> value with no null-juggling.
   const [formWorkspaceId, setFormWorkspaceId] = useState<string>('')
   const [showPassword, setShowPassword] = useState(false)
+  // Invitation is the default. The password path stays reachable because
+  // invitations need working SMTP, and an org that can't email is an org that
+  // can't onboard anyone at all if this is the only route in.
+  const [inviteMode, setInviteMode] = useState(true)
+  // Ids of people who were invited and have never signed in. Comes from
+  // auth.users via /api/users, since the profile row alone can't tell an
+  // invited person apart from an active one.
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
 
@@ -101,7 +110,10 @@ export function UsersManagement() {
     createClient().from('areas').select('*').eq('is_active', true).order('name').then(({ data }) => {
       if (data) setAreas(data as Area[])
     })
-    fetch('/api/users').then(r => r.json()).then(d => { if (d.max_seats) setMaxSeats(d.max_seats) })
+    fetch('/api/users').then(r => r.json()).then(d => {
+      if (d.max_seats) setMaxSeats(d.max_seats)
+      if (Array.isArray(d.pending_ids)) setPendingIds(new Set(d.pending_ids))
+    })
     // Only populated when the org actually has the add-on; the endpoint
     // reports that, so the picker below can stay hidden rather than showing an
     // empty dropdown to an org that doesn't use sites.
@@ -125,7 +137,7 @@ export function UsersManagement() {
 
   useEffect(() => { fetchUsers() }, [fetchUsers])
 
-  function resetForm() { setFormName(''); setFormEmail(''); setFormPassword(''); setFormAreaIds([]); setCreateError(''); setShowPassword(false); setFormRole('sdr'); setFormWorkspaceId('') }
+  function resetForm() { setFormName(''); setFormEmail(''); setFormPassword(''); setFormAreaIds([]); setCreateError(''); setShowPassword(false); setFormRole('sdr'); setFormWorkspaceId(''); setInviteMode(true) }
 
   function toggleAreaId(id: string) { setFormAreaIds(prev => prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]) }
   function toggleEditAreaId(id: string) { setEditAreaIds(prev => prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]) }
@@ -171,14 +183,24 @@ export function UsersManagement() {
   }
 
   async function handleCreate() {
-    if (!formName || !formEmail || !formPassword) { setCreateError(t('allFieldsRequired')); return }
-    if (formPassword.length < 8) { setCreateError(t('passwordMinLength')); return }
+    if (!formName || !formEmail) { setCreateError(t('allFieldsRequired')); return }
+    if (!inviteMode && !formPassword) { setCreateError(t('allFieldsRequired')); return }
+    if (!inviteMode && formPassword.length < 8) { setCreateError(t('passwordMinLength')); return }
     setCreating(true); setCreateError('')
     try {
       const res = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ full_name: formName, email: formEmail, password: formPassword, area_ids: formAreaIds, area_id: formAreaIds[0] ?? null, role: formRole, workspace_id: formWorkspaceId || null }),
+        body: JSON.stringify({
+          full_name: formName, email: formEmail,
+          invite: inviteMode,
+          // Omitted entirely when inviting, so the server can't be handed a
+          // stale value from a form that was toggled back and forth.
+          password: inviteMode ? undefined : formPassword,
+          locale,
+          area_ids: formAreaIds, area_id: formAreaIds[0] ?? null,
+          role: formRole, workspace_id: formWorkspaceId || null,
+        }),
       })
       const json = await res.json()
       if (!res.ok) {
@@ -311,7 +333,22 @@ export function UsersManagement() {
                     {u.full_name[0]?.toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--crm-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.full_name}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--crm-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.full_name}</span>
+                      {/* Invited but never signed in. Without this an admin
+                          can't tell "the email never arrived" from "they
+                          haven't got round to it" — the profile row looks
+                          identical either way. */}
+                      {pendingIds.has(u.id) && (
+                        <span title={t('pendingInviteHelp')} style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
+                          fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                          backgroundColor: '#F59E0B20', color: '#F59E0B', border: '1px solid #F59E0B40',
+                        }}>
+                          <Clock size={9} /> {t('pendingInvite')}
+                        </span>
+                      )}
+                    </div>
                     <div style={{ fontSize: 12, color: 'var(--crm-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</div>
                   </div>
                   <span style={{ backgroundColor: isAdminUser ? '#EC489920' : '#6C63FF20', color: isAdminUser ? '#EC4899' : 'var(--crm-accent)', borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', flexShrink: 0 }}>
@@ -400,15 +437,48 @@ export function UsersManagement() {
                 <label style={S.label}>{t('email')} *</label>
                 <input style={S.input} type="email" value={formEmail} onChange={e => setFormEmail(e.target.value)} placeholder={t('emailPlaceholder')} />
               </div>
+              {/* How they get in. Invitation first and selected by default,
+                  because the alternative ends with a password travelling
+                  through a chat app in plain text. */}
               <div>
-                <label style={S.label}>{t('tempPassword')} *</label>
-                <div style={{ position: 'relative' }}>
-                  <input style={{ ...S.input, paddingRight: 36 }} type={showPassword ? 'text' : 'password'} value={formPassword} onChange={e => setFormPassword(e.target.value)} placeholder={t('passwordPlaceholder')} autoComplete="new-password" />
-                  <button type="button" onClick={() => setShowPassword(p => !p)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--crm-text-muted)', cursor: 'pointer', padding: 0 }}>
-                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
+                <label style={S.label}>{t('accessMethod')}</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {([true, false] as const).map(mode => (
+                    <label key={String(mode)} style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer',
+                      padding: '9px 11px', borderRadius: 6,
+                      border: `1px solid ${inviteMode === mode ? '#6C63FF40' : 'var(--crm-border)'}`,
+                      backgroundColor: inviteMode === mode ? '#6C63FF10' : 'transparent',
+                    }}>
+                      <input
+                        type="radio" checked={inviteMode === mode} onChange={() => setInviteMode(mode)}
+                        style={{ accentColor: 'var(--crm-accent)', width: 14, height: 14, marginTop: 2, flexShrink: 0 }}
+                      />
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--crm-text-primary)' }}>
+                          {mode ? <Mail size={13} /> : <Eye size={13} />}
+                          {mode ? t('sendInvite') : t('setTempPassword')}
+                        </span>
+                        <span style={{ display: 'block', fontSize: 11.5, color: 'var(--crm-text-muted)', marginTop: 3, lineHeight: 1.45 }}>
+                          {mode ? t('sendInviteHelp') : t('setTempPasswordHelp')}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
                 </div>
               </div>
+
+              {!inviteMode && (
+                <div>
+                  <label style={S.label}>{t('tempPassword')} *</label>
+                  <div style={{ position: 'relative' }}>
+                    <input style={{ ...S.input, paddingRight: 36 }} type={showPassword ? 'text' : 'password'} value={formPassword} onChange={e => setFormPassword(e.target.value)} placeholder={t('passwordPlaceholder')} autoComplete="new-password" />
+                    <button type="button" onClick={() => setShowPassword(p => !p)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--crm-text-muted)', cursor: 'pointer', padding: 0 }}>
+                      {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                </div>
+              )}
               <div>
                 <label style={S.label}>Role</label>
                 <select value={formRole} onChange={e => setFormRole(e.target.value as 'sdr' | 'admin')} style={{ ...S.input, cursor: 'pointer' }}>

@@ -362,7 +362,14 @@
     "deactivateSuccess": "SDR đã bị vô hiệu hóa",
     "cannotDeactivateAdmin": "Không thể vô hiệu hóa người dùng admin",
     "admin": "Admin",
-    "sdr": "SDR"
+    "sdr": "SDR",
+    "accessMethod": "Cách đăng nhập",
+    "sendInvite": "Gửi lời mời",
+    "sendInviteHelp": "Họ nhận email và tự đặt mật khẩu. Không cần chia sẻ thông tin bí mật nào.",
+    "setTempPassword": "Đặt mật khẩu tạm thời",
+    "setTempPasswordHelp": "Chỉ dùng khi email mời không hoạt động — bạn sẽ phải tự chuyển mật khẩu cho họ.",
+    "pendingInvite": "Đã mời",
+    "pendingInviteHelp": "Đã gửi lời mời nhưng người này chưa từng đăng nhập."
   },
   "common": {
     "loading": "Đang tải...",
@@ -875,5 +882,18 @@
     "demoConvNote": "Mỗi cuộc hội thoại được viết bằng chính ngôn ngữ của khách hàng tiềm năng — không phải dịch máy từ một mẫu duy nhất. Bốn ví dụ dưới đây là thật, chưa chỉnh sửa, bằng tiếng Trung phồn thể, tiếng Tây Ban Nha, tiếng Việt và tiếng Anh.",
     "demoMobileMenu": "Chuyển đổi menu",
     "navLogin": "Đăng nhập"
+  },
+  "setPassword": {
+    "title": "Chọn mật khẩu của bạn",
+    "subtitle": "Đang thiết lập quyền truy cập cho {email}.",
+    "newPassword": "Mật khẩu mới",
+    "confirmPassword": "Xác nhận mật khẩu",
+    "submit": "Lưu và tiếp tục",
+    "saving": "Đang lưu…",
+    "tooShort": "Dùng ít nhất 8 ký tự.",
+    "mismatch": "Hai mật khẩu không khớp.",
+    "expiredTitle": "Liên kết này không còn hiệu lực",
+    "expiredBody": "Liên kết mời chỉ dùng được một lần và sẽ hết hạn. Hãy nhờ quản trị viên gửi lại.",
+    "backToLogin": "Quay lại đăng nhập"
   }
 }
