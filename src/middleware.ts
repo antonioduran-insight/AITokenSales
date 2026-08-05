@@ -9,10 +9,16 @@ const defaultLocale = 'zh'
 // else; while it lived at a bare /landing it could only ever be English.
 // It's a standalone destination now, not where bare "/" goes (see below) —
 // reached only via its own explicit URL (shared link, ad, etc.).
-const publicPages = ['/login', '/landing']
-// Fully public and locale-free. Empty now, kept because the check below is
-// still the right shape for anything that must bypass the locale prefix.
-const publicPaths: string[] = []
+// `/set-password` is public even though whoever reaches it normally DOES have
+// a session (the auth callback just created one from their invite token).
+// Without it here, the auth check below would send them straight into the CRM
+// with an account that still has no password of their own — and if the token
+// was already spent, into a login loop instead of the "this link expired"
+// message the page exists to show.
+const publicPages = ['/login', '/landing', '/set-password']
+// Fully public and locale-free: URLs that are baked into emails already sent,
+// so they cannot acquire a locale prefix later without breaking.
+const publicPaths: string[] = ['/auth/callback']
 
 const intlMiddleware = createMiddleware({
   locales,
