@@ -19,6 +19,27 @@ async function isLastAdmin(adminClient: SupabaseClient, organizationId: string |
   return (count ?? 0) <= 1
 }
 
+/**
+ * Caller must be an admin AND belong to an organization.
+ *
+ * The org requirement is not decoration — this function used to return
+ * `orgId: string | null`, and every caller then coped with the null in a way
+ * that quietly disabled a protection:
+ *   - POST skipped the seat-limit check entirely (`if (auth.orgId)`), so an
+ *     org-less admin could create unlimited users;
+ *   - POST then wrote `organization_id: auth.orgId ?? null`, minting ANOTHER
+ *     org-less user — self-propagating, and if that user was an admin they
+ *     inherited the same hole;
+ *   - `isLastAdmin()` returns false for a null org, so the "an org must keep
+ *     one admin" rule silently didn't apply either.
+ *
+ * An org-less admin (`role = 'admin'`, `organization_id = NULL` — what
+ * `isGlobalAdmin()` in src/lib/supabase/server.ts calls a legacy global admin)
+ * has no business managing org members through this endpoint. Global Admin has
+ * its own routes for that (`/api/global-admin/create-org`, `/support-users`),
+ * so refusing here breaks nothing legitimate. `admin_global` never reaches
+ * this code at all — it fails the role check below.
+ */
 async function verifyAdminWithOrg() {
   const cookieStore = await cookies()
   const supabase = createServerClient(
@@ -36,15 +57,68 @@ async function verifyAdminWithOrg() {
     .single()
 
   if (profile?.role !== 'admin') return null
-  return { authUser: user, orgId: profile.organization_id as string | null }
+  if (!profile.organization_id) return null
+
+  return { authUser: user, orgId: profile.organization_id as string }
+}
+
+/**
+ * Validate a site id supplied by the client before it is written to a user.
+ *
+ * Returns `undefined` when the caller didn't mention a site (so the field is
+ * left alone), and `null` when they explicitly cleared it. Anything that isn't
+ * one of this org's own sites resolves to `null` rather than being trusted:
+ * `users.workspace_id` decides what that person can see, so a client-supplied
+ * id pointing at another organization's site would be a cross-tenant grant.
+ */
+async function resolveWorkspaceId(
+  adminClient: SupabaseClient,
+  raw: unknown,
+  orgId: string
+): Promise<string | null | undefined> {
+  if (raw === undefined) return undefined
+  if (raw === null || raw === '') return null
+  if (typeof raw !== 'string') return null
+
+  const { data } = await adminClient
+    .from('workspaces')
+    .select('id')
+    .eq('id', raw)
+    .eq('organization_id', orgId)
+    .maybeSingle()
+
+  return data ? raw : null
+}
+
+/**
+ * Load the user being acted upon, but only if they are in the caller's org.
+ *
+ * EVERY mutating handler in this file uses the service-role client, which
+ * bypasses RLS completely. Before this existed they matched on `.eq('id', id)`
+ * and nothing else — so an admin of one organization holding the UUID of a
+ * user in ANOTHER organization could delete their account, rename them, change
+ * their role, deactivate them, or unassign all of their leads. RLS was not a
+ * backstop here, because the service-role client is precisely the tool that
+ * ignores it.
+ *
+ * Returns null when the target does not exist or belongs to someone else;
+ * callers must treat both the same way and answer 404, so this endpoint cannot
+ * be used to probe which UUIDs exist in other organizations.
+ */
+async function loadTargetInOrg(adminClient: SupabaseClient, targetId: string, orgId: string) {
+  const { data } = await adminClient
+    .from('users')
+    .select('id, role, organization_id')
+    .eq('id', targetId)
+    .eq('organization_id', orgId)
+    .maybeSingle()
+  return data ?? null
 }
 
 // GET /api/users — return seat info for the org
 export async function GET() {
   const auth = await verifyAdminWithOrg()
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  if (!auth.orgId) return NextResponse.json({ max_seats: 999, active_sdrs: 0 })
 
   const adminClient = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -84,22 +158,22 @@ export async function POST(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Seat limit check
-  if (auth.orgId) {
-    const [orgRes, countRes] = await Promise.all([
-      adminClient.from('organizations').select('max_seats').eq('id', auth.orgId).single(),
-      adminClient
-        .from('users')
-        .select('id', { count: 'exact', head: true })
-        .eq('organization_id', auth.orgId)
-        .eq('role', 'sdr')
-        .eq('is_active', true),
-    ])
-    const maxSeats = orgRes.data?.max_seats ?? 999
-    const activeSdrs = countRes.count ?? 0
-    if (activeSdrs >= maxSeats) {
-      return NextResponse.json({ error: 'seat_limit_reached', max_seats: maxSeats }, { status: 409 })
-    }
+  // Seat limit check. No longer conditional on the org existing —
+  // verifyAdminWithOrg guarantees it, and the old `if (auth.orgId)` wrapper
+  // meant an org-less admin skipped the seat limit altogether.
+  const [orgRes, countRes] = await Promise.all([
+    adminClient.from('organizations').select('max_seats').eq('id', auth.orgId).single(),
+    adminClient
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', auth.orgId)
+      .eq('role', 'sdr')
+      .eq('is_active', true),
+  ])
+  const maxSeats = orgRes.data?.max_seats ?? 999
+  const activeSdrs = countRes.count ?? 0
+  if (activeSdrs >= maxSeats) {
+    return NextResponse.json({ error: 'seat_limit_reached', max_seats: maxSeats }, { status: 409 })
   }
 
   // Create auth user
@@ -124,7 +198,12 @@ export async function POST(req: NextRequest) {
     email,
     role: body.role === 'admin' ? 'admin' : 'sdr',
     area_id: primaryAreaId,
-    organization_id: auth.orgId ?? null,
+    // No `?? null`: verifyAdminWithOrg refuses an org-less caller, and a
+    // fallback here is what created org-less users in the first place.
+    organization_id: auth.orgId,
+    // `?? null` here is correct and unrelated: a user with no site is
+    // org-wide, which is the right default for any org that doesn't use sites.
+    workspace_id: (await resolveWorkspaceId(adminClient, body.workspace_id, auth.orgId)) ?? null,
     is_active: true,
   })
 
@@ -156,8 +235,14 @@ export async function DELETE(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  const { data: profile } = await adminClient.from('users').select('role, organization_id').eq('id', id).single()
-  if (profile?.role === 'admin' && await isLastAdmin(adminClient, profile.organization_id)) {
+  // Ownership check FIRST, before any read or write touches this user. 404
+  // rather than 403 for a target in another org: distinguishing "not yours"
+  // from "doesn't exist" would turn this endpoint into a way to test whether
+  // a given UUID is a real user somewhere else in the system.
+  const profile = await loadTargetInOrg(adminClient, id, auth.orgId)
+  if (!profile) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+  if (profile.role === 'admin' && await isLastAdmin(adminClient, profile.organization_id)) {
     return NextResponse.json({ error: 'Cannot delete the last admin. Promote another user to admin first.' }, { status: 403 })
   }
 
@@ -210,6 +295,14 @@ export async function PATCH(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
+  // One ownership check covering all three branches below — 'edit',
+  // 'unassign' and the is_active toggle all act on `id`, and every one of them
+  // ran through the service-role client with no org scoping at all before
+  // this. Deliberately placed before the branches so a new action added later
+  // is covered by default rather than by remembering to add it.
+  const target = await loadTargetInOrg(adminClient, id, auth.orgId)
+  if (!target) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
   if (action === 'edit') {
     const { full_name, role, area_ids, years_experience, seniority, expertise_area } = body
 
@@ -217,8 +310,7 @@ export async function PATCH(req: NextRequest) {
     // would leave nobody able to promote anyone back — same protection as
     // deleting the last admin, applied before a role change instead.
     if (role === 'sdr') {
-      const { data: target } = await adminClient.from('users').select('role, organization_id').eq('id', id).single()
-      if (target?.role === 'admin' && await isLastAdmin(adminClient, target.organization_id)) {
+      if (target.role === 'admin' && await isLastAdmin(adminClient, target.organization_id)) {
         const { data: org } = await adminClient.from('organizations').select('name').eq('id', target.organization_id).single()
         return NextResponse.json({
           error: `Cannot change role — ${org?.name ?? 'this organization'} must have at least one admin. Assign another admin first.`,
@@ -236,8 +328,14 @@ export async function PATCH(req: NextRequest) {
     if (years_experience !== undefined) updates.years_experience = years_experience
     if (seniority !== undefined) updates.seniority = seniority || null
     if (expertise_area !== undefined) updates.expertise_area = expertise_area ? expertise_area.trim() : null
+    const resolvedWorkspace = await resolveWorkspaceId(adminClient, body.workspace_id, auth.orgId)
+    if (resolvedWorkspace !== undefined) updates.workspace_id = resolvedWorkspace
 
-    const { error: updateErr } = await adminClient.from('users').update(updates).eq('id', id)
+    // The org filter is redundant given loadTargetInOrg above, and kept
+    // anyway: a service-role write scoped only by id is one careless refactor
+    // away from being cross-tenant again, and the guard is free here.
+    const { error: updateErr } = await adminClient
+      .from('users').update(updates).eq('id', id).eq('organization_id', auth.orgId)
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 400 })
 
     if (area_ids !== undefined) {
@@ -272,8 +370,7 @@ export async function PATCH(req: NextRequest) {
   // DELETE and the role-change path above, both of which only block when
   // the target is genuinely the last one. Same real check here instead.
   if (is_active === false) {
-    const { data: target } = await adminClient.from('users').select('role, organization_id').eq('id', id).single()
-    if (target?.role === 'admin' && await isLastAdmin(adminClient, target.organization_id)) {
+    if (target.role === 'admin' && await isLastAdmin(adminClient, target.organization_id)) {
       const { data: org } = await adminClient.from('organizations').select('name').eq('id', target.organization_id).single()
       return NextResponse.json({
         error: `Cannot deactivate — ${org?.name ?? 'this organization'} must have at least one active admin. Promote another admin first.`,
@@ -281,7 +378,8 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
-  const { error } = await adminClient.from('users').update({ is_active }).eq('id', id)
+  const { error } = await adminClient
+    .from('users').update({ is_active }).eq('id', id).eq('organization_id', auth.orgId)
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
   return NextResponse.json({ ok: true })
