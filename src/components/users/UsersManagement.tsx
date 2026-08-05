@@ -42,11 +42,22 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
   )
 }
 
+// This screen is hardcoded English throughout ("Markets", "Edit User",
+// "Save"), so these follow suit. Translating one field while its neighbours
+// stay in English would look like a bug rather than progress.
+const SITE_LABEL = 'Site'
+const SITE_ORGWIDE = 'Organization-wide (all sites)'
+const SITE_HELP = 'Someone with no site sees every site in the organization.'
+
 export function UsersManagement() {
   const t = useTranslations('users')
 
   const [users, setUsers] = useState<UserWithArea[]>([])
   const [areas, setAreas] = useState<Area[]>([])
+  // Empty unless the org has the multi_workspace add-on: /api/workspaces
+  // reports that, and the picker below stays hidden when there is nothing to
+  // choose between. An org that never bought sites shouldn't see the concept.
+  const [workspaces, setWorkspaces] = useState<Array<{ id: string; name: string; is_active: boolean }>>([])
   const [loading, setLoading] = useState(true)
   const [maxSeats, setMaxSeats] = useState<number>(999)
   const [showSeatLimit, setShowSeatLimit] = useState(false)
@@ -58,6 +69,9 @@ export function UsersManagement() {
   const [formPassword, setFormPassword] = useState('')
   const [formRole, setFormRole] = useState<'sdr' | 'admin'>('sdr')
   const [formAreaIds, setFormAreaIds] = useState<string[]>([])
+  // '' means org-wide (no site). Kept as a string rather than string|null so
+  // it maps straight onto a <select> value with no null-juggling.
+  const [formWorkspaceId, setFormWorkspaceId] = useState<string>('')
   const [showPassword, setShowPassword] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
@@ -66,6 +80,7 @@ export function UsersManagement() {
   const [editUser, setEditUser] = useState<UserWithArea | null>(null)
   const [editName, setEditName] = useState('')
   const [editAreaIds, setEditAreaIds] = useState<string[]>([])
+  const [editWorkspaceId, setEditWorkspaceId] = useState<string>('')
   const [editRole, setEditRole] = useState<'sdr' | 'admin'>('sdr')
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
@@ -87,6 +102,13 @@ export function UsersManagement() {
       if (data) setAreas(data as Area[])
     })
     fetch('/api/users').then(r => r.json()).then(d => { if (d.max_seats) setMaxSeats(d.max_seats) })
+    // Only populated when the org actually has the add-on; the endpoint
+    // reports that, so the picker below can stay hidden rather than showing an
+    // empty dropdown to an org that doesn't use sites.
+    fetch('/api/workspaces')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.addon_active) setWorkspaces(d.workspaces ?? []) })
+      .catch(() => { /* no sites, no picker */ })
   }, [])
 
   const fetchUsers = useCallback(async () => {
@@ -103,7 +125,7 @@ export function UsersManagement() {
 
   useEffect(() => { fetchUsers() }, [fetchUsers])
 
-  function resetForm() { setFormName(''); setFormEmail(''); setFormPassword(''); setFormAreaIds([]); setCreateError(''); setShowPassword(false); setFormRole('sdr') }
+  function resetForm() { setFormName(''); setFormEmail(''); setFormPassword(''); setFormAreaIds([]); setCreateError(''); setShowPassword(false); setFormRole('sdr'); setFormWorkspaceId('') }
 
   function toggleAreaId(id: string) { setFormAreaIds(prev => prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]) }
   function toggleEditAreaId(id: string) { setEditAreaIds(prev => prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]) }
@@ -115,6 +137,7 @@ export function UsersManagement() {
     setEditName(u.full_name)
     setEditAreaIds(areas)
     setEditRole(u.role as 'sdr' | 'admin')
+    setEditWorkspaceId(u.workspace_id ?? '')
     setEditError('')
   }
 
@@ -131,6 +154,7 @@ export function UsersManagement() {
           full_name: editName.trim(),
           role: editRole,
           area_ids: editAreaIds,
+          workspace_id: editWorkspaceId || null,
         }),
       })
       const json = await res.json()
@@ -154,7 +178,7 @@ export function UsersManagement() {
       const res = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ full_name: formName, email: formEmail, password: formPassword, area_ids: formAreaIds, area_id: formAreaIds[0] ?? null, role: formRole }),
+        body: JSON.stringify({ full_name: formName, email: formEmail, password: formPassword, area_ids: formAreaIds, area_id: formAreaIds[0] ?? null, role: formRole, workspace_id: formWorkspaceId || null }),
       })
       const json = await res.json()
       if (!res.ok) {
@@ -404,6 +428,28 @@ export function UsersManagement() {
                   ))}
                 </div>
               </div>
+              {/* Site picker. Rendered only when the org has sites at all —
+                  see the /api/workspaces fetch above. Deliberately a single
+                  select, not checkboxes like Markets: a person works at one
+                  office, whereas they can cover several territories. */}
+              {workspaces.length > 0 && (
+                <div>
+                  <label style={S.label}>{SITE_LABEL}</label>
+                  <select
+                    value={formWorkspaceId}
+                    onChange={e => setFormWorkspaceId(e.target.value)}
+                    style={S.input}
+                  >
+                    <option value="">{SITE_ORGWIDE}</option>
+                    {workspaces.filter(w => w.is_active).map(w => (
+                      <option key={w.id} value={w.id}>{w.name}</option>
+                    ))}
+                  </select>
+                  <p style={{ fontSize: 11.5, color: 'var(--crm-text-muted)', margin: '6px 0 0' }}>
+                    {SITE_HELP}
+                  </p>
+                </div>
+              )}
               {createError && (
                 <div style={{ padding: '8px 12px', backgroundColor: '#3A1A1A', border: '1px solid #EF4444', borderRadius: 6, color: '#F87171', fontSize: 12 }}>{createError}</div>
               )}
@@ -445,6 +491,24 @@ export function UsersManagement() {
                   ))}
                 </div>
               </div>
+              {workspaces.length > 0 && (
+                <div>
+                  <label style={S.label}>{SITE_LABEL}</label>
+                  <select
+                    value={editWorkspaceId}
+                    onChange={e => setEditWorkspaceId(e.target.value)}
+                    style={S.input}
+                  >
+                    <option value="">{SITE_ORGWIDE}</option>
+                    {workspaces.filter(w => w.is_active).map(w => (
+                      <option key={w.id} value={w.id}>{w.name}</option>
+                    ))}
+                  </select>
+                  <p style={{ fontSize: 11.5, color: 'var(--crm-text-muted)', margin: '6px 0 0' }}>
+                    {SITE_HELP}
+                  </p>
+                </div>
+              )}
               {editError && (
                 <div style={{ padding: '8px 12px', backgroundColor: '#3A1A1A', border: '1px solid #EF4444', borderRadius: 6, color: '#F87171', fontSize: 12 }}>{editError}</div>
               )}

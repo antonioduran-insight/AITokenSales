@@ -16,7 +16,7 @@ async function getCallerProfile() {
   if (!user) return null
   const { data: profile } = await supabase
     .from('users')
-    .select('id, role, area_id, organization_id')
+    .select('id, role, area_id, organization_id, workspace_id')
     .eq('id', user.id)
     .single()
   return profile ?? null
@@ -219,9 +219,12 @@ export async function PUT(req: NextRequest) {
   // (an SDR seeing leads is driven by area, so a client-chosen area_id is a
   // cross-area leak waiting to happen).
   const areaByUserId = new Map<string, string | null>()
+  // Site is read off the assignee's row for the same reason area_id is: it
+  // decides who can see the lead, so it must never come from the client.
+  const workspaceByUserId = new Map<string, string | null>()
   const { data: assignees, error: assigneeErr } = await admin
     .from('users')
-    .select('id, area_id')
+    .select('id, area_id, workspace_id')
     .in('id', [...requestedAssignees])
     .eq('organization_id', orgId)
     .eq('is_active', true)
@@ -229,12 +232,14 @@ export async function PUT(req: NextRequest) {
     console.error('[import] assignee lookup failed:', assigneeErr.code, assigneeErr.message)
     return NextResponse.json({ error: 'Could not verify who these leads should be assigned to. Please try again.' }, { status: 500 })
   }
-  for (const u of (assignees ?? []) as { id: string; area_id: string | null }[]) {
+  for (const u of (assignees ?? []) as { id: string; area_id: string | null; workspace_id: string | null }[]) {
     areaByUserId.set(u.id, u.area_id)
+    workspaceByUserId.set(u.id, u.workspace_id)
   }
   // The caller themselves is always a legitimate destination (self-import),
   // even in the edge case where their own row didn't come back above.
   if (!areaByUserId.has(caller.id)) areaByUserId.set(caller.id, caller.area_id ?? null)
+  if (!workspaceByUserId.has(caller.id)) workspaceByUserId.set(caller.id, caller.workspace_id ?? null)
 
   const foreignAssignees = [...requestedAssignees].filter(id => !areaByUserId.has(id))
   if (foreignAssignees.length > 0) {
@@ -304,6 +309,8 @@ export async function PUT(req: NextRequest) {
       // straight past the mandatory CloseDealModal chat upload.
       organization_id: orgId,
       area_id: areaId,
+      // Inherited from whoever receives the lead, never from the CSV.
+      workspace_id: workspaceByUserId.get(assignedTo) ?? null,
       assigned_to: assignedTo,
       created_by: caller.id,
       source: 'csv_import',

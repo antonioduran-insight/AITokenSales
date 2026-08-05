@@ -75,7 +75,7 @@ export async function assignBridgeCandidates({
   // --- Who receives them, and into which area. ---
   const { data: sdrRow, error: sdrErr } = await admin
     .from('users')
-    .select('id, area_id')
+    .select('id, area_id, workspace_id')
     .eq('id', sdrId)
     .eq('organization_id', organizationId)
     .maybeSingle()
@@ -241,6 +241,10 @@ export async function assignBridgeCandidates({
       area_id: sdrAreaId,
       assigned_to: sdrId,
       organization_id: organizationId,
+      // Same rule as assignRunLeads: the contact belongs to the site its rep
+      // works at. Sites are independent of markets, so this is inherited, not
+      // derived. NULL keeps it org-wide, which is the normal case.
+      workspace_id: sdrRow?.workspace_id ?? null,
       flag_tomorrow: false,
     })
   }

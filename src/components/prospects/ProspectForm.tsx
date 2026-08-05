@@ -172,6 +172,22 @@ export function ProspectForm({ open, onClose, onCreated, defaultAreaId }: Props)
     const { data: authUser } = await supabase.auth.getUser()
     const orgId = await getCurrentOrganizationId()
 
+    // Resolve the assignee's site. Falls back to the creator's own when the
+    // lead is left unassigned, so a lead created inside a site stays in it
+    // rather than escaping to org-wide. Read through the browser client, so
+    // RLS applies: a user who cannot see the target row gets null and the lead
+    // is simply org-wide, never placed in a site the creator can't see.
+    const assigneeForSite = form.assigned_to || authUser.user?.id
+    let assigneeWorkspaceId: string | null = null
+    if (assigneeForSite) {
+      const { data: assigneeRow } = await supabase
+        .from('users')
+        .select('workspace_id')
+        .eq('id', assigneeForSite)
+        .maybeSingle()
+      assigneeWorkspaceId = assigneeRow?.workspace_id ?? null
+    }
+
     const payload = {
       name: form.name,
       linkedin_url: form.linkedin_url || null,
@@ -190,6 +206,11 @@ export function ProspectForm({ open, onClose, onCreated, defaultAreaId }: Props)
       market: form.market || null,
       area_id: form.area_id,
       assigned_to: form.assigned_to || null,
+      // The lead belongs to the site of whoever will work it, resolved just
+      // below from that user's own row. No site picker in this form on
+      // purpose: a lead in one site owned by a rep in another is a state with
+      // no meaning, so it is derived rather than offered as a choice.
+      workspace_id: assigneeWorkspaceId,
       flag_tomorrow: form.flag_tomorrow,
       source: 'manual' as const,
       created_by: authUser.user?.id ?? null,
