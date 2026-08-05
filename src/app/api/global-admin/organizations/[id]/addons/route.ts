@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { isAddonSellable, isAddonIncluded } from '@/lib/types'
 
 async function verifyGlobalAdmin() {
   const cookieStore = await cookies()
@@ -107,6 +108,35 @@ export async function POST(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
+
+  // Plan eligibility, checked against the org's CURRENT plan read from the
+  // database — never a plan sent by the client, which would make the rule
+  // trivially bypassable by the same form it is meant to constrain.
+  //
+  // Only NEW activations are blocked. An org that already has an add-on and
+  // then downgrades keeps it: silently switching off a paid feature because a
+  // plan changed is a worse failure than an inconsistent row, and it would
+  // happen with nobody watching. Global Admin surfaces the mismatch instead.
+  const { data: orgRow } = await admin
+    .from('organizations')
+    .select('plan')
+    .eq('id', id)
+    .maybeSingle()
+
+  const plan = orgRow?.plan ?? 'basic'
+
+  if (isAddonIncluded(addon_type, plan)) {
+    return NextResponse.json(
+      { error: `The ${plan} plan already includes this add-on — selling it again would double-charge.` },
+      { status: 409 }
+    )
+  }
+  if (!isAddonSellable(addon_type, plan)) {
+    return NextResponse.json(
+      { error: `This add-on is not available on the ${plan} plan.` },
+      { status: 409 }
+    )
+  }
 
   // A real upsert, resolved by the database rather than by a read followed by
   // a write. The previous check-then-insert was a race: two concurrent

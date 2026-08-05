@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { normalizeAnthropicBaseUrl } from '@/lib/utils/anthropic'
+import { isAddonSellable, isAddonIncluded } from '@/lib/types'
 
 async function verifyGlobalAdmin() {
   const cookieStore = await cookies()
@@ -113,8 +114,22 @@ export async function POST(req: NextRequest) {
   }
 
   // 4. Insert addons if selected
-  if (Array.isArray(addons) && addons.length > 0) {
-    const addonRows = addons.map((addonType: string) => ({
+  //
+  // Filtered by plan eligibility, not trusted from the form. The org's plan
+  // was just written above, so the rule is applied against what was actually
+  // saved rather than what the client claimed. Ineligible entries are dropped
+  // silently on purpose: the UI already prevents selecting them, so anything
+  // arriving here is either a stale tab or a hand-crafted request, and
+  // failing the whole org creation over it would be a worse outcome than
+  // creating the org without an add-on that could never have been sold.
+  const eligibleAddons = Array.isArray(addons)
+    ? (addons as string[]).filter(
+        a => isAddonSellable(a, org.plan) && !isAddonIncluded(a, org.plan)
+      )
+    : []
+
+  if (eligibleAddons.length > 0) {
+    const addonRows = eligibleAddons.map((addonType: string) => ({
       organization_id: org.id,
       addon_type: addonType,
       is_active: true,

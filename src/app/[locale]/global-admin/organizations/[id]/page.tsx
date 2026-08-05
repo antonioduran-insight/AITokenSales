@@ -7,7 +7,7 @@ import { ArrowLeft } from 'lucide-react'
 import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
 import { createClient } from '@/lib/supabase/client'
 import type { Organization, OrganizationAddon, Vendor } from '@/lib/types'
-import { ADDON_LIST, PLAN_DEFAULTS } from '@/lib/types'
+import { ADDON_LIST, PLAN_DEFAULTS, isAddonSellable, isAddonIncluded } from '@/lib/types'
 
 const PLAN_COLORS: Record<string, string> = {
   basic: '#3B82F6', premium: '#8B5CF6', enterprise: '#F59E0B', ultra: '#EF4444',
@@ -566,23 +566,55 @@ export default function OrgDetailPage() {
               {ADDON_LIST.map(addon => {
                 const isActive = activeAddons.has(addon.type)
                 const isToggling = togglingAddon === addon.type
+                // Eligibility follows the plan currently selected in the form,
+                // not the saved one, so the list reacts as soon as the plan
+                // dropdown changes rather than after a save.
+                const included = isAddonIncluded(addon.type, plan)
+                const sellable = isAddonSellable(addon.type, plan)
+                // An add-on already active on a plan that can't sell it — the
+                // result of a downgrade. Left switched on deliberately (the
+                // server refuses new activations but never auto-revokes a paid
+                // feature), so it has to be visible rather than just wrong.
+                const mismatch = isActive && (!sellable || included)
+                const blocked = !isActive && (!sellable || included)
                 return (
                   <label key={addon.type} style={{
-                    display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    cursor: blocked ? 'not-allowed' : 'pointer',
                     padding: '9px 12px', borderRadius: 8,
-                    backgroundColor: isActive ? `${colors.accent}10` : colors.surfaceRaised,
-                    border: `1px solid ${isActive ? colors.accent + '40' : colors.border}`,
-                    opacity: isToggling ? 0.6 : 1,
+                    backgroundColor: mismatch ? '#F59E0B10' : isActive ? `${colors.accent}10` : colors.surfaceRaised,
+                    border: `1px solid ${mismatch ? '#F59E0B60' : isActive ? colors.accent + '40' : colors.border}`,
+                    opacity: isToggling ? 0.6 : blocked ? 0.45 : 1,
                   }}>
                     <input
                       type="checkbox"
                       checked={isActive}
                       onChange={() => toggleAddon(addon.type)}
-                      disabled={isToggling}
-                      style={{ width: 14, height: 14, accentColor: colors.accent, cursor: 'pointer', flexShrink: 0 }}
+                      // Blocked only for turning ON. Switching OFF a mismatched
+                      // add-on must stay possible — that is exactly how an
+                      // admin resolves the downgrade leftover.
+                      disabled={isToggling || blocked}
+                      style={{ width: 14, height: 14, accentColor: colors.accent, cursor: blocked ? 'not-allowed' : 'pointer', flexShrink: 0 }}
                     />
-                    <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, color: colors.textPrimary, flex: 1 }}>{t(addon.labelKey)}</span>
-                    <span style={{ fontSize: 11, color: colors.textMuted }}>{addon.price}</span>
+                    <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, color: colors.textPrimary, flex: 1, minWidth: 0 }}>
+                      {t(addon.labelKey)}
+                      {included && (
+                        <span style={{ marginLeft: 8, fontSize: 10, color: '#22C55E' }}>
+                          {t('addOnIncludedInPlan')}
+                        </span>
+                      )}
+                      {!included && !sellable && (
+                        <span style={{ marginLeft: 8, fontSize: 10, color: colors.textMuted }}>
+                          {t('addOnNotOnPlan')}
+                        </span>
+                      )}
+                      {mismatch && (
+                        <span style={{ marginLeft: 8, fontSize: 10, color: '#F59E0B', fontWeight: 700 }}>
+                          {t('addOnPlanMismatch')}
+                        </span>
+                      )}
+                    </span>
+                    <span style={{ fontSize: 11, color: colors.textMuted, flexShrink: 0 }}>{addon.price}</span>
                   </label>
                 )
               })}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useLocale } from 'next-intl'
 import type { Vendor } from '@/lib/types'
-import { ADDON_LIST, MAX_INT, PLAN_DEFAULTS } from '@/lib/types'
+import { ADDON_LIST, MAX_INT, PLAN_DEFAULTS, isAddonSellable, isAddonIncluded } from '@/lib/types'
 import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
 import { createClient } from '@/lib/supabase/client'
 
@@ -354,22 +354,41 @@ export default function NewOrganizationPage() {
             <h2 style={{ fontSize: 13, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px' }}>{t('addOns')}</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {ADDON_LIST.map(addon => {
-                const isActive = selectedAddons.has(addon.type)
+                // Ineligible entries are checked here AND filtered again in
+                // POST /api/global-admin/create-org: if the plan dropdown is
+                // changed after ticking something, this list re-renders as
+                // disabled but the already-ticked value stays in state, so the
+                // server is what guarantees it never reaches the database.
+                const included = isAddonIncluded(addon.type, plan)
+                const sellable = isAddonSellable(addon.type, plan)
+                const blocked = !sellable || included
+                const isActive = selectedAddons.has(addon.type) && !blocked
                 return (
                   <label key={addon.type} style={{
-                    display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    cursor: blocked ? 'not-allowed' : 'pointer',
                     padding: '8px 12px', borderRadius: 7,
                     backgroundColor: isActive ? `${colors.accent}10` : colors.surfaceRaised,
                     border: `1px solid ${isActive ? colors.accent + '40' : colors.border}`,
+                    opacity: blocked ? 0.45 : 1,
                   }}>
                     <input
                       type="checkbox"
                       checked={isActive}
+                      disabled={blocked}
                       onChange={() => toggleAddon(addon.type)}
-                      style={{ width: 14, height: 14, accentColor: colors.accent, cursor: 'pointer', flexShrink: 0 }}
+                      style={{ width: 14, height: 14, accentColor: colors.accent, cursor: blocked ? 'not-allowed' : 'pointer', flexShrink: 0 }}
                     />
-                    <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, color: colors.textPrimary, flex: 1 }}>{t(addon.labelKey)}</span>
-                    <span style={{ fontSize: 11, color: colors.textMuted }}>{addon.price}</span>
+                    <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, color: colors.textPrimary, flex: 1, minWidth: 0 }}>
+                      {t(addon.labelKey)}
+                      {included && (
+                        <span style={{ marginLeft: 8, fontSize: 10, color: '#22C55E' }}>{t('addOnIncludedInPlan')}</span>
+                      )}
+                      {!included && !sellable && (
+                        <span style={{ marginLeft: 8, fontSize: 10, color: colors.textMuted }}>{t('addOnNotOnPlan')}</span>
+                      )}
+                    </span>
+                    <span style={{ fontSize: 11, color: colors.textMuted, flexShrink: 0 }}>{addon.price}</span>
                   </label>
                 )
               })}

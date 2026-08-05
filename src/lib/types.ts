@@ -58,6 +58,12 @@ export interface User {
   role: UserRole
   area_id: string | null
   organization_id: string | null
+  /** Which site (branch office) this person belongs to. `null` means org-wide:
+   *  they see every workspace, which is how the customer's head-office admin
+   *  is expressed — there is no separate role for it. Every user is null until
+   *  someone is explicitly assigned, so this stays inert for single-site orgs.
+   *  See {@link Workspace}. */
+  workspace_id: string | null
   is_active: boolean
   /** @deprecated SDRs never have scraper access — only the org admin runs the
    *  scraper. The column still exists in the DB but nothing reads it. */
@@ -98,6 +104,10 @@ export interface Prospect {
   outreach_status: OutreachStatus
   market: string | null
   area_id: string
+  /** The site this lead belongs to. Independent of `market`/`area_id` — two
+   *  sites can work the same territory. Inherited from the SDR it is assigned
+   *  to; null for leads that predate any site assignment. See {@link Workspace}. */
+  workspace_id: string | null
   assigned_to: string | null
   flag_tomorrow: boolean
   // Kept in sync with the CHECK constraint on prospects.source. This type had
@@ -424,24 +434,114 @@ export const PLAN_DEFAULTS: Record<string, { max_seats: number; max_leads_per_mo
   ultra:      { max_seats: MAX_INT,  max_leads_per_month: MAX_INT },
 }
 
+export type PlanName = 'basic' | 'premium' | 'enterprise' | 'ultra'
+
+const ALL_PLANS: PlanName[] = ['basic', 'premium', 'enterprise', 'ultra']
+
+/**
+ * The add-on catalogue.
+ *
+ * `plans`      — plans on which the add-on can be SOLD.
+ * `includedIn` — plans that already bundle it, so selling it again would
+ *                double-charge for something the customer has.
+ *
+ * Both come from the product brief (Aug 2026). `ultra` is in every list
+ * because it is Insight Software's own internal plan, deliberately without
+ * limits; it is never invoiced, so eligibility rules would only get in the way.
+ *
+ * Before this existed, Global Admin let any add-on be ticked on any plan —
+ * so a Premium org could be charged $149/mo for Account Management that its
+ * plan already includes, and Multi-workspace (Enterprise-only) could be sold
+ * to a Basic account.
+ */
 export const ADDON_LIST = [
-  { type: 'account_management', labelKey: 'addOn_account_management', price: '$149/mo' },
-  { type: 'multi_workspace', labelKey: 'addOn_multi_workspace', price: '$300/mo' },
-  { type: 'extended_data_retention', labelKey: 'addOn_extended_data_retention', price: '$99/mo' },
-  { type: 'sso', labelKey: 'addOn_sso', price: '$299 one-time' },
-  { type: 'linkedin_auto_messaging', labelKey: 'addOn_linkedin_auto_messaging', price: 'TBD' },
-  { type: 'bridge', labelKey: 'addOn_bridge', price: 'TBD' },
+  {
+    type: 'account_management', labelKey: 'addOn_account_management', price: '$149/mo',
+    // Brief: "Basic 加購；Premium／Enterprise 已內含" — a Basic upsell, and
+    // already part of the two plans above it.
+    plans: ['basic', 'ultra'] as PlanName[],
+    includedIn: ['premium', 'enterprise'] as PlanName[],
+  },
+  {
+    type: 'multi_workspace', labelKey: 'addOn_multi_workspace', price: '$300/mo per site',
+    // Brief: "僅 Enterprise". Priced per site; the main one comes with the
+    // plan, so Revenue Reports charges (active sites − 1).
+    plans: ['enterprise', 'ultra'] as PlanName[],
+    includedIn: [] as PlanName[],
+  },
+  {
+    type: 'extended_data_retention', labelKey: 'addOn_extended_data_retention', price: '$99/mo',
+    plans: ALL_PLANS,
+    includedIn: [] as PlanName[],
+  },
+  {
+    type: 'sso', labelKey: 'addOn_sso', price: '$299 one-time',
+    plans: ['premium', 'enterprise', 'ultra'] as PlanName[],
+    includedIn: [] as PlanName[],
+  },
+  {
+    type: 'linkedin_auto_messaging', labelKey: 'addOn_linkedin_auto_messaging', price: 'TBD',
+    plans: ['premium', 'enterprise', 'ultra'] as PlanName[],
+    includedIn: [] as PlanName[],
+  },
+  {
+    type: 'bridge', labelKey: 'addOn_bridge', price: 'TBD',
+    // Bridge postdates the brief and has no stated plan restriction, so it is
+    // left open rather than guessed at. Narrow it once it is priced.
+    plans: ALL_PLANS,
+    includedIn: [] as PlanName[],
+  },
 ] as const
+
+/** Can this add-on be sold on this plan? */
+export function isAddonSellable(addonType: string, plan: string): boolean {
+  const a = ADDON_LIST.find(x => x.type === addonType)
+  if (!a) return false
+  return (a.plans as readonly string[]).includes(plan)
+}
+
+/** Does the plan already bundle it, making a separate charge a double-charge? */
+export function isAddonIncluded(addonType: string, plan: string): boolean {
+  const a = ADDON_LIST.find(x => x.type === addonType)
+  if (!a) return false
+  return (a.includedIn as readonly string[]).includes(plan)
+}
 
 // Recurring monthly price per add-on, used by Revenue Reports. One-time / TBD
 // add-ons (sso, linkedin_auto_messaging) contribute 0 to the monthly run-rate.
 export const ADDON_MONTHLY_PRICE: Record<string, number> = {
   account_management: 149,
+  /** PER SITE, not per org. The main site comes with the plan, so Revenue
+   *  Reports multiplies this by (active sites − 1). See `addonsMonthly()` in
+   *  the reports page — reading this constant alone will understate an org
+   *  with several branches. */
   multi_workspace: 300,
   extended_data_retention: 99,
   sso: 99,
   linkedin_auto_messaging: 0,
   bridge: 0, // TBD
+}
+
+/**
+ * A site/branch inside one organization — an Enterprise customer with an
+ * office in Taiwan and another in Hong Kong.
+ *
+ * Orthogonal to markets and areas: two sites can work the same markets. A
+ * workspace answers "which office does this belong to", not "which territory".
+ *
+ * `workspace_id` being NULL on a user means org-wide visibility (the
+ * customer's head-office admin). Note this is unrelated to the `admin_global`
+ * role, which is Insight Software staff and not a customer role at all.
+ *
+ * Billing is per site beyond the first: the main site is included with the
+ * plan, each additional one is $300/mo (see the product brief, Aug 2026).
+ */
+export interface Workspace {
+  id: string
+  organization_id: string
+  name: string
+  is_active: boolean
+  created_at: string
 }
 
 export interface UserArea {
