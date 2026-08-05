@@ -517,9 +517,33 @@ export const ADDON_MONTHLY_PRICE: Record<string, number> = {
    *  with several branches. */
   multi_workspace: 300,
   extended_data_retention: 99,
-  sso: 99,
+  /** 0 because SSO is a ONE-TIME $299 charge, not a subscription — see
+   *  ADDON_ONE_TIME_PRICE below and the product brief (Aug 2026).
+   *
+   *  This was 99 until 05/08/2026, which silently added $99/mo of MRR for
+   *  every org with SSO to Revenue Reports. The bug was easy to miss because
+   *  `ADDON_LIST` said "$299 one-time" and the comment right above this object
+   *  claimed one-time add-ons contributed 0 — three sources, all disagreeing,
+   *  and only this one was actually being summed. */
+  sso: 0,
   linkedin_auto_messaging: 0,
   bridge: 0, // TBD
+}
+
+/**
+ * Add-ons billed once at activation rather than every month.
+ *
+ * Kept separate from ADDON_MONTHLY_PRICE rather than flagged inside it: a
+ * single map with a "recurring?" boolean invites exactly the mistake that
+ * happened with SSO, where one caller summed a value the shape of a monthly
+ * fee that was never monthly. Two maps make the question unaskable — if a
+ * price is in here, no monthly total can accidentally include it.
+ *
+ * Recognised in Revenue Reports through `addon_audit_log.created_at`, so the
+ * charge lands in the quarter the add-on was actually switched on.
+ */
+export const ADDON_ONE_TIME_PRICE: Record<string, number> = {
+  sso: 299,
 }
 
 /**

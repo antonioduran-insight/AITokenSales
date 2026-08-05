@@ -4,11 +4,15 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useLocale } from 'next-intl'
 import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
-import { PLAN_PRICES, ADDON_MONTHLY_PRICE, type Organization, type Vendor } from '@/lib/types'
+import { PLAN_PRICES, ADDON_MONTHLY_PRICE, ADDON_ONE_TIME_PRICE, type Organization, type Vendor } from '@/lib/types'
 import { quarterDef, billingForQuarter, type FiscalQuarter } from '@/lib/utils/quarter'
 import { Download } from 'lucide-react'
 
-type OrgWithAddons = Organization & { addons: string[]; workspace_count?: number }
+type OrgWithAddons = Organization & {
+  addons: string[]
+  workspace_count?: number
+  addon_activations?: { addon_type: string; created_at: string }[]
+}
 
 const SETUP_FEE = 1000
 const PARTNERS = { frank: 'Frank Kao', nicolas: 'Nicolás Nicoli' }
@@ -76,11 +80,40 @@ function addonsMonthly(org: OrgWithAddons): number {
   }, 0)
 }
 
+/**
+ * One-time add-on fees (SSO's $299) that were charged inside this quarter.
+ *
+ * Attached to the ACTIVATION EVENT, not to current state: an add-on switched
+ * on last quarter and still active must not be billed again this quarter, and
+ * one switched off since was still invoiced when it went on. Only
+ * `addon_audit_log` distinguishes those, which is why it is read here instead
+ * of `organization_addons`.
+ *
+ * The quarter's boundaries are derived from `quarterDef`'s own month list
+ * rather than recomputed, so a fiscal quarter that straddles a calendar year
+ * (Q3 and Q4 do) can't drift out of step with the rest of this page.
+ */
+function oneTimeThisQuarter(org: OrgWithAddons, fq: FiscalQuarter, year: number): number {
+  const def = quarterDef(fq, year)
+  const first = new Date(def.monthYears[0], def.months[0], 1)
+  const lastIdx = def.months.length - 1
+  // Exclusive upper bound: the first instant of the month after the last one.
+  const end = new Date(def.monthYears[lastIdx], def.months[lastIdx] + 1, 1)
+
+  return (org.addon_activations ?? []).reduce((sum, ev) => {
+    const price = ADDON_ONE_TIME_PRICE[ev.addon_type]
+    if (!price) return sum
+    const when = new Date(ev.created_at)
+    return when >= first && when < end ? sum + price : sum
+  }, 0)
+}
+
 interface ReportRow {
   org: OrgWithAddons
   isNew: boolean
   setupFee: number
   addonsMonthly: number
+  addonsOneTime: number
   months: number
   mrrThisQuarter: number
   total: number
@@ -99,10 +132,11 @@ function buildRows(orgs: OrgWithAddons[], fq: FiscalQuarter, year: number): Repo
     const months = billing.billableMonths
     const mrrThisQuarter = pMonthly * months
     const setupFee = billing.isNew ? SETUP_FEE : 0
-    const total = setupFee + aMonthly * months + mrrThisQuarter
+    const aOneTime = oneTimeThisQuarter(org, fq, year)
+    const total = setupFee + aOneTime + aMonthly * months + mrrThisQuarter
     rows.push({
-      org, isNew: billing.isNew, setupFee, addonsMonthly: aMonthly, months,
-      mrrThisQuarter, total, vendor: org.vendor || 'Direct',
+      org, isNew: billing.isNew, setupFee, addonsMonthly: aMonthly, addonsOneTime: aOneTime,
+      months, mrrThisQuarter, total, vendor: org.vendor || 'Direct',
     })
   }
   return rows.sort((a, b) => b.total - a.total)
@@ -214,13 +248,18 @@ export default function ReportsPage() {
       ? `Sales Report — ${vendorName || 'Vendor'} — ${qdef.label}`
       : `Revenue Report — ${qdef.label}`
 
-    const head = ['Organization', 'Plan', 'Sale Date', 'New?', 'Setup', 'Add-ons/mo', 'Months', 'MRR (Q)', 'Total', 'Vendor']
+    // 'One-time' sits next to 'Setup' because both are non-recurring charges;
+    // keeping it out of 'Add-ons/mo' is the whole point — that column is a
+    // monthly run-rate and a $299 one-off silently inflating it is the exact
+    // bug this change fixes.
+    const head = ['Organization', 'Plan', 'Sale Date', 'New?', 'Setup', 'One-time', 'Add-ons/mo', 'Months', 'MRR (Q)', 'Total', 'Vendor']
     const bodyRows = rows.map(r => [
       r.org.name,
       r.org.plan,
       new Date(r.org.created_at).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' }),
       r.isNew ? 'Yes' : 'No',
       r.isNew ? fmt(r.setupFee) : '—',
+      r.addonsOneTime > 0 ? fmt(r.addonsOneTime) : '—',
       r.addonsMonthly > 0 ? fmt(r.addonsMonthly) : '—',
       String(r.months),
       fmt(r.mrrThisQuarter),
@@ -267,8 +306,8 @@ export default function ReportsPage() {
       </style></head><body>
       <h1>${escapeHtml(title)}</h1>
       <div class="meta">${qdef.label} · ${MONTH_NAMES[qdef.months[0]]}–${MONTH_NAMES[qdef.months[2]]} · Generated ${new Date().toLocaleDateString()}</div>
-      <table><thead><tr>${head.map((h, i) => `<th class="${i >= 4 && i <= 8 ? 'r' : ''}">${h}</th>`).join('')}</tr></thead>
-      <tbody>${bodyRows.map(row => `<tr>${row.map((c, i) => `<td class="${i >= 4 && i <= 8 ? 'r' : ''}">${escapeHtml(String(c))}</td>`).join('')}</tr>`).join('')}</tbody></table>
+      <table><thead><tr>${head.map((h, i) => `<th class="${i >= 4 && i <= 9 ? 'r' : ''}">${h}</th>`).join('')}</tr></thead>
+      <tbody>${bodyRows.map(row => `<tr>${row.map((c, i) => `<td class="${i >= 4 && i <= 9 ? 'r' : ''}">${escapeHtml(String(c))}</td>`).join('')}</tr>`).join('')}</tbody></table>
       ${summary}
       </body></html>`
 
@@ -329,11 +368,16 @@ export default function ReportsPage() {
         <>
           {/* Table */}
           <div style={{ ...card, overflow: 'auto', marginBottom: 20 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            {/* minWidth so the 11 columns scroll sideways instead of squeezing
+                unreadably thin on a narrow screen — the wrapper is already
+                `overflow: auto`, but without a floor the table just shrinks to
+                fit. Sized for the column count, so revisit it if a column is
+                added or removed. */}
+            <table style={{ width: '100%', minWidth: 980, borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Organization', 'Plan', 'Sale Date', 'New this Q?', 'Setup Fee', 'Add-ons/mo', 'Months', 'MRR this Q', 'Total', 'Vendor'].map((h, i) => (
-                    <th key={h} style={{ ...th, textAlign: i >= 4 && i <= 8 ? 'right' : 'left' }}>{h}</th>
+                  {['Organization', 'Plan', 'Sale Date', 'New this Q?', 'Setup Fee', 'One-time', 'Add-ons/mo', 'Months', 'MRR this Q', 'Total', 'Vendor'].map((h, i) => (
+                    <th key={h} style={{ ...th, textAlign: i >= 4 && i <= 9 ? 'right' : 'left' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -345,6 +389,7 @@ export default function ReportsPage() {
                     <td style={{ ...td, color: colors.textSecondary }}>{new Date(r.org.created_at).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                     <td style={{ ...td, textAlign: 'right', color: r.isNew ? colors.success : colors.textMuted, fontWeight: 600 }}>{r.isNew ? 'Yes' : 'No'}</td>
                     <td style={{ ...td, textAlign: 'right', color: r.isNew ? '#F59E0B' : colors.textMuted }}>{r.isNew ? fmt(r.setupFee) : '—'}</td>
+                    <td style={{ ...td, textAlign: 'right', color: colors.textSecondary }}>{r.addonsOneTime > 0 ? fmt(r.addonsOneTime) : '—'}</td>
                     <td style={{ ...td, textAlign: 'right', color: colors.textSecondary }}>{r.addonsMonthly > 0 ? fmt(r.addonsMonthly) : '—'}</td>
                     <td style={{ ...td, textAlign: 'right', color: colors.textSecondary }}>{r.months}</td>
                     <td style={{ ...td, textAlign: 'right', color: colors.success, fontWeight: 600 }}>{fmt(r.mrrThisQuarter)}</td>
