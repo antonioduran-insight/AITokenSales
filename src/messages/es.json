@@ -671,7 +671,8 @@
       "multi_workspace": "Multi Workspace",
       "extended_data_retention": "Retención Extendida de Datos",
       "sso": "SSO",
-      "linkedin_auto_messaging": "Mensajería Automática de LinkedIn"
+      "linkedin_auto_messaging": "Mensajería Automática de LinkedIn",
+      "bridge": "Bridge (Alianzas)"
     },
     "companyContextPlaceholder": "Describí qué hace tu empresa, a quién le vendés y cualquier producto o foco específico que quieras que mencionen tus mensajes de contacto. Ejemplo: vendemos software de CRM con IA a equipos de ventas B2B en Asia. Ahora estamos empujando nuestra nueva función de automatización — mencionala cuando venga al caso.",
     "bridgeContextPlaceholder": "Describí qué tipo de partnerships buscás a través de Bridge — qué ofrecés como partner, qué buscás a cambio y cualquier tipo de acuerdo específico que quieras priorizar ahora. Ejemplo: buscamos partners revendedores del rubro SaaS que atiendan empresas mid-market. Ofrecemos 20% de comisión y soporte completo de onboarding."

@@ -16,16 +16,22 @@ const PLAN_COLORS: Record<string, string> = {
   ultra: '#EF4444',
 }
 
-// Add-on types that have a translated label under `settings.addons.*`.
-// Anything not listed here falls back to the raw `addon_type` from the DB,
-// exactly as the old hardcoded label map did.
-const TRANSLATED_ADDONS = new Set([
-  'account_management',
-  'multi_workspace',
-  'extended_data_retention',
-  'sso',
-  'linkedin_auto_messaging',
-])
+// Whether an add-on has a translated label under `settings.addons.*`.
+//
+// This used to be a hardcoded Set, which drifted the moment an add-on was
+// added without anyone remembering to update it: `bridge` shipped and every
+// admin with it saw the raw string "bridge" in all four languages. Asking the
+// message catalogue directly can't drift — add the key and the label appears,
+// forget it and the raw type still shows as a graceful fallback instead of
+// throwing.
+function addonLabel(t: ReturnType<typeof useTranslations<'settings'>>, addonType: string) {
+  const key = `addons.${addonType}`
+  // `has` is typed for literal keys; `addon_type` is a runtime string from the
+  // DB, so the cast is the honest way to ask a question the type system can't.
+  return (t as unknown as { has(k: string): boolean }).has(key)
+    ? (t as unknown as (k: string) => string)(key)
+    : addonType
+}
 
 const S: Record<string, React.CSSProperties> = {
   page:    { padding: '28px 32px', color: 'var(--crm-text-primary)', maxWidth: 860 },
@@ -368,7 +374,7 @@ function PlanTab() {
             {addons.map(a => (
               <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: 'var(--crm-surface-raised)', borderRadius: 8 }}>
                 <div>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--crm-text-primary)' }}>{TRANSLATED_ADDONS.has(a.addon_type) ? t(`addons.${a.addon_type}`) : a.addon_type}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--crm-text-primary)' }}>{addonLabel(t, a.addon_type)}</span>
                   <span style={{ display: 'inline-block', marginLeft: 10, fontSize: 10, backgroundColor: '#22C55E20', color: '#22C55E', border: '1px solid #22C55E30', borderRadius: 3, padding: '1px 6px' }}>{t('active')}</span>
                 </div>
                 {a.price_monthly && (

@@ -671,7 +671,8 @@
       "multi_workspace": "Multi Workspace",
       "extended_data_retention": "Extended Data Retention",
       "sso": "SSO",
-      "linkedin_auto_messaging": "LinkedIn Auto Messaging"
+      "linkedin_auto_messaging": "LinkedIn Auto Messaging",
+      "bridge": "Bridge (Partnerships)"
     },
     "companyContextPlaceholder": "Describe what your company does, who you sell to, and any specific products or focus you want your outreach messages to mention. Example: We sell AI-powered CRM software to B2B sales teams in Asia. Right now we're pushing our new automation feature — mention it when relevant.",
     "bridgeContextPlaceholder": "Describe what kind of partnerships you're looking for through Bridge — what you offer as a partner, what you're looking for in return, and any specific type of deal you want to prioritize right now. Example: We're looking for reseller partners in the SaaS space who serve mid-market companies. We offer 20% commission and full onboarding support."
