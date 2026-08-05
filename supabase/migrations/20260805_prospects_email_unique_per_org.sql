@@ -1,0 +1,72 @@
+-- Scope the prospects email uniqueness to the organization.
+--
+-- THE BUG
+-- -------
+-- `prospects_email_unique` was created as:
+--
+--   CREATE UNIQUE INDEX prospects_email_unique
+--     ON prospects (email) WHERE email IS NOT NULL;
+--
+-- with no `organization_id` in it — unlike `prospects_linkedin_assignee_unique`
+-- right beside it, which is correctly scoped to `(organization_id,
+-- linkedin_url, assigned_to)`. Email uniqueness is therefore GLOBAL across
+-- every tenant: whichever organization records a given address first
+-- permanently prevents every other organization from ever holding that
+-- contact.
+--
+-- What makes it dangerous rather than merely wrong is how it fails. The insert
+-- raises 23505, and every insert path in this codebase deliberately tolerates
+-- 23505 row-by-row (so one duplicate doesn't abort a whole scraper batch or
+-- CSV import). So the second org's lead is dropped with no error surfaced
+-- anywhere: not in the UI, not in the run summary, not in a log. It looks
+-- exactly like a lead that was never found.
+--
+-- Invisible today with a single real organization. It becomes near-certain the
+-- moment several orgs prospect overlapping markets — which is the plan for
+-- September.
+--
+-- WHY THIS ORDER IS SAFE
+-- ----------------------
+-- The new index is created BEFORE the old one is dropped, and that ordering is
+-- not cosmetic: global uniqueness is strictly stronger than per-org
+-- uniqueness, so any data that satisfies the existing index necessarily
+-- satisfies the new one. The CREATE therefore cannot fail while the old index
+-- is still in place. Doing it the other way round — drop, then create — risks
+-- the CREATE failing on unexpected data and leaving the table with NO
+-- uniqueness protection on email at all, which is worse than the bug being
+-- fixed.
+--
+-- Both indexes coexist for the duration of this migration. That is fine: the
+-- old one is simply the stricter of the two until it is dropped.
+--
+-- Not using CREATE INDEX CONCURRENTLY: it cannot run inside a transaction
+-- block (the SQL editor wraps statements), and at this table's size the plain
+-- form takes milliseconds. Revisit only if prospects grows by orders of
+-- magnitude.
+--
+-- RUN THIS BY HAND in the Supabase SQL editor: migrations in this repo are
+-- NOT applied automatically.
+
+-- Step 1 — the correctly scoped index, under a new name so it can coexist.
+CREATE UNIQUE INDEX IF NOT EXISTS prospects_org_email_unique
+  ON public.prospects (organization_id, email)
+  WHERE email IS NOT NULL;
+
+-- Step 2 — retire the global one. Only reached if step 1 succeeded.
+DROP INDEX IF EXISTS public.prospects_email_unique;
+
+-- Verify — expect exactly one row, `prospects_org_email_unique`:
+--
+--   SELECT indexname, indexdef FROM pg_indexes
+--   WHERE schemaname = 'public' AND tablename = 'prospects'
+--     AND indexname LIKE '%email%';
+--
+-- Out of interest, to see what the global index had been silently blocking
+-- (run AFTER this migration; before it, the answer is always zero by
+-- definition). Any row returned is a contact two different orgs both hold —
+-- now allowed, and previously an invisible drop for whoever came second:
+--
+--   SELECT email, count(DISTINCT organization_id) AS orgs
+--   FROM public.prospects
+--   WHERE email IS NOT NULL
+--   GROUP BY email HAVING count(DISTINCT organization_id) > 1;
