@@ -16,6 +16,13 @@ interface GlobalAdminThemeContextType {
 
 const translations = {
   zh: {
+    demoRequests: '導覽申請', demoRequestsSubtitle: '從公開網站送出的聯絡表單',
+    demoRequestsEmpty: '目前沒有任何申請', demoRequestsEmptyFiltered: '此狀態下沒有申請',
+    demoRequestsLoadError: '無法載入申請', demoRequestsSaveError: '無法儲存變更',
+    demoRequestsAddNote: '新增備註', demoRequestsEditNote: '編輯備註',
+    demoStatus_new: '新申請', demoStatus_contacted: '已聯絡', demoStatus_qualified: '已確認需求',
+    demoStatus_converted: '已成交', demoStatus_discarded: '已排除',
+    refresh: '重新整理', all: '全部',
     organizations: '組織', revenue: '收入', vendors: '銷售商', support: '支援', logout: '登出',
     newOrganization: '新增組織', name: '名稱', plan: '方案', seats: '席位',
     leadsPerMonth: '每月線索', vendor: '銷售商', mrr: 'MRR', created: '創建日期',
@@ -47,6 +54,13 @@ const translations = {
     subtotal: '小計', total: '總計', monthlyTotal: '每月總計',
   },
   en: {
+    demoRequests: 'Demo requests', demoRequestsSubtitle: 'Contact forms submitted from the public site',
+    demoRequestsEmpty: 'No requests yet', demoRequestsEmptyFiltered: 'No requests with this status',
+    demoRequestsLoadError: 'Could not load requests', demoRequestsSaveError: 'Could not save the change',
+    demoRequestsAddNote: 'Add a note', demoRequestsEditNote: 'Edit note',
+    demoStatus_new: 'New', demoStatus_contacted: 'Contacted', demoStatus_qualified: 'Qualified',
+    demoStatus_converted: 'Converted', demoStatus_discarded: 'Discarded',
+    refresh: 'Refresh', all: 'All',
     organizations: 'Organizations', revenue: 'Revenue', vendors: 'Vendors',
     support: 'Support', logout: 'Logout', newOrganization: 'New Organization',
     name: 'Name', plan: 'Plan', seats: 'Seats', leadsPerMonth: 'Leads/mo',

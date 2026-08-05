@@ -16,6 +16,7 @@ export function GlobalAdminNavbar() {
     { href: '/global-admin/revenue', label: t('revenue') },
     { href: '/global-admin/vendors', label: t('vendors') },
     { href: '/global-admin/support', label: t('support') },
+    { href: '/global-admin/demo-requests', label: t('demoRequests') },
   ]
 
   async function handleLogout() {
