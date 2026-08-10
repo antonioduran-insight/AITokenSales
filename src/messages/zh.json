@@ -15,7 +15,8 @@
     "history": "歷史記錄",
     "scraperSection": "抓取工具",
     "bridgeSection": "Bridge",
-    "partnerships": "合作夥伴"
+    "partnerships": "合作夥伴",
+    "account": "我的帳號"
   },
   "areas": {
     "taiwan": "台灣",
@@ -97,7 +98,14 @@
     "loginError": "電子郵件或密碼無效",
     "signingIn": "登入中...",
     "accountDeactivated": "您的帳戶已被停用，請聯絡您的管理員。",
-    "orgDeactivated": "此組織的存取權限已被暫停。"
+    "orgDeactivated": "此組織的存取權限已被暫停。",
+    "forgotPassword": "忘記密碼？",
+    "ssoUnavailable": "你的組織目前無法使用單一登入，請聯絡管理員。",
+    "ssoNotAuthorised": "登入成功，但管理員尚未開放這個信箱使用 CRM。請請管理員將你加入。",
+    "ssoNoOrg": "沒有任何組織為此信箱網域設定單一登入。",
+    "ssoSeatLimit": "你的組織已無可用席次，因此無法建立帳號。請聯絡管理員。",
+    "ssoFailed": "建立帳號時發生問題。你的登入本身沒有問題 —— 請重試或聯絡管理員。",
+    "inviteLinkExpired": "此連結已使用過或已失效。請聯絡管理員重新寄送。"
   },
   "prospect": {
     "new": "新潛在客戶",
@@ -159,7 +167,15 @@
     "translationFailed": "翻譯失敗 — 請再試一次。",
     "translationNotConfigured": "此組織尚未設定翻譯功能 — 請至「設定 → Scraper」新增 Anthropic 金鑰。",
     "showOriginal": "顯示原文",
-    "showTranslation": "顯示翻譯"
+    "showTranslation": "顯示翻譯",
+    "archive": "封存",
+    "unarchive": "還原",
+    "archived": "已封存此名單",
+    "unarchived": "已還原此名單",
+    "archiveHint": "從看板與名單列表中隱藏。日後匯入時仍會被視為重複，且不會退回本月名單額度。",
+    "unarchiveHint": "將此名單放回看板與名單列表。",
+    "viewArchived": "已封存",
+    "viewingArchived": "顯示已封存"
   },
   "import": {
     "title": "匯入 CSV",
@@ -369,7 +385,13 @@
     "setTempPassword": "設定臨時密碼",
     "setTempPasswordHelp": "僅在邀請郵件無法寄送時使用 —— 你必須自行把密碼交給對方。",
     "pendingInvite": "已邀請",
-    "pendingInviteHelp": "邀請已寄出，但對方尚未登入過。"
+    "pendingInviteHelp": "邀請已寄出，但對方尚未登入過。",
+    "resetPassword": "重設密碼",
+    "resetSending": "寄送中…",
+    "resetSent": "已寄送重設密碼郵件至 {email}。",
+    "resetFailed": "重設郵件寄送失敗。",
+    "resetPasswordHint": "寄送連結讓對方自行設定新密碼，你不會看到密碼內容。",
+    "inviteEmailFailed": "已建立 {email} 的帳號，但邀請郵件寄送失敗。請在該列點選「重設密碼」重新寄送。"
   },
   "common": {
     "loading": "載入中...",
@@ -895,5 +917,63 @@
     "expiredTitle": "此連結已失效",
     "expiredBody": "邀請連結只能使用一次，且會過期。請聯絡管理員重新寄送。",
     "backToLogin": "返回登入"
+  },
+  "forgotPassword": {
+    "title": "重設密碼",
+    "subtitle": "輸入你用來登入的信箱，我們會寄送重設密碼的連結。",
+    "email": "電子郵件",
+    "submit": "寄送重設連結",
+    "sending": "寄送中…",
+    "sentTitle": "請查收信箱",
+    "sentBody": "我們已將重設連結寄至 {email}。該連結僅能使用一次，並會在短時間內失效。",
+    "sendFailed": "郵件寄送失敗，請稍後再試。",
+    "backToLogin": "返回登入",
+    "noAccount": "找不到使用此信箱的帳號。請確認拼字是否正確，或詢問管理員你的帳號使用哪個信箱。",
+    "deactivated": "該帳號已停用，重設密碼也無法登入。請聯絡你的管理員。",
+    "tooMany": "嘗試次數過多，請稍待一分鐘後再試。"
+  },
+  "account": {
+    "title": "我的帳號",
+    "profile": "個人資料",
+    "name": "姓名",
+    "email": "電子郵件",
+    "changePassword": "變更密碼",
+    "currentPassword": "目前密碼",
+    "newPassword": "新密碼",
+    "confirmPassword": "確認新密碼",
+    "changed": "密碼已變更，其他所有裝置皆已登出。",
+    "wrongCurrent": "目前密碼不正確。",
+    "tooShort": "請至少使用 8 個字元。",
+    "mismatch": "兩次輸入的密碼不一致。",
+    "sameAsCurrent": "新密碼必須與目前密碼不同。",
+    "changedButSessionsKept": "密碼已變更，但其他裝置未能登出。若你是因為擔心他人取得存取權而變更密碼，請從該裝置手動登出，或聯絡管理員。"
+  },
+  "email": {
+    "resetSubject": "重設你的密碼",
+    "resetHeading": "重設你的密碼",
+    "resetBody1": "我們收到重設你帳號密碼的請求。請點擊下方按鈕設定新密碼。",
+    "resetBody2": "此連結僅能使用一次，並會在短時間內失效。",
+    "resetCta": "設定新密碼",
+    "resetFooter": "如果這不是你發出的請求，可以忽略這封郵件，你的密碼不會有任何變動。",
+    "inviteSubject": "你已受邀加入",
+    "inviteSubjectWithOrg": "你已受邀加入 {org}",
+    "inviteHeading": "你已受邀加入",
+    "inviteBody1": "我們已為你建立帳號。請點擊下方按鈕設定你自己的密碼並開始使用。",
+    "inviteBody1WithNames": "{inviter} 已在 {org} 為你建立帳號。請點擊下方按鈕設定你自己的密碼並開始使用。",
+    "inviteBody2": "你設定的密碼不會被任何人看到。",
+    "inviteCta": "設定密碼",
+    "inviteFooter": "此連結僅能使用一次，並會在短時間內失效。若連結已過期，請聯絡邀請你的人重新寄送。"
+  },
+  "sso": {
+    "title": "單一登入名冊",
+    "help": "可以透過公司身分提供者登入的人。在那邊驗證只證明「他是誰」；這份名單決定「能不能進入 CRM」。當對方首次登入時，這筆項目會變成正式帳號並移到上方列表。",
+    "notConfigured": "你的組織尚未接通單一登入，因此名單上的人都還無法登入。請聯絡 Insight Software 進行設定。",
+    "emailPlaceholder": "name@company.com",
+    "selectArea": "選擇地區…",
+    "allSites": "所有據點",
+    "authorise": "授權",
+    "removeHint": "移除此授權。不影響已經登入過的人。",
+    "addFailed": "無法新增此人。",
+    "seatLimit": "已無可用席次 —— 你的方案允許 {max} 席。請停用某位成員，或移除一筆待處理的授權。"
   }
 }

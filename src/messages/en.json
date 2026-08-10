@@ -15,7 +15,8 @@
     "history": "History",
     "scraperSection": "Scraper",
     "bridgeSection": "Bridge",
-    "partnerships": "Partnerships"
+    "partnerships": "Partnerships",
+    "account": "My account"
   },
   "areas": {
     "taiwan": "Taiwan",
@@ -97,7 +98,14 @@
     "loginError": "Invalid email or password",
     "signingIn": "Signing in...",
     "accountDeactivated": "Your account has been deactivated. Contact your administrator.",
-    "orgDeactivated": "This organization's access has been suspended."
+    "orgDeactivated": "This organization's access has been suspended.",
+    "forgotPassword": "Forgot your password?",
+    "ssoUnavailable": "Single sign-on is not available for your organisation right now. Contact your administrator.",
+    "ssoNotAuthorised": "You signed in successfully, but your administrator has not given this address access to the CRM yet. Ask them to add you.",
+    "ssoNoOrg": "No organisation is configured for single sign-on with that email domain.",
+    "ssoSeatLimit": "Your organisation has no seats left, so your account could not be created. Ask your administrator.",
+    "ssoFailed": "Something went wrong setting up your account. Your sign-in was fine — try again, or contact your administrator.",
+    "inviteLinkExpired": "That link has already been used or has expired. Ask your administrator to send a new one."
   },
   "prospect": {
     "new": "New Lead",
@@ -159,7 +167,15 @@
     "translationFailed": "Could not translate — try again.",
     "translationNotConfigured": "Translation isn't set up for this organization yet — add an Anthropic key in Settings → Scraper.",
     "showOriginal": "Show original",
-    "showTranslation": "Show translation"
+    "showTranslation": "Show translation",
+    "archive": "Archive",
+    "unarchive": "Restore",
+    "archived": "Lead archived",
+    "unarchived": "Lead restored",
+    "archiveHint": "Hides it from the board and the Leads table. It still counts as a duplicate on future imports, and your monthly lead quota is not refunded.",
+    "unarchiveHint": "Bring this lead back to the board and the Leads table.",
+    "viewArchived": "Archived",
+    "viewingArchived": "Showing archived"
   },
   "import": {
     "title": "Import CSV",
@@ -369,7 +385,13 @@
     "setTempPassword": "Set a temporary password",
     "setTempPasswordHelp": "Use only if invitation emails are not working — you will have to pass the password on yourself.",
     "pendingInvite": "Invited",
-    "pendingInviteHelp": "Invitation sent, but this person has never signed in."
+    "pendingInviteHelp": "Invitation sent, but this person has never signed in.",
+    "resetPassword": "Reset password",
+    "resetSending": "Sending…",
+    "resetSent": "A password reset email was sent to {email}.",
+    "resetFailed": "The reset email could not be sent.",
+    "resetPasswordHint": "Emails them a link to choose a new password. You never see it.",
+    "inviteEmailFailed": "The account for {email} was created, but the invitation email could not be sent. Use “Reset password” on their row to try again."
   },
   "common": {
     "loading": "Loading...",
@@ -895,5 +917,63 @@
     "expiredTitle": "This link is no longer valid",
     "expiredBody": "Invitation links can only be used once, and they expire. Ask your administrator to send a new one.",
     "backToLogin": "Back to sign in"
+  },
+  "forgotPassword": {
+    "title": "Reset your password",
+    "subtitle": "Enter the email you use to sign in and we'll send you a link to choose a new password.",
+    "email": "Email",
+    "submit": "Send reset link",
+    "sending": "Sending…",
+    "sentTitle": "Check your email",
+    "sentBody": "We sent a reset link to {email}. It can only be used once and expires shortly.",
+    "sendFailed": "The email could not be sent. Please try again in a moment.",
+    "backToLogin": "Back to sign in",
+    "noAccount": "There is no account with that email address. Check the spelling, or ask your administrator which address your account uses.",
+    "deactivated": "That account has been deactivated, so resetting the password would not let you in. Contact your administrator.",
+    "tooMany": "Too many attempts. Wait a minute and try again."
+  },
+  "account": {
+    "title": "My account",
+    "profile": "Profile",
+    "name": "Name",
+    "email": "Email",
+    "changePassword": "Change password",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "changed": "Your password has been changed. You have been signed out on all other devices.",
+    "wrongCurrent": "That current password is not correct.",
+    "tooShort": "Use at least 8 characters.",
+    "mismatch": "The two passwords do not match.",
+    "sameAsCurrent": "The new password must be different from the current one.",
+    "changedButSessionsKept": "Your password has been changed, but other devices could not be signed out. If you changed it because someone else may have had access, sign out everywhere from that device or contact your administrator."
+  },
+  "email": {
+    "resetSubject": "Reset your password",
+    "resetHeading": "Reset your password",
+    "resetBody1": "We received a request to reset the password for your account. Use the button below to choose a new one.",
+    "resetBody2": "The link can only be used once and expires shortly.",
+    "resetCta": "Choose a new password",
+    "resetFooter": "If you didn't request this, you can ignore this email — your password won't change.",
+    "inviteSubject": "You've been invited",
+    "inviteSubjectWithOrg": "You’ve been invited to {org}",
+    "inviteHeading": "You've been invited",
+    "inviteBody1": "An account has been created for you. Use the button below to choose your own password and get started.",
+    "inviteBody1WithNames": "{inviter} created an account for you at {org}. Use the button below to choose your own password and get started.",
+    "inviteBody2": "Nobody else will ever see the password you choose.",
+    "inviteCta": "Set your password",
+    "inviteFooter": "The link can only be used once and expires shortly. If it has expired, ask whoever invited you to send a new one."
+  },
+  "sso": {
+    "title": "Single sign-on roster",
+    "help": "Who may sign in through your company’s identity provider. Authenticating there proves who someone is; this list decides whether they get into the CRM. An entry becomes a real account the first time that person signs in, and then moves to the list above.",
+    "notConfigured": "Single sign-on isn’t connected for your organisation yet, so nobody on this list can sign in. Contact Insight Software to set it up.",
+    "emailPlaceholder": "name@company.com",
+    "selectArea": "Area…",
+    "allSites": "All sites",
+    "authorise": "Authorise",
+    "removeHint": "Remove this authorisation. Does not affect anyone who has already signed in.",
+    "addFailed": "Could not add that person.",
+    "seatLimit": "No seats left — your plan allows {max}. Deactivate someone, or remove a pending authorisation."
   }
 }

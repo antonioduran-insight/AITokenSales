@@ -15,7 +15,8 @@
     "history": "Lịch Sử",
     "scraperSection": "Thu Thập Dữ Liệu",
     "bridgeSection": "Bridge",
-    "partnerships": "Đối Tác"
+    "partnerships": "Đối Tác",
+    "account": "Tài khoản"
   },
   "areas": {
     "taiwan": "Đài Loan",
@@ -97,7 +98,14 @@
     "loginError": "Email hoặc mật khẩu không hợp lệ",
     "signingIn": "Đang đăng nhập...",
     "accountDeactivated": "Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.",
-    "orgDeactivated": "Quyền truy cập của tổ chức này đã bị tạm ngưng."
+    "orgDeactivated": "Quyền truy cập của tổ chức này đã bị tạm ngưng.",
+    "forgotPassword": "Quên mật khẩu?",
+    "ssoUnavailable": "Đăng nhập một lần hiện không khả dụng cho tổ chức của bạn. Hãy liên hệ quản trị viên.",
+    "ssoNotAuthorised": "Bạn đã đăng nhập thành công, nhưng quản trị viên chưa cấp quyền truy cập CRM cho địa chỉ này. Hãy nhờ họ thêm bạn.",
+    "ssoNoOrg": "Không có tổ chức nào được cấu hình đăng nhập một lần cho tên miền email đó.",
+    "ssoSeatLimit": "Tổ chức của bạn đã hết chỗ nên không thể tạo tài khoản. Hãy liên hệ quản trị viên.",
+    "ssoFailed": "Có lỗi khi thiết lập tài khoản của bạn. Việc đăng nhập không có vấn đề — hãy thử lại hoặc liên hệ quản trị viên.",
+    "inviteLinkExpired": "Liên kết đó đã được dùng hoặc đã hết hạn. Hãy nhờ quản trị viên gửi lại."
   },
   "prospect": {
     "new": "Khách Hàng Tiềm Năng Mới",
@@ -159,7 +167,15 @@
     "translationFailed": "Không thể dịch — vui lòng thử lại.",
     "translationNotConfigured": "Tổ chức này chưa cấu hình tính năng dịch — hãy thêm khóa Anthropic trong Cài đặt → Scraper.",
     "showOriginal": "Xem bản gốc",
-    "showTranslation": "Xem bản dịch"
+    "showTranslation": "Xem bản dịch",
+    "archive": "Lưu trữ",
+    "unarchive": "Khôi phục",
+    "archived": "Đã lưu trữ khách hàng",
+    "unarchived": "Đã khôi phục khách hàng",
+    "archiveHint": "Ẩn khỏi bảng và danh sách khách hàng. Vẫn được tính là trùng lặp khi nhập sau này, và không hoàn lại hạn mức tháng.",
+    "unarchiveHint": "Đưa khách hàng này trở lại bảng và danh sách.",
+    "viewArchived": "Đã lưu trữ",
+    "viewingArchived": "Đang xem đã lưu trữ"
   },
   "import": {
     "title": "Nhập CSV",
@@ -369,7 +385,13 @@
     "setTempPassword": "Đặt mật khẩu tạm thời",
     "setTempPasswordHelp": "Chỉ dùng khi email mời không hoạt động — bạn sẽ phải tự chuyển mật khẩu cho họ.",
     "pendingInvite": "Đã mời",
-    "pendingInviteHelp": "Đã gửi lời mời nhưng người này chưa từng đăng nhập."
+    "pendingInviteHelp": "Đã gửi lời mời nhưng người này chưa từng đăng nhập.",
+    "resetPassword": "Đặt lại mật khẩu",
+    "resetSending": "Đang gửi…",
+    "resetSent": "Đã gửi email đặt lại mật khẩu tới {email}.",
+    "resetFailed": "Không gửi được email đặt lại.",
+    "resetPasswordHint": "Gửi liên kết để họ tự chọn mật khẩu mới. Bạn không bao giờ thấy mật khẩu.",
+    "inviteEmailFailed": "Đã tạo tài khoản cho {email}, nhưng không gửi được email mời. Dùng “Đặt lại mật khẩu” ở dòng của họ để thử lại."
   },
   "common": {
     "loading": "Đang tải...",
@@ -895,5 +917,63 @@
     "expiredTitle": "Liên kết này không còn hiệu lực",
     "expiredBody": "Liên kết mời chỉ dùng được một lần và sẽ hết hạn. Hãy nhờ quản trị viên gửi lại.",
     "backToLogin": "Quay lại đăng nhập"
+  },
+  "forgotPassword": {
+    "title": "Đặt lại mật khẩu",
+    "subtitle": "Nhập email bạn dùng để đăng nhập, chúng tôi sẽ gửi liên kết để chọn mật khẩu mới.",
+    "email": "Email",
+    "submit": "Gửi liên kết",
+    "sending": "Đang gửi…",
+    "sentTitle": "Kiểm tra email của bạn",
+    "sentBody": "Chúng tôi đã gửi liên kết đặt lại tới {email}. Liên kết chỉ dùng được một lần và sẽ sớm hết hạn.",
+    "sendFailed": "Không gửi được email. Vui lòng thử lại sau giây lát.",
+    "backToLogin": "Quay lại đăng nhập",
+    "noAccount": "Không có tài khoản nào dùng email này. Hãy kiểm tra chính tả, hoặc hỏi quản trị viên tài khoản của bạn dùng địa chỉ nào.",
+    "deactivated": "Tài khoản đó đã bị vô hiệu hóa, nên đặt lại mật khẩu cũng không đăng nhập được. Hãy liên hệ quản trị viên.",
+    "tooMany": "Quá nhiều lần thử. Đợi một phút rồi thử lại."
+  },
+  "account": {
+    "title": "Tài khoản của tôi",
+    "profile": "Hồ sơ",
+    "name": "Tên",
+    "email": "Email",
+    "changePassword": "Đổi mật khẩu",
+    "currentPassword": "Mật khẩu hiện tại",
+    "newPassword": "Mật khẩu mới",
+    "confirmPassword": "Xác nhận mật khẩu mới",
+    "changed": "Mật khẩu của bạn đã được đổi. Bạn đã được đăng xuất trên tất cả thiết bị khác.",
+    "wrongCurrent": "Mật khẩu hiện tại không đúng.",
+    "tooShort": "Dùng ít nhất 8 ký tự.",
+    "mismatch": "Hai mật khẩu không khớp.",
+    "sameAsCurrent": "Mật khẩu mới phải khác mật khẩu hiện tại.",
+    "changedButSessionsKept": "Mật khẩu đã được đổi, nhưng không thể đăng xuất các thiết bị khác. Nếu bạn đổi vì lo người khác có quyền truy cập, hãy đăng xuất từ thiết bị đó hoặc liên hệ quản trị viên."
+  },
+  "email": {
+    "resetSubject": "Đặt lại mật khẩu của bạn",
+    "resetHeading": "Đặt lại mật khẩu của bạn",
+    "resetBody1": "Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn. Dùng nút bên dưới để chọn mật khẩu mới.",
+    "resetBody2": "Liên kết chỉ dùng được một lần và sẽ sớm hết hạn.",
+    "resetCta": "Chọn mật khẩu mới",
+    "resetFooter": "Nếu bạn không yêu cầu điều này, hãy bỏ qua email này — mật khẩu của bạn sẽ không thay đổi.",
+    "inviteSubject": "Bạn được mời tham gia",
+    "inviteSubjectWithOrg": "Bạn được mời tham gia {org}",
+    "inviteHeading": "Bạn được mời tham gia",
+    "inviteBody1": "Một tài khoản đã được tạo cho bạn. Dùng nút bên dưới để tự đặt mật khẩu và bắt đầu.",
+    "inviteBody1WithNames": "{inviter} đã tạo tài khoản cho bạn tại {org}. Dùng nút bên dưới để tự đặt mật khẩu và bắt đầu.",
+    "inviteBody2": "Không ai khác nhìn thấy mật khẩu bạn chọn.",
+    "inviteCta": "Đặt mật khẩu",
+    "inviteFooter": "Liên kết chỉ dùng được một lần và sẽ sớm hết hạn. Nếu đã hết hạn, hãy nhờ người mời gửi lại."
+  },
+  "sso": {
+    "title": "Danh sách đăng nhập một lần",
+    "help": "Những người có thể đăng nhập qua nhà cung cấp danh tính của công ty. Xác thực ở đó chứng minh họ là ai; danh sách này quyết định họ có vào được CRM hay không. Một mục sẽ trở thành tài khoản thật khi người đó đăng nhập lần đầu, rồi chuyển lên danh sách phía trên.",
+    "notConfigured": "Tổ chức của bạn chưa kết nối đăng nhập một lần, nên chưa ai trong danh sách này đăng nhập được. Hãy liên hệ Insight Software để thiết lập.",
+    "emailPlaceholder": "ten@congty.com",
+    "selectArea": "Khu vực…",
+    "allSites": "Tất cả chi nhánh",
+    "authorise": "Cấp quyền",
+    "removeHint": "Xóa quyền này. Không ảnh hưởng đến người đã đăng nhập.",
+    "addFailed": "Không thể thêm người này.",
+    "seatLimit": "Đã hết chỗ — gói của bạn cho phép {max}. Hãy vô hiệu hóa một người, hoặc xóa một quyền đang chờ."
   }
 }

@@ -15,7 +15,8 @@
     "history": "Historial",
     "scraperSection": "Scraper",
     "bridgeSection": "Bridge",
-    "partnerships": "Sociedades"
+    "partnerships": "Sociedades",
+    "account": "Mi cuenta"
   },
   "areas": {
     "taiwan": "Taiwán",
@@ -97,7 +98,14 @@
     "loginError": "Email o contraseña inválidos",
     "signingIn": "Ingresando...",
     "accountDeactivated": "Tu cuenta ha sido desactivada. Contactá a tu administrador.",
-    "orgDeactivated": "El acceso de esta organización ha sido suspendido."
+    "orgDeactivated": "El acceso de esta organización ha sido suspendido.",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "ssoUnavailable": "El inicio de sesión único no está disponible para tu organización en este momento. Contactá a tu administrador.",
+    "ssoNotAuthorised": "Iniciaste sesión correctamente, pero tu administrador todavía no le dio acceso al CRM a esta dirección. Pedile que te agregue.",
+    "ssoNoOrg": "No hay ninguna organización configurada con inicio de sesión único para ese dominio de email.",
+    "ssoSeatLimit": "Tu organización no tiene asientos disponibles, así que no se pudo crear tu cuenta. Consultá con tu administrador.",
+    "ssoFailed": "Algo falló al crear tu cuenta. Tu inicio de sesión estuvo bien — probá de nuevo o contactá a tu administrador.",
+    "inviteLinkExpired": "Ese link ya se usó o venció. Pedile a tu administrador que te envíe uno nuevo."
   },
   "prospect": {
     "new": "Nuevo Lead",
@@ -159,7 +167,15 @@
     "translationFailed": "No se pudo traducir — intentá de nuevo.",
     "translationNotConfigured": "La traducción todavía no está configurada para esta organización — agregá una clave de Anthropic en Configuración → Scraper.",
     "showOriginal": "Ver original",
-    "showTranslation": "Ver traducción"
+    "showTranslation": "Ver traducción",
+    "archive": "Archivar",
+    "unarchive": "Restaurar",
+    "archived": "Lead archivado",
+    "unarchived": "Lead restaurado",
+    "archiveHint": "Lo oculta del tablero y de la tabla de Leads. Sigue contando como duplicado en futuras importaciones, y no devuelve cupo del mes.",
+    "unarchiveHint": "Devolver este lead al tablero y a la tabla de Leads.",
+    "viewArchived": "Archivados",
+    "viewingArchived": "Viendo archivados"
   },
   "import": {
     "title": "Importar CSV",
@@ -369,7 +385,13 @@
     "setTempPassword": "Definir contraseña temporal",
     "setTempPasswordHelp": "Usalo solo si los emails de invitación no funcionan — vas a tener que pasarle la contraseña vos.",
     "pendingInvite": "Invitado",
-    "pendingInviteHelp": "Invitación enviada, pero esta persona nunca inició sesión."
+    "pendingInviteHelp": "Invitación enviada, pero esta persona nunca inició sesión.",
+    "resetPassword": "Restablecer",
+    "resetSending": "Enviando…",
+    "resetSent": "Se envió un email de restablecimiento a {email}.",
+    "resetFailed": "No se pudo enviar el email.",
+    "resetPasswordHint": "Le envía un link para que elija una nueva contraseña. Vos nunca la ves.",
+    "inviteEmailFailed": "La cuenta de {email} se creó, pero no se pudo enviar el email de invitación. Usá “Restablecer” en su fila para reintentar."
   },
   "common": {
     "loading": "Cargando...",
@@ -895,5 +917,63 @@
     "expiredTitle": "Este link ya no es válido",
     "expiredBody": "Los links de invitación se usan una sola vez y vencen. Pedile a tu administrador que te envíe uno nuevo.",
     "backToLogin": "Volver al inicio de sesión"
+  },
+  "forgotPassword": {
+    "title": "Restablecer tu contraseña",
+    "subtitle": "Ingresá el email con el que iniciás sesión y te enviamos un link para elegir una nueva contraseña.",
+    "email": "Email",
+    "submit": "Enviar link",
+    "sending": "Enviando…",
+    "sentTitle": "Revisá tu email",
+    "sentBody": "Enviamos un link de restablecimiento a {email}. Se usa una sola vez y vence en poco tiempo.",
+    "sendFailed": "No se pudo enviar el email. Probá de nuevo en un momento.",
+    "backToLogin": "Volver al inicio de sesión",
+    "noAccount": "No hay ninguna cuenta con ese email. Revisá cómo lo escribiste, o preguntale a tu administrador qué dirección usa tu cuenta.",
+    "deactivated": "Esa cuenta está desactivada, así que restablecer la contraseña no te dejaría entrar. Contactá a tu administrador.",
+    "tooMany": "Demasiados intentos. Esperá un minuto y probá de nuevo."
+  },
+  "account": {
+    "title": "Mi cuenta",
+    "profile": "Perfil",
+    "name": "Nombre",
+    "email": "Email",
+    "changePassword": "Cambiar contraseña",
+    "currentPassword": "Contraseña actual",
+    "newPassword": "Nueva contraseña",
+    "confirmPassword": "Confirmar nueva contraseña",
+    "changed": "Tu contraseña fue cambiada. Se cerró la sesión en todos los demás dispositivos.",
+    "wrongCurrent": "Esa contraseña actual no es correcta.",
+    "tooShort": "Usá al menos 8 caracteres.",
+    "mismatch": "Las contraseñas no coinciden.",
+    "sameAsCurrent": "La nueva contraseña tiene que ser distinta de la actual.",
+    "changedButSessionsKept": "Tu contraseña fue cambiada, pero no se pudieron cerrar las sesiones en otros dispositivos. Si la cambiaste porque alguien más podía tener acceso, cerrá sesión desde ese dispositivo o contactá a tu administrador."
+  },
+  "email": {
+    "resetSubject": "Restablecer tu contraseña",
+    "resetHeading": "Restablecer tu contraseña",
+    "resetBody1": "Recibimos un pedido para restablecer la contraseña de tu cuenta. Usá el botón de abajo para elegir una nueva.",
+    "resetBody2": "El enlace se usa una sola vez y vence en poco tiempo.",
+    "resetCta": "Elegir nueva contraseña",
+    "resetFooter": "Si no pediste esto, podés ignorar este email: tu contraseña no va a cambiar.",
+    "inviteSubject": "Te invitaron a unirte",
+    "inviteSubjectWithOrg": "Te invitaron a unirte a {org}",
+    "inviteHeading": "Te invitaron a unirte",
+    "inviteBody1": "Se creó una cuenta para vos. Usá el botón de abajo para elegir tu propia contraseña y empezar.",
+    "inviteBody1WithNames": "{inviter} creó una cuenta para vos en {org}. Usá el botón de abajo para elegir tu propia contraseña y empezar.",
+    "inviteBody2": "Nadie más va a ver la contraseña que elijas.",
+    "inviteCta": "Elegir contraseña",
+    "inviteFooter": "El enlace se usa una sola vez y vence en poco tiempo. Si ya venció, pedile a quien te invitó que te mande uno nuevo."
+  },
+  "sso": {
+    "title": "Padrón de inicio de sesión único",
+    "help": "Quién puede entrar por el proveedor de identidad de tu empresa. Autenticarse ahí prueba quién es alguien; esta lista decide si entra al CRM. Una entrada se convierte en cuenta real la primera vez que esa persona entra, y pasa a la lista de arriba.",
+    "notConfigured": "El inicio de sesión único todavía no está conectado para tu organización, así que nadie de esta lista puede entrar. Contactá a Insight Software para configurarlo.",
+    "emailPlaceholder": "nombre@empresa.com",
+    "selectArea": "Área…",
+    "allSites": "Todas las sedes",
+    "authorise": "Autorizar",
+    "removeHint": "Quitar esta autorización. No afecta a quien ya haya entrado.",
+    "addFailed": "No se pudo agregar a esa persona.",
+    "seatLimit": "No quedan asientos — tu plan permite {max}. Desactivá a alguien, o quitá una autorización pendiente."
   }
 }

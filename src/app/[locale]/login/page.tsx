@@ -69,6 +69,19 @@ function LoginContent() {
     const deactivated = searchParams.get('deactivated')
     if (deactivated === 'org') return t('orgDeactivated')
     if (deactivated === 'user') return t('accountDeactivated')
+
+    // Bounced back by /auth/callback after an SSO sign-in that authenticated
+    // correctly but couldn't become a CRM member. Each reason gets its own
+    // message because each has a different next step — and the person needs to
+    // know their credentials were fine, or they'll spend the afternoon
+    // retyping a password that was never the problem.
+    const sso = searchParams.get('sso_error')
+    if (sso === 'not_on_roster') return t('ssoNotAuthorised')
+    if (sso === 'no_org')        return t('ssoNoOrg')
+    if (sso === 'seat_limit')    return t('ssoSeatLimit')
+    if (sso === 'error')         return t('ssoFailed')
+
+    if (searchParams.get('invite_error')) return t('inviteLinkExpired')
     return null
   })
   const [loading, setLoading] = useState(false)
@@ -90,6 +103,40 @@ function LoginContent() {
     setError(null)
 
     const supabase = createClient()
+
+    // SSO first, checked against the email's domain.
+    //
+    // Asked at submit rather than on blur: a check that fires while someone is
+    // still typing hits the server once per keystroke-pause and can leave the
+    // form flickering between a password field and an SSO button. One request,
+    // when they've decided they're done.
+    //
+    // A failure here falls through to the password path instead of blocking:
+    // an org that doesn't use SSO is the common case, and a network blip on
+    // this check must not stop a perfectly ordinary login.
+    try {
+      const res = await fetch('/api/auth/sso-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      const check = await res.json().catch(() => ({ sso: false }))
+
+      if (check.sso && check.domain) {
+        const { error: ssoError } = await supabase.auth.signInWithSSO({
+          domain: check.domain,
+          options: { redirectTo: `${window.location.origin}/auth/callback?locale=${locale}` },
+        })
+        // On success the browser is already navigating to the customer's IdP,
+        // so there is nothing after this to run. Only an error returns here.
+        if (ssoError) {
+          setError(t('ssoUnavailable'))
+          setLoading(false)
+        }
+        return
+      }
+    } catch { /* not an SSO domain, or the check itself failed — use the password */ }
+
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
@@ -97,6 +144,19 @@ function LoginContent() {
       setLoading(false)
       return
     }
+
+    // Remember the language this person actually works in.
+    //
+    // Supabase has ONE email template per type, not one per language, but the
+    // templates are Go templates — so the "Reset password" body branches on
+    // `{{ .Data.locale }}`, which is this value. Writing it on every login
+    // means a password-reset email arrives in whatever language they last used
+    // the CRM in, and self-corrects if they switch, rather than being frozen to
+    // whatever the admin who created the account happened to be using.
+    //
+    // Fire-and-forget: a failure here must never block a valid login. The
+    // template falls back to English when the key is absent.
+    supabase.auth.updateUser({ data: { locale } }).catch(() => {})
 
     const outcome = await resolveLoginOutcome(locale)
     if (!outcome || !outcome.ok) {
@@ -202,6 +262,16 @@ function LoginContent() {
           >
             {loading ? t('signingIn') : t('loginButton')}
           </Button>
+
+          <a
+            href={`/${locale}/forgot-password`}
+            style={{
+              display: 'block', textAlign: 'center', marginTop: 6,
+              fontSize: 12.5, color: 'var(--crm-text-muted)', textDecoration: 'none',
+            }}
+          >
+            {t('forgotPassword')}
+          </a>
         </form>
       </div>
     </div>
