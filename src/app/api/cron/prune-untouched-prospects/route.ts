@@ -62,6 +62,25 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 // add-on and is skipped entirely, or it doesn't and this window applies.
 const RETENTION_MONTHS = 3
 
+/**
+ * The day the retention policy started existing. Nothing is deleted until
+ * RETENTION_MONTHS have passed since this date.
+ *
+ * WHY: every lead currently in the database was created under no retention
+ * policy at all. The oldest is from 23 June 2026, so without this floor the
+ * very first scheduled run would delete leads that were already older than the
+ * window on the day the rule was written — customers losing data to a policy
+ * that did not exist when they collected it.
+ *
+ * The clock therefore starts here, not at each lead's `created_at`. First
+ * possible deletion: 10 November 2026. After that this constant stops
+ * mattering and can be removed; leaving it costs one comparison.
+ *
+ * Deliberately a hardcoded date and not "the earliest created_at": a floor
+ * that moves with the data is not a grace period, it is a moving target.
+ */
+const RETENTION_EPOCH = new Date('2026-08-10T00:00:00Z')
+
 // Bounded so one invocation can't run long enough to be killed mid-way. The
 // job is idempotent and runs daily, so leftovers are picked up tomorrow.
 const MAX_DELETIONS_PER_INVOCATION = 500
@@ -130,6 +149,27 @@ export async function GET(req: NextRequest) {
   const cutoff = new Date()
   cutoff.setMonth(cutoff.getMonth() - months)
   const cutoffIso = cutoff.toISOString()
+
+  // El piso de gracia. Se calcula sobre RETENTION_MONTHS y no sobre `months`,
+  // así el override de dry-run puede mirar qué se borraría sin que eso corra
+  // la fecha en la que el borrado real empieza a estar habilitado.
+  const graceEnds = new Date(RETENTION_EPOCH)
+  graceEnds.setMonth(graceEnds.getMonth() + RETENTION_MONTHS)
+  const withinGrace = new Date() < graceEnds
+
+  // En dry-run se reporta y se sigue: el sentido del dry-run es ver la
+  // selección, y esconderla durante tres meses lo volvería inútil justo en el
+  // período en que hay que validarlo.
+  if (withinGrace && !dryRun) {
+    return NextResponse.json({
+      ok: true,
+      skipped: 'grace_period',
+      grace_ends: graceEnds.toISOString(),
+      // El centinela de huérfanos sí corrió — es lo único de este job que no
+      // depende de la política de retención.
+      orphaned_prospects: orphanCount ?? 0,
+    })
+  }
 
   // 1. Orgs that bought their way out of this entirely.
   const { data: exemptRows, error: exemptErr } = await admin
@@ -241,6 +281,10 @@ export async function GET(req: NextRequest) {
     cutoff: cutoffIso,
     retention_months: months,
     retention_months_default: RETENTION_MONTHS,
+    // Hasta esta fecha no se borra nada, aunque la selección de abajo tenga
+    // candidatos. Ver RETENTION_EPOCH.
+    grace_ends: graceEnds.toISOString(),
+    within_grace: withinGrace,
     exempt_orgs: exemptOrgs.size,
     candidates: candidates?.length ?? 0,
     eligible_after_addon_filter: eligible.length,
