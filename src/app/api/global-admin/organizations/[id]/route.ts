@@ -94,7 +94,7 @@ export async function PATCH(
   const { id } = await params
   const fields = await req.json()
 
-  const allowed = ['name', 'slug', 'plan', 'max_seats', 'max_leads_per_month', 'billing_day', 'custom_price', 'vendor', 'is_active', 'internal_notes', 'logo_url', 'apify_token', 'anthropic_key', 'anthropic_base_url', 'anthropic_model']
+  const allowed = ['name', 'slug', 'plan', 'max_seats', 'max_leads_per_month', 'billing_day', 'custom_price', 'vendor', 'is_active', 'internal_notes', 'logo_url', 'apify_token', 'anthropic_key', 'anthropic_base_url', 'anthropic_model', 'sso_provider_id', 'sso_domains']
   const patch: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in fields) patch[key] = fields[key]
@@ -102,6 +102,24 @@ export async function PATCH(
   // Never store a base URL that already ends in /v1 (avoids the /v1/v1 error).
   if ('anthropic_base_url' in patch) {
     patch.anthropic_base_url = normalizeAnthropicBaseUrl(patch.anthropic_base_url as string | null)
+  }
+
+  // SSO domains are matched against the domain of an email at login, which is
+  // always lowercase — a stored `Acme.com` would silently never match and the
+  // org's people would be offered a password field instead of their IdP.
+  // Blanks are dropped rather than stored: an empty string in the array would
+  // make `contains(['',...])` behave unpredictably.
+  if ('sso_domains' in patch) {
+    const raw = patch.sso_domains
+    patch.sso_domains = Array.isArray(raw)
+      ? [...new Set(raw.map(d => String(d).trim().toLowerCase()).filter(Boolean))]
+      : []
+  }
+
+  // An empty string from a cleared input is not a uuid, and Postgres would
+  // reject the whole PATCH with a type error rather than clearing the field.
+  if ('sso_provider_id' in patch && !patch.sso_provider_id) {
+    patch.sso_provider_id = null
   }
 
   const admin = createAdminClient(
