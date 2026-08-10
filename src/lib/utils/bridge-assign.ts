@@ -31,6 +31,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  * error here too, never an invented/nulled area.
  */
 
+// Mirrors `tempMap` in run-assign.ts. The Python scorers emit uppercase
+// tiers; `prospects.lead_temperature` has a CHECK for the capitalised form.
+const TEMP_MAP: Record<string, string> = { HOT: 'Hot', WARM: 'Warm', COLD: 'Cold' }
+
 export interface AssignBridgeParams {
   admin: SupabaseClient
   /** Candidate ids the client asked to confirm. Re-read from the DB, not trusted. */
@@ -237,7 +241,19 @@ export async function assignBridgeCandidates({
       // with a scraper lead in the same run was silently swept up by it.
       source: 'bridge',
       outreach_status: 'new',
-      lead_temperature: 'Cold',
+      // Scored by the Python backend at candidate-import time
+      // (scraper/bridge_icp_scorer.py), on a scale built from what Bridge
+      // actually knows — job title, AI signals in the bio, and the fact that
+      // the admin chose the company by hand. Same 70/50 thresholds as the
+      // sales scorer, so the two lead types are comparable on one board.
+      //
+      // This used to be a hardcoded 'Cold' with no score at all, which made
+      // every partnership contact arrive indistinguishable from every other.
+      icp_score: typeof c.icp_score === 'number' ? c.icp_score : null,
+      // Same map run-assign uses. Falls back to 'Cold' only for candidates
+      // that predate scoring AND were missed by the backfill — not as the
+      // default for everyone.
+      lead_temperature: TEMP_MAP[String(c.icp_tier ?? '').toUpperCase()] ?? 'Cold',
       area_id: sdrAreaId,
       assigned_to: sdrId,
       organization_id: organizationId,

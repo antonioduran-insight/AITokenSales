@@ -6,10 +6,11 @@ import { createClient } from '@/lib/supabase/client'
 import { logAuditEvent } from '@/lib/utils/audit'
 import { Button } from '@/components/ui/button'
 import { AreaBadge } from '@/components/ui/AreaBadge'
-import { Plus, Eye, EyeOff, Trash2, UserMinus, ShieldAlert, Pencil, Mail, Clock } from 'lucide-react'
+import { Plus, Eye, EyeOff, Trash2, UserMinus, ShieldAlert, Pencil, Mail, Clock, KeyRound } from 'lucide-react'
 import { format } from 'date-fns'
 import type { User, Area } from '@/lib/types'
 import { MAX_INT } from '@/lib/types'
+import { SsoRoster } from './SsoRoster'
 
 interface UserWithArea extends User {
   area?: Area
@@ -82,6 +83,8 @@ export function UsersManagement() {
   // auth.users via /api/users, since the profile row alone can't tell an
   // invited person apart from an active one.
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
+  const [resettingId, setResettingId] = useState<string | null>(null)
+  const [resetToast, setResetToast] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
 
@@ -176,6 +179,27 @@ export function UsersManagement() {
     } finally { setEditSaving(false) }
   }
 
+  // The admin triggers the email; they never see or choose the new password.
+  // That is the whole point — the old "here's a temp password, pass it along"
+  // flow is exactly what this replaces.
+  async function sendPasswordReset(u: UserWithArea) {
+    setResettingId(u.id); setResetToast(null)
+    try {
+      const res = await fetch('/api/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: u.id, action: 'send_password_reset', locale }),
+      })
+      const json = await res.json().catch(() => ({}))
+      setResetToast(res.ok ? t('resetSent', { email: u.email }) : (json.error ?? t('resetFailed')))
+    } catch {
+      setResetToast(t('resetFailed'))
+    } finally {
+      setResettingId(null)
+      setTimeout(() => setResetToast(null), 6000)
+    }
+  }
+
   async function handleCreateClick() {
     const activeSdrs = users.filter(u => u.role === 'sdr' && u.is_active).length
     if (activeSdrs >= maxSeats) { setShowSeatLimit(true); return }
@@ -209,6 +233,14 @@ export function UsersManagement() {
       }
       await logAuditEvent({ event_type: 'sdr_created', metadata: { name: formName, email: formEmail, area_ids: formAreaIds } })
       setShowForm(false); resetForm(); fetchUsers()
+
+      // The account was created but the invitation email didn't go out. This
+      // has to be said out loud: from the admin's side it looks like a clean
+      // success, and the person is sitting there waiting for a message that
+      // will never arrive. "Reset password" on their row sends it again.
+      if (json.invite_email_error) {
+        setResetToast(t('inviteEmailFailed', { email: formEmail }))
+      }
     } finally { setCreating(false) }
   }
 
@@ -296,6 +328,13 @@ export function UsersManagement() {
 
   return (
     <div style={S.page}>
+      {resetToast && (
+        <div style={{
+          padding: '9px 13px', borderRadius: 7, marginBottom: 14, fontSize: 12.5,
+          background: 'var(--crm-surface-raised)', border: '1px solid var(--crm-border)',
+          color: 'var(--crm-text-secondary)',
+        }}>{resetToast}</div>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 700 }}>{t('title')}</h1>
@@ -389,6 +428,14 @@ export function UsersManagement() {
                     </button>
                   )}
                   <button
+                    onClick={() => sendPasswordReset(u)}
+                    disabled={resettingId === u.id}
+                    title={t('resetPasswordHint')}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 5, fontSize: 12, cursor: resettingId === u.id ? 'default' : 'pointer', border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', opacity: resettingId === u.id ? 0.5 : 1 }}
+                  >
+                    <KeyRound size={12} /> {resettingId === u.id ? t('resetSending') : t('resetPassword')}
+                  </button>
+                  <button
                     onClick={() => openEdit(u)}
                     style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 5, fontSize: 12, cursor: 'pointer', border: '1px solid #6C63FF40', backgroundColor: '#6C63FF10', color: 'var(--crm-accent)' }}
                   >
@@ -406,6 +453,9 @@ export function UsersManagement() {
           })}
         </div>
       )}
+
+      <SsoRoster areas={areas} />
+
 
       {/* Seat limit modal */}
       {showSeatLimit && (
