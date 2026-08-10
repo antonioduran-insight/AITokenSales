@@ -108,6 +108,15 @@ export interface Prospect {
    *  sites can work the same territory. Inherited from the SDR it is assigned
    *  to; null for leads that predate any site assignment. See {@link Workspace}. */
   workspace_id: string | null
+  /** When the lead was archived, or null while it is active.
+   *
+   *  Archiving hides a lead from Kanban and the Leads table WITHOUT deleting
+   *  it and WITHOUT refunding it against the monthly quota — quota counts
+   *  `scraper_leads`, never prospects. Deduplication deliberately ignores this
+   *  field: an archived lead that stopped counting as a duplicate would be
+   *  re-imported and reappear. */
+  archived_at: string | null
+  archived_by: string | null
   assigned_to: string | null
   flag_tomorrow: boolean
   // Kept in sync with the CHECK constraint on prospects.source. This type had
@@ -565,6 +574,32 @@ export interface Workspace {
   organization_id: string
   name: string
   is_active: boolean
+  created_at: string
+}
+
+/**
+ * Una entrada del padrón de SSO: alguien autorizado a entrar por el IdP de su
+ * organización, con los atributos que tendrá su perfil cuando lo haga.
+ *
+ * Existe porque Supabase Auth no enlaza identidades — ver docs/PLAN-SSO.md. El
+ * IdP prueba QUIÉN es la persona; esta tabla decide si tiene permiso de estar
+ * acá y con qué alcance. Son dos preguntas distintas.
+ *
+ * La fila se consume en el primer login exitoso: se crea el perfil en `users`
+ * con estos valores y la entrada se borra.
+ */
+export interface SsoRosterEntry {
+  id: string
+  organization_id: string
+  /** Siempre en minúsculas — hay un CHECK que lo garantiza, porque la búsqueda
+   *  al momento del login compara contra el email que manda el IdP. */
+  email: string
+  role: 'admin' | 'sdr'
+  /** NOT NULL: un SDR sin área ve un CRM vacío que parece roto. */
+  area_id: string
+  /** null = toda la organización, igual que en {@link User.workspace_id}. */
+  workspace_id: string | null
+  created_by: string | null
   created_at: string
 }
 
