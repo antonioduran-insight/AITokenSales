@@ -23,6 +23,7 @@ export async function GET(
   const orderAsc = searchParams.get('order_dir') === 'asc'
   // Extra filters
   const statusFilter = searchParams.get('status')           // outreach_status for prospects
+  const archivedFilter = searchParams.get('archived')       // '1' = show ONLY archived
   const prospectIdFilter = searchParams.get('prospect_id')  // for conversations/notes
 
   if (impersonateOrgId) {
@@ -77,6 +78,16 @@ export async function GET(
     // optional extra filters
     if (statusFilter && table === 'prospects') query = query.eq('outreach_status', statusFilter)
 
+    // Archived leads are hidden here too, so an impersonating Global Admin
+    // sees the same board the customer does. `?archived=1` opts into the
+    // archive view instead — the only way to reach those rows through this
+    // proxy, which keeps "hidden" from quietly meaning "unreachable".
+    if (table === 'prospects') {
+      query = archivedFilter === '1'
+        ? query.not('archived_at', 'is', null)
+        : query.is('archived_at', null)
+    }
+
     const { data, error, count } = await query
       .order(orderCol, { ascending: orderAsc })
       .range(offset, offset + limit - 1)
@@ -86,9 +97,14 @@ export async function GET(
 
   // Without impersonate — use normal client with RLS
   const supabase = await createClient()
-  const { data, error, count } = await supabase
-    .from(table)
-    .select(select, { count: 'exact' })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let plainQuery: any = supabase.from(table).select(select, { count: 'exact' })
+  if (table === 'prospects') {
+    plainQuery = archivedFilter === '1'
+      ? plainQuery.not('archived_at', 'is', null)
+      : plainQuery.is('archived_at', null)
+  }
+  const { data, error, count } = await plainQuery
     .order(orderCol, { ascending: orderAsc })
     .range(offset, offset + limit - 1)
 

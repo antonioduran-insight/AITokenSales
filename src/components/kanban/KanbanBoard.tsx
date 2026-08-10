@@ -234,6 +234,7 @@ export function KanbanBoard() {
             let query = supabase
               .from('prospects')
               .select(PROSPECT_SELECT, { count: 'exact' })
+              .is('archived_at', null)
               .order('created_at', { ascending: false })
               .range(offset, offset + limit - 1)
             if (user?.role === 'sdr') {
@@ -297,6 +298,7 @@ export function KanbanBoard() {
           let query = supabase
             .from('prospects')
             .select(PROSPECT_SELECT, { count: 'exact' })
+            .is('archived_at', null)
             .order('created_at', { ascending: false })
             .range(offset, offset + limit - 1)
           if (isAdmin) {

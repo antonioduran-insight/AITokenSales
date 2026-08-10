@@ -16,7 +16,7 @@ import { useComboLabels } from '@/lib/hooks/useComboLabels'
 import { useOrgMarkets } from '@/lib/hooks/useOrgMarkets'
 import { useMarketAreaMap } from '@/lib/hooks/useMarketAreaMap'
 import { inferAreaFromCountry } from '@/lib/utils/area-inference'
-import { ExternalLink, Copy, Check, Star, ChevronDown, CheckCircle, AlertTriangle, X, Pencil, Languages } from 'lucide-react'
+import { ExternalLink, Copy, Check, Star, ChevronDown, CheckCircle, AlertTriangle, X, Pencil, Languages, Archive, ArchiveRestore } from 'lucide-react'
 import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, LeadTemperature, User } from '@/lib/types'
 import { OUTREACH_STATUSES, LEAD_TEMPERATURES } from '@/lib/types'
@@ -287,6 +287,25 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
   // one: the caller still showed a green "Saved" and still wrote an audit row
   // for a change that never happened. Every caller must now branch on the
   // result — never assume the write landed.
+  async function toggleArchived() {
+    if (isReadOnly) return
+    const archiving = !prospect.archived_at
+    const { data: authUser } = await createClient().auth.getUser()
+    // Written together so a row can never be archived without a timestamp or
+    // carry a stale archiver after being restored.
+    const ok = await updateField('archived_at', archiving ? new Date().toISOString() : null, {
+      silent: true,
+      extraDb: { archived_by: archiving ? (authUser.user?.id ?? null) : null },
+    })
+    if (ok) {
+      showToast(archiving ? t('prospect.archived') : t('prospect.unarchived'), 'success')
+      // Closes on archive because the lead has just left every list behind
+      // this drawer; leaving it open would show a card that no longer exists
+      // on the board underneath.
+      if (archiving) onClose()
+    }
+  }
+
   async function updateField(
     field: string,
     value: unknown,
@@ -586,6 +605,30 @@ export function ProspectDrawer({ prospect: initial, open, onClose, onUpdated }: 
                 {prospect.name}
               </h2>
               {prospect.area && <AreaBadge area={prospect.area} size="md" />}
+
+              <div style={{ flex: 1 }} />
+
+              {/* Archive / restore.
+                  Archiving only hides the lead from Kanban and the Leads
+                  table: the row stays, it still counts as a duplicate on any
+                  future import, and it does NOT give the month's quota back —
+                  quota is measured on `scraper_leads`, never on prospects. */}
+              <button
+                onClick={toggleArchived}
+                disabled={isReadOnly || saving}
+                title={prospect.archived_at ? t('prospect.unarchiveHint') : t('prospect.archiveHint')}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
+                  background: 'none', padding: '4px 9px', borderRadius: 6, fontSize: 11.5, fontWeight: 600,
+                  border: '1px solid var(--crm-border)',
+                  color: prospect.archived_at ? '#F59E0B' : 'var(--crm-text-muted)',
+                  cursor: isReadOnly ? 'default' : 'pointer',
+                  opacity: isReadOnly ? 0.4 : 1,
+                }}
+              >
+                {prospect.archived_at ? <ArchiveRestore size={12} /> : <Archive size={12} />}
+                {prospect.archived_at ? t('prospect.unarchive') : t('prospect.archive')}
+              </button>
             </div>
             {prospect.company && (
               <p style={{ color: 'var(--crm-text-secondary)', fontSize: 13, margin: 0 }}>

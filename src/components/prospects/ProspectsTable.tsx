@@ -9,7 +9,7 @@ import { useOrgId } from '@/lib/hooks/useOrgId'
 import { ProspectDrawer } from './ProspectDrawer'
 import { TemperatureBadge } from '@/components/ui/TemperatureBadge'
 import { AreaBadge } from '@/components/ui/AreaBadge'
-import { Search, ChevronLeft, ChevronRight, Users, RefreshCw, X, Trash2, CheckCircle, ArrowRight, MessageSquareWarning, Star, Link2 } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, Users, RefreshCw, X, Trash2, CheckCircle, ArrowRight, MessageSquareWarning, Star, Link2, Archive} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, Area, User, LeadTemperature } from '@/lib/types'
@@ -59,6 +59,9 @@ export function ProspectsTable() {
   const comboLabels = useComboLabels()
 
   const [prospects, setProspects] = useState<Prospect[]>([])
+  // Archived leads are hidden by default; this flips the list to show ONLY
+  // them, so an archive is reviewable rather than a black hole.
+  const [showArchived, setShowArchived] = useState(false)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(25)
@@ -217,6 +220,7 @@ export function ProspectsTable() {
           impersonate_org_id: impersonateOrgId,
           select: PROSPECT_SELECT,
           limit: '1000',
+          ...(showArchived ? { archived: '1' } : {}),
         })
         const res = await fetch(`/api/crm/prospects?${params}`)
         const json = await res.json()
@@ -249,7 +253,12 @@ export function ProspectsTable() {
           .from('prospects')
           .select(PROSPECT_SELECT, { count: 'exact' })
           .order('created_at', { ascending: false })
-          .range(page * pageSize, (page + 1) * pageSize - 1)
+        // Two mutually exclusive views, never a mixed list: the default board
+        // and the archive.
+        query = (showArchived
+          ? query.not('archived_at', 'is', null)
+          : query.is('archived_at', null)
+        ).range(page * pageSize, (page + 1) * pageSize - 1)
 
         // A multi-area SDR must see ALL of their areas, not just the single
         // legacy `users.area_id`. Filtering on that one field is why leads
@@ -280,7 +289,7 @@ export function ProspectsTable() {
     } finally {
       if (seq === fetchSeq.current) setLoading(false)
     }
-  }, [page, pageSize, search, filterArea, filterSdr, filterStatus, filterTemp, isAdmin, user?.area_id, user?.organization_id, sdrAreaIds, isImpersonating, impersonateOrgId])
+  }, [page, pageSize, search, filterArea, filterSdr, filterStatus, filterTemp, showArchived, isAdmin, user?.area_id, user?.organization_id, sdrAreaIds, isImpersonating, impersonateOrgId])
 
   useEffect(() => {
     // Wait for the SDR's areas to resolve before the first fetch — see the
@@ -513,6 +522,23 @@ export function ProspectsTable() {
             <option value="">{t('temperature.all')}</option>
             {LEAD_TEMPERATURES.map(t2 => <option key={t2} value={t2}>{t2}</option>)}
           </select>
+
+          {/* Archive view. A toggle rather than another dropdown value,
+              because it isn't a filter within one list — it swaps which list
+              you're looking at, and the two never mix. Resets to page 1 so
+              you don't land on an empty page 7 of a much shorter list. */}
+          <button
+            onClick={() => { setShowArchived(v => !v); setPage(0) }}
+            style={{
+              padding: '6px 11px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 5,
+              border: `1px solid ${showArchived ? '#F59E0B60' : 'var(--crm-border)'}`,
+              backgroundColor: showArchived ? '#F59E0B15' : 'transparent',
+              color: showArchived ? '#F59E0B' : 'var(--crm-text-secondary)',
+            }}
+          >
+            <Archive size={12} /> {showArchived ? t('prospect.viewingArchived') : t('prospect.viewArchived')}
+          </button>
 
           {hasFilters && (
             <button onClick={clearFilters} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--crm-border)', backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
