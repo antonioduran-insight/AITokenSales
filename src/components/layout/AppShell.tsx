@@ -117,7 +117,18 @@ export function AppShell({ children, initialUser, orgPlan }: Props) {
               <LanguageSwitcher />
             </header>
             <main style={{ flex: 1, overflow: 'auto', backgroundColor: 'var(--crm-background)' }}>
-              <div style={{ maxWidth: 1400, margin: '0 auto', width: '100%' }}>
+              {/* `height: '100%'` is load-bearing, not cosmetic: Kanban and Leads
+                  are `height: 100%` + `overflow: hidden` shells with their own
+                  inner `overflow-x: auto` scroller. A percentage height only
+                  resolves against a parent with a definite height — without it
+                  this wrapper collapsed to content height, so those pages grew as
+                  tall as their columns instead of filling the viewport, and their
+                  horizontal scrollbar ended up at the bottom of that oversized box
+                  (you had to scroll `<main>` all the way down to reach it) instead
+                  of pinned to the bottom of the screen. Overflow stays visible, so
+                  ordinary tall pages (Settings, Stats, ...) still scroll vertically
+                  through `<main>` exactly as before. */}
+              <div style={{ maxWidth: 1400, margin: '0 auto', width: '100%', height: '100%' }}>
                 {children}
               </div>
             </main>
