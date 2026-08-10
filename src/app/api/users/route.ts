@@ -3,6 +3,8 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { sendEmail } from '@/lib/email/send'
+import { inviteEmail, resetPasswordEmail } from '@/lib/email/templates'
 
 // Shared by DELETE (removing a user) and PATCH's 'edit' action (changing a
 // user's role away from admin) — an org must always keep at least one admin,
@@ -232,22 +234,42 @@ export async function POST(req: NextRequest) {
   const locale = typeof body.locale === 'string' ? body.locale : 'zh'
   const redirectTo = `${origin}/auth/callback?locale=${encodeURIComponent(locale)}`
 
+  // `user_metadata.locale` seeds the language of every email this person will
+  // receive before they have ever logged in — the Supabase templates branch on
+  // it. Taken from the admin doing the inviting, which is a guess, but the
+  // login handler overwrites it with the language they actually use.
+  // Who is inviting, and to what. Only used to make the email read like it
+  // came from a colleague rather than a system — the template falls back to a
+  // neutral wording when either is missing, so a failed lookup never blocks
+  // the invitation itself.
+  let inviterName: string | undefined
+  let orgName: string | undefined
+  if (invite) {
+    const [{ data: me }, { data: org }] = await Promise.all([
+      adminClient.from('users').select('full_name').eq('id', auth.authUser.id).maybeSingle(),
+      adminClient.from('organizations').select('name').eq('id', auth.orgId).maybeSingle(),
+    ])
+    inviterName = me?.full_name ?? undefined
+    orgName = org?.name ?? undefined
+  }
+
+  // `generateLink({ type: 'invite' })` CREATES the user and returns the link
+  // without mailing anything — so the account exists either way and the email
+  // is ours to compose, in the invitee's language.
   const { data: authData, error: authError } = invite
-    ? await adminClient.auth.admin.inviteUserByEmail(email, { redirectTo })
-    : await adminClient.auth.admin.createUser({ email, password, email_confirm: true })
+    ? await adminClient.auth.admin.generateLink({
+        type: 'invite',
+        email,
+        options: { redirectTo, data: { locale } },
+      })
+    : await adminClient.auth.admin.createUser({
+        email, password, email_confirm: true,
+        user_metadata: { locale },
+      })
 
   if (authError || !authData.user) {
-    const raw = authError?.message ?? 'Failed to create user'
-    // Email failures are the expected way invitations break, and the generic
-    // message sends the admin hunting in the wrong place. Name the cause and
-    // the way out, since the password fallback is right there in the form.
-    const looksLikeEmail = /smtp|email|mail|rate limit|535|550/i.test(raw)
     return NextResponse.json(
-      {
-        error: invite && looksLikeEmail
-          ? `The invitation could not be emailed (${raw}). Check the project's SMTP settings, or create the account with a temporary password instead.`
-          : raw,
-      },
+      { error: authError?.message ?? 'Failed to create user' },
       { status: 400 }
     )
   }
@@ -284,7 +306,35 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  return NextResponse.json({ id: authData.user.id, invited: invite })
+  // Sent AFTER the profile row exists. The other order would mail somebody a
+  // working link to an account with no role and no organisation — the orphaned
+  // state this codebase has been bitten by more than once.
+  //
+  // A send failure does NOT roll the user back: the account is valid and the
+  // admin can simply hit "Reset password" to try again. Deleting a good
+  // account over a transient mail error would be the worse outcome, so the
+  // failure is reported alongside the success instead.
+  let inviteEmailError: string | null = null
+  if (invite) {
+    const link = (authData as { properties?: { action_link?: string } }).properties?.action_link
+    if (!link) {
+      inviteEmailError = 'The invitation link could not be generated.'
+    } else {
+      const mail = inviteEmail(locale, link, { inviter: inviterName, org: orgName })
+      const sent = await sendEmail({ to: email, ...mail })
+      if (!sent.ok) inviteEmailError = sent.error
+    }
+    if (inviteEmailError) {
+      console.error(`[users] invite email to ${email} failed: ${inviteEmailError}`)
+    }
+  }
+
+  return NextResponse.json({
+    id: authData.user.id,
+    invited: invite,
+    // Present only when the account was created but the email didn't go out.
+    invite_email_error: inviteEmailError,
+  })
 }
 
 // DELETE /api/users — permanently delete an SDR
@@ -411,6 +461,58 @@ export async function PATCH(req: NextRequest) {
     }
 
     return NextResponse.json({ ok: true })
+  }
+
+  if (action === 'send_password_reset') {
+    // The admin never sees or sets the new password — they only trigger the
+    // same email the person could have requested themselves. That keeps the
+    // one rule that made the old flow bad ("someone else knows your password")
+    // from coming back through a side door.
+    //
+    // `target` above already proved this user is in the caller's org, so an
+    // admin cannot fire reset emails at addresses in other organisations.
+    const { data: targetRow } = await adminClient
+      .from('users')
+      .select('email')
+      .eq('id', id)
+      .eq('organization_id', auth.orgId)
+      .maybeSingle()
+
+    if (!targetRow?.email) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    // The recipient's OWN language, read from their metadata — not the
+    // language the admin happens to be using. An SDR who works in Chinese gets
+    // a Chinese email even when a Spanish-speaking admin clicks the button.
+    const { data: authUser } = await adminClient.auth.admin.getUserById(id)
+    const targetLocale =
+      (authUser?.user?.user_metadata?.locale as string | undefined) ||
+      (typeof body.locale === 'string' ? body.locale : 'zh')
+
+    const { data: link, error: linkError } = await adminClient.auth.admin.generateLink({
+      type: 'recovery',
+      email: targetRow.email,
+      options: {
+        redirectTo: `${req.nextUrl.origin}/auth/callback?locale=${encodeURIComponent(targetLocale)}`,
+      },
+    })
+
+    if (linkError || !link?.properties?.action_link) {
+      return NextResponse.json(
+        { error: linkError?.message ?? 'The reset link could not be generated.' },
+        { status: 400 }
+      )
+    }
+
+    const mail = resetPasswordEmail(targetLocale, link.properties.action_link)
+    const sent = await sendEmail({ to: targetRow.email, ...mail })
+
+    if (!sent.ok) {
+      return NextResponse.json({ error: `The email could not be sent. ${sent.error}` }, { status: 502 })
+    }
+
+    return NextResponse.json({ ok: true, sent_to: targetRow.email })
   }
 
   if (action === 'unassign') {
