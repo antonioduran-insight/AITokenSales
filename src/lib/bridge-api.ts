@@ -75,6 +75,12 @@ export interface BridgeCandidate {
   /** Personalised partnership messages generated on batch confirmation. */
   custom1?: string | null
   custom2?: string | null
+  /** ICP score 0–100, computed by the backend at import time on Bridge's own
+   *  scale — see scraper/bridge_icp_scorer.py. Null only for candidates that
+   *  predate scoring. */
+  icp_score?: number | null
+  /** 'HOT' | 'WARM' | 'COLD', uppercase as the Python scorers emit it. */
+  icp_tier?: string | null
 }
 
 export interface BridgeLog {
