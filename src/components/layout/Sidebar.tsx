@@ -8,8 +8,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
   LayoutGrid, Users2, ClipboardList, BarChart3, Users, LogOut, Trophy,
-  LayoutDashboard, Play, History, Headphones, Settings2, Handshake, UploadCloud, X,
-} from 'lucide-react'
+  LayoutDashboard, Play, History, Headphones, Settings2, Handshake, UploadCloud, X, UserCircle } from 'lucide-react'
 import { AreaBadge } from '@/components/ui/AreaBadge'
 import type { UserWithArea } from '@/contexts/UserContext'
 
@@ -92,6 +91,9 @@ export function Sidebar({ user, mobileOpen = false, onCloseMobile }: Props) {
         { href: '/stats', label: t('stats'), icon: BarChart3, adminOnly: true },
         { href: '/admin/users', label: t('users'), icon: Users, adminOnly: true },
         { href: '/settings', label: t('settings'), icon: Settings2, adminOnly: true },
+        // `always`, not `adminOnly`: Settings is admin-only, so without this an
+        // SDR has nowhere at all to change their own password.
+        { href: '/account', label: t('account'), icon: UserCircle, always: true, hideWhenImpersonating: true },
       ]
 
   async function handleLogout() {

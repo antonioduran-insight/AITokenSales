@@ -15,7 +15,9 @@ const defaultLocale = 'zh'
 // with an account that still has no password of their own — and if the token
 // was already spent, into a login loop instead of the "this link expired"
 // message the page exists to show.
-const publicPages = ['/login', '/landing', '/set-password']
+// `/forgot-password` is public for the obvious reason: someone who can log in
+// doesn't need it.
+const publicPages = ['/login', '/landing', '/set-password', '/forgot-password']
 // Fully public and locale-free: URLs that are baked into emails already sent,
 // so they cannot acquire a locale prefix later without breaking.
 const publicPaths: string[] = ['/auth/callback']

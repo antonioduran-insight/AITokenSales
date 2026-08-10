@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { provisionSsoUser } from '@/lib/utils/sso-provision'
 
 /**
  * Landing point for every link Supabase emails out — today an invitation,
@@ -72,6 +73,39 @@ export async function GET(req: NextRequest) {
     // Carry over anything Supabase wrote (e.g. clearing a bad session).
     response.cookies.getAll().forEach(c => errResponse.cookies.set(c))
     return errResponse
+  }
+
+  // ── SSO takes a different exit ──────────────────────────────────────────
+  //
+  // An invitation or a recovery ends at /set-password, because that is the
+  // point: choose one. Someone arriving from their company's IdP has no
+  // password and never will, so sending them there would show a form they
+  // cannot meaningfully fill in.
+  //
+  // They also might not have a profile yet — this may be their first ever
+  // login — so this is where the roster is consumed.
+  const { data: { user } } = await supabase.auth.getUser()
+  const isSso = (user?.identities ?? []).some(i => i.provider?.startsWith('sso'))
+
+  if (user && isSso) {
+    const outcome = await provisionSsoUser(user.id, user.email ?? '')
+
+    if (outcome !== 'ok') {
+      // Signed out on purpose. Leaving a valid session attached to a user with
+      // no profile is the orphaned state this codebase has been bitten by
+      // repeatedly: they'd land in the CRM with no role and no organisation,
+      // and every page would render empty instead of explaining anything.
+      await supabase.auth.signOut()
+      const dest = new URL(`/${locale}/login`, url.origin)
+      dest.searchParams.set('sso_error', outcome)
+      const errResponse = NextResponse.redirect(dest)
+      response.cookies.getAll().forEach(c => errResponse.cookies.set(c))
+      return errResponse
+    }
+
+    const okResponse = NextResponse.redirect(new URL(`/${locale}/kanban`, url.origin))
+    response.cookies.getAll().forEach(c => okResponse.cookies.set(c))
+    return okResponse
   }
 
   return response
