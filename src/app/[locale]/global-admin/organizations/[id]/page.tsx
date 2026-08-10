@@ -54,6 +54,11 @@ function generateSlug(name: string) {
     .replace(/^-|-$/g, '')
 }
 
+// Los datos que el IT del cliente necesita se derivan de la URL del proyecto,
+// no se hardcodean: si algún día el proyecto de Supabase cambia, esta pantalla
+// no puede seguir dictando una ACS URL que ya no existe.
+const supabaseAuthBase = `${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''}/auth/v1`
+
 export default function OrgDetailPage() {
   const params = useParams()
   const id = params.id as string
@@ -105,6 +110,15 @@ export default function OrgDetailPage() {
   const [saveKeysError, setSaveKeysError] = useState('')
   const [saveNotesError, setSaveNotesError] = useState('')
 
+  const [ssoProviderId, setSsoProviderId] = useState('')
+  // Editado como texto separado por comas y convertido a array al guardar: un
+  // input por dominio para un caso con dos dominios es más UI de la que el
+  // problema pide.
+  const [ssoDomains, setSsoDomains] = useState('')
+  const [savingSso, setSavingSso] = useState(false)
+  const [savedSso, setSavedSso] = useState(false)
+  const [saveSsoError, setSaveSsoError] = useState('')
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -137,6 +151,8 @@ export default function OrgDetailPage() {
       // hand, the API can't return this key and the panel must simply not
       // render rather than crashing the whole org page.
       setAddonHistory(data.addon_history ?? [])
+      setSsoProviderId(data.sso_provider_id ?? '')
+      setSsoDomains((data.sso_domains ?? []).join(', '))
 
       // QA-F28: Vendor used to be free text, risking silent duplicates from
       // a typo (e.g. "testvendor" vs "TestVendor") that split revenue
@@ -219,6 +235,32 @@ export default function OrgDetailPage() {
   // reporting "✓ Saved" unconditionally. A rejected key (bad anthropic_key,
   // a base URL the API refuses) used to look saved here while every later
   // scraper run failed with no visible cause.
+  async function saveSso() {
+    setSavingSso(true); setSavedSso(false); setSaveSsoError('')
+    try {
+      const res = await fetch(`/api/global-admin/organizations/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sso_provider_id: ssoProviderId.trim() || null,
+          // El servidor normaliza a minúsculas y quita vacíos; acá solo se
+          // parte la cadena.
+          sso_domains: ssoDomains.split(',').map(d => d.trim()).filter(Boolean),
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        // El trigger de unicidad de dominios devuelve un mensaje con el nombre
+        // de la org que ya lo reclamó — se muestra tal cual, porque saber cuál
+        // es es justamente lo accionable.
+        setSaveSsoError(json.error ?? 'Could not save the SSO settings')
+        return
+      }
+      setSavedSso(true)
+      setTimeout(() => setSavedSso(false), 2500)
+    } finally { setSavingSso(false) }
+  }
+
   async function saveApiKeys() {
     setSavingKeys(true)
     setSaveKeysError('')
@@ -520,6 +562,69 @@ export default function OrgDetailPage() {
               {savingKeys ? 'Saving…' : savedKeys ? '✓ Saved' : 'Save API Keys'}
             </button>
           </div>
+
+          {/* SSO (SAML) — only for orgs that bought it. Rendering it for
+              everyone would invite pasting a provider id into an org whose
+              people would then be sent to an IdP they don't have. */}
+          {activeAddons.has('sso') && (
+            <div style={card}>
+              <h2 style={sectionTitle}>SSO (SAML)</h2>
+
+              <p style={{ fontSize: 12.5, color: colors.textMuted, margin: '0 0 16px', lineHeight: 1.6 }}>
+                Run <code style={{ color: colors.textSecondary }}>supabase sso add --type saml --domains …</code> first,
+                then paste the id it returns here. Both fields are needed: the id
+                identifies the connection, the domains are what the login screen
+                matches an email against.
+              </p>
+
+              <div style={{ display: 'grid', gap: 14, marginBottom: 16 }}>
+                <div>
+                  <label style={labelStyle}>SSO Provider ID</label>
+                  <input
+                    value={ssoProviderId}
+                    onChange={e => setSsoProviderId(e.target.value)}
+                    placeholder="00000000-0000-0000-0000-000000000000"
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Email domains</label>
+                  <input
+                    value={ssoDomains}
+                    onChange={e => setSsoDomains(e.target.value)}
+                    placeholder="acme.com, acme.co.uk"
+                    style={inputStyle}
+                  />
+                  <p style={{ fontSize: 11.5, color: colors.textMuted, margin: '6px 0 0' }}>
+                    Comma-separated. Must match what you passed to{' '}
+                    <code>--domains</code> — they are two separate records and
+                    nothing keeps them in step automatically.
+                  </p>
+                </div>
+              </div>
+
+              {/* What the customer's IT department needs. Shown here so nobody
+                  has to go dig it out of the CLI mid-call. */}
+              <div style={{ padding: '12px 14px', borderRadius: 8, backgroundColor: colors.surfaceRaised, marginBottom: 16 }}>
+                <p style={{ fontSize: 10.5, fontWeight: 700, color: colors.textMuted, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Give these to the customer&apos;s IT
+                </p>
+                <p style={{ fontSize: 11.5, color: colors.textSecondary, margin: 0, lineHeight: 1.8, wordBreak: 'break-all' }}>
+                  <strong>EntityID / Metadata:</strong> {supabaseAuthBase}/sso/saml/metadata<br />
+                  <strong>ACS URL:</strong> {supabaseAuthBase}/sso/saml/acs
+                </p>
+              </div>
+
+              {saveSsoError && <div style={errorBanner}>{saveSsoError}</div>}
+              <button
+                onClick={saveSso}
+                disabled={savingSso}
+                style={{ backgroundColor: colors.accent, color: '#fff', border: 'none', borderRadius: 7, padding: '8px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: savingSso ? 0.6 : 1 }}
+              >
+                {savingSso ? 'Saving…' : savedSso ? '✓ Saved' : 'Save SSO'}
+              </button>
+            </div>
+          )}
 
           {/* Internal Notes */}
           <div style={card}>
