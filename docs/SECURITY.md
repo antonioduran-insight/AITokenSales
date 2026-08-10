@@ -168,11 +168,20 @@ Two independent mechanisms, both scoped to `organization_id`, neither exposing c
 
 ### Add-on gating
 
-Feature add-ons (currently `bridge`) are enforced at two layers, mirroring the role model:
-- **UI**: the sidebar entry only renders when `/api/settings/addons` reports the add-on active
-- **API**: `/api/bridge/[...path]` independently re-queries `organization_addons` on every request
+Three add-ons gate real functionality, and every one is enforced at two layers, mirroring the role model. **The UI check is a convenience only — removing it client-side grants nothing.**
 
-The UI check is a convenience only. Removing it client-side does not grant access.
+| Add-on | UI layer | Server layer |
+|---|---|---|
+| `bridge` | Sidebar entry renders only when `/api/settings/addons` reports it active | `/api/bridge/[...path]` re-queries `organization_addons` on every request; `requireAddon(locale, 'bridge')` blocks the page in SSR |
+| `multi_workspace` | The Sites panel in Settings renders only when the add-on is active | `/api/workspaces` re-checks on every write (reads are deliberately exempt — see below) |
+| `sso` | The SSO roster panel and the Global Admin SSO card render only when active | `/api/sso-roster` re-checks on POST |
+
+**`/api/workspaces` gates writes but not reads, on purpose.** An org that lets the add-on lapse must still be able to *see* which sites its data is sitting in; hiding that would make its own CRM unexplainable to its admin. It cannot create, rename or delete one.
+
+**Two things that look like add-on gates and are not:**
+
+- **Plan eligibility** (`isAddonSellable` / `isAddonIncluded`) is a *commercial* rule, checked in `POST /api/global-admin/organizations/[id]/addons` and `create-org` against the org's **saved** plan — never one supplied by the client. It stops an add-on being sold where the brief doesn't sell it, or sold twice where the plan already includes it. It does **not** revoke anything already active: a downgrade leaves the feature on and Global Admin flags the mismatch, because silently withdrawing a paid feature is the worse failure.
+- **SSO provisioning** (`src/lib/utils/sso-provision.ts`) reads `sso_roster` with the **service-role client**, bypassing RLS. That is not a gap: the person being provisioned has no `public.users` row yet, so `my_role()` and `my_org_id()` are null and RLS would hide the very row that authorises them. It is the system's cold start. Every value written comes from the roster or the verified session — nothing from the caller.
 
 ---
 

@@ -71,7 +71,7 @@ The Global Admin panel is only accessible to accounts with the `admin_global` ro
    - **Markets** — click chips (Taiwan, LATAM, Vietnam, Europe, Global)
    - **Admin name**, **email**, and **temporary password** (creates the first admin user)
    - Optional: custom price, vendor, logo URL, default language, internal notes
-   - Optional: toggle **Add-ons** (Account Management, Multi Workspace, SSO, etc.)
+   - Optional: toggle **Add-ons** — only the ones the chosen plan can be sold are enabled; the rest are greyed out with the reason
 3. Click **Create Organization**
 
 This provisions the organization and its first admin user in a single operation.
@@ -87,16 +87,27 @@ Click an org name to open its detail page:
 
 #### Add-ons
 
-| Add-on | Effect |
-|---|---|
-| Account Management | Dedicated account manager (commercial) |
-| Multi Workspace | Multiple workspaces (commercial) |
-| Extended Data Retention | Longer data retention (commercial) |
-| SSO | SSO integration (commercial) |
-| LinkedIn Auto-messaging | Automated messaging (commercial) |
-| **Bridge (Partnerships)** | **Unlocks the Bridge partnership-discovery module in the org's CRM sidebar** |
+| Add-on | Price | Plans | What the customer gets |
+|---|---|---|---|
+| **Multi-workspace** | $300/mo per site | Enterprise | **Sites** in Settings — branch offices inside one organisation, each with its own people and leads. An admin with no site assigned sees all of them; one assigned to a site sees only that site. Billed per site **beyond the first**: three sites is $600, because the main one comes with the plan. |
+| **Extended Data Retention** | $99/mo | all | Their leads are never deleted by age. Without it, prospects still sitting in **New** — never contacted, no notes, no conversations — are removed after 3 months. Anything a rep actually touched is never deleted either way. |
+| **Enterprise SSO (SAML)** | $299 one-time | Premium, Enterprise | Their people sign in through the company's own identity provider (Okta, Microsoft Entra, Google Workspace). Adds the **SSO roster** in Users: the admin lists who may enter and with what role, area and site. Authenticating at the IdP is not enough — only people on the roster get in. |
+| **Bridge (Partnerships)** | TBD | all | The **Partnerships** section in the sidebar: partner-company discovery, seed lists and candidate review. |
+| LinkedIn Auto-messaging | TBD | Premium, Enterprise | **Not built yet.** The toggle exists and bills nothing. |
 
-Bridge is the only add-on that changes the product UI today: turning it on makes the **Partnerships** section appear for that org's admin.
+Three of these change the product visibly today — Multi-workspace, SSO and Bridge each add their own section — and Extended Data Retention changes behaviour without adding any UI at all, which is exactly why it is the easiest one to forget is switched on.
+
+**Account Management was retired on 05/08/2026** and no longer appears. Any historical activation still shows in the add-on history panel so past billing stays explainable.
+
+#### Eligibility, and what happens on a downgrade
+
+An add-on can only be ticked on a plan the product brief sells it on, and that rule is enforced by the server, not just greyed out. Ticking something a plan already includes is refused with the reason, rather than double-charging.
+
+If an org **downgrades** while an add-on is active, it is **not** switched off automatically — revoking a paid feature quietly is worse than an inconsistent row. It shows in amber as a *plan mismatch*, and the toggle can still be switched off deliberately.
+
+#### Add-on history
+
+Every activation and deactivation is logged with who did it, when, and the price at that moment. It sits under the add-on toggles in the organisation's detail page, is visible **only to Insight Software**, and answers the one question current state cannot: *why was this charged?*
 
 > **Anthropic base URL**: paste the plain host (e.g. `https://api.aitokenking.com.tw`). If you paste a URL ending in `/v1`, the app strips it automatically before saving — the backend appends the version path itself.
 

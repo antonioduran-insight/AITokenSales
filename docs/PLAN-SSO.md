@@ -181,9 +181,19 @@ de quién está autorizado y todavía no entró — misma forma que el badge
 
 ## El add-on
 
-Con la auto-unión por dominio descartada y las invitaciones ya hechas y
-gratuitas, **a este add-on solo le queda SAML**. Se redefine como "SSO
-empresarial (SAML)".
+El brief lo llama solo "SSO 單一登入", sin precisar qué incluye. **Se precisa
+como SAML empresarial**, que es lo único que entrega: la conexión al IdP del
+cliente.
+
+Para que quede claro qué se construyó y qué no, porque hoy se habló de tres
+caminos posibles y solo dos existen:
+
+| | Estado |
+|---|---|
+| **SAML empresarial** | Construido. Es este add-on. |
+| Invitaciones por email | Construidas, pero **no son parte del add-on** — son gratis para todos los planes. Se hicieron el mismo día por conveniencia, nada más. |
+| "Entrar con Google" | **Nunca se construyó ni se decidió construir.** Se descartó porque es un interruptor global sin trabajo por cliente, así que no sostiene un fee. |
+| Auto-unión por dominio | Descartada. Cualquiera del IdP del cliente entraría y consumiría asientos. |
 
 El fee de **$299 única vez** ahora sí corresponde a trabajo real: coordinar con
 el departamento de IT de cada cliente el intercambio de metadata. No es el

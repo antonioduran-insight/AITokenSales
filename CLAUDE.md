@@ -215,7 +215,11 @@ ultra:      { max_seats: MAX_INT, max_leads_per_month: MAX_INT }
 
 `inferAreaFromCountry(marketName, map)` is **synchronous** and takes a prebuilt `MarketAreaMap`. Build it once per page with `useMarketAreaMap()` (which reads the full catalogue) — never query per call, since list views resolve an area per row. Unknown markets return `null`, which callers treat as "no filter" (show every SDR) rather than "no matches". The old hardcoded `countryToArea` dictionary is gone.
 
-**Add-ons** — `addon_type` is constrained in the DB. Adding a new one requires both an `ADDON_LIST` entry in `src/lib/types.ts` (which auto-renders it in Global Admin) **and** a migration widening the CHECK constraint.
+**Add-ons** — `ADDON_LIST` in `src/lib/types.ts` is the single source of truth: it drives the Global Admin toggles, the customer's Settings list and Revenue Reports at once. Adding one needs an `ADDON_LIST` entry **and** a migration widening the `addon_type` CHECK. **Retiring one needs only the `ADDON_LIST` removal** — do NOT narrow the CHECK, or the constraint starts rejecting rows the table already holds (`account_management`, retired 05/08/2026, is exactly this case).
+
+Each entry carries `plans` (where it can be SOLD) and `includedIn` (where the plan already bundles it, so selling it again double-charges). Both are enforced server-side in `POST /api/global-admin/organizations/[id]/addons` and `create-org`, against the org's **saved** plan — never one supplied by the client. An add-on already active on a plan that can no longer sell it is deliberately **left on**: silently revoking a paid feature is worse than an inconsistent row, so Global Admin flags it in amber instead.
+
+Two prices, deliberately in separate maps: `ADDON_MONTHLY_PRICE` (recurring) and `ADDON_ONE_TIME_PRICE` (charged once, recognised in the quarter of the `addon_audit_log` activation). One map with a "recurring?" flag is how `sso` ended up adding $99/mo of phantom MRR for months while `ADDON_LIST` said "$299 one-time". `multi_workspace` is **per site** — Revenue Reports multiplies it by (active sites − 1), so reading the constant alone understates a multi-branch org.
 
 **`scraper_access` is dead** — the column still exists on `users` but nothing reads it. Do not reintroduce it as a filter or toggle.
 

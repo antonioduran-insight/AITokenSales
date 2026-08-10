@@ -183,7 +183,26 @@ Once that fix landed, the Settings → Pipeline editor (rename/recolor stages) w
 
 Plan limits apply immediately on selection. Seats and leads stored as `int4`; Ultra uses `2147483647` (INT_MAX), displayed as `∞`. The lead allowance renews on the org's `billing_day`, not the calendar month.
 
-**Add-ons** (`organization_addons.addon_type`): `account_management`, `multi_workspace`, `extended_data_retention`, `sso`, `linkedin_auto_messaging`, `bridge`.
+### Add-ons
+
+Five are sellable. `ADDON_LIST` in `src/lib/types.ts` is the single source of truth — it drives the Global Admin toggles, the customer's Settings list and Revenue Reports at once, so adding or retiring one is an edit there, not in three places.
+
+| Add-on | Price | Plans | What it actually changes |
+|---|---|---|---|
+| `multi_workspace` | $300/mo **per site** | Enterprise | Sites (branch offices) inside one org. Adds `workspaces`, `users.workspace_id`, `prospects.workspace_id`, and a workspace clause to the `admin` branch of the RLS on both tables. Billed as `$300 × (active sites − 1)` — the main site comes with the plan. |
+| `extended_data_retention` | $99/mo | all | Exempts the org from `GET /api/cron/prune-untouched-prospects`, which otherwise deletes prospects still in `new`, with no conversations, notes or audit history, older than 3 months. |
+| `sso` | **$299 one-time** | Premium, Enterprise | Enterprise SAML. Adds `organizations.sso_provider_id` / `sso_domains` and the `sso_roster` authorisation list. Login routes a known email domain to the customer's IdP; first sign-in provisions from the roster. |
+| `linkedin_auto_messaging` | TBD | Premium, Enterprise | **Nothing yet.** Postponed — the flag exists and is billable at 0. |
+| `bridge` | TBD | all | Unlocks the Partnerships module: the sidebar section plus the `/api/bridge/[...path]` proxy, which re-checks the add-on server-side and 403s without it. |
+
+`account_management` was **retired 05/08/2026**. It is gone from `ADDON_LIST` so nothing can sell it, but the `addon_type` CHECK still permits the value on purpose — narrowing it would make the constraint reject rows the table already holds.
+
+Two rules that are easy to get wrong:
+
+- **Plan eligibility is enforced server-side**, not just greyed out in the UI. `isAddonSellable()` / `isAddonIncluded()` gate `POST /api/global-admin/organizations/[id]/addons` and `create-org`, checked against the org's **saved** plan — never a plan sent by the client.
+- **An add-on already active on a plan that can no longer sell it is left alone.** A downgrade does not silently revoke a paid feature; Global Admin flags it in amber as a plan mismatch and the toggle stays switchable off.
+
+Every activation and deactivation is recorded in `addon_audit_log` with the actor and a snapshot of the price — internal-only, `admin_global` RLS, never shown to the customer.
 
 ---
 
