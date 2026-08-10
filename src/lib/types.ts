@@ -382,6 +382,11 @@ export interface RunSdrAssignment {
 export interface OrganizationAddon {
   id: string
   organization_id: string
+  /** Refleja el CHECK de `organization_addons.addon_type`, que sigue
+   *  permitiendo `account_management` a propósito para que las filas
+   *  históricas sigan siendo legibles. Lo que se puede VENDER es
+   *  {@link ADDON_LIST}, que es más corto — no uses este tipo para decidir
+   *  qué ofrecer. */
   addon_type: 'account_management' | 'multi_workspace' | 'extended_data_retention' | 'sso' | 'linkedin_auto_messaging' | 'bridge'
   is_active: boolean
   price_monthly: number | null
@@ -448,7 +453,7 @@ export type PlanName = 'basic' | 'premium' | 'enterprise' | 'ultra'
 const ALL_PLANS: PlanName[] = ['basic', 'premium', 'enterprise', 'ultra']
 
 /**
- * The add-on catalogue.
+ * The add-on catalogue — what can actually be sold.
  *
  * `plans`      — plans on which the add-on can be SOLD.
  * `includedIn` — plans that already bundle it, so selling it again would
@@ -459,18 +464,19 @@ const ALL_PLANS: PlanName[] = ['basic', 'premium', 'enterprise', 'ultra']
  * limits; it is never invoiced, so eligibility rules would only get in the way.
  *
  * Before this existed, Global Admin let any add-on be ticked on any plan —
- * so a Premium org could be charged $149/mo for Account Management that its
- * plan already includes, and Multi-workspace (Enterprise-only) could be sold
- * to a Basic account.
+ * a Premium org could be charged for something its plan already included, and
+ * Multi-workspace (Enterprise-only) could be sold to a Basic account.
+ *
+ * RETIRED, and deliberately absent rather than commented out:
+ *
+ *   `account_management` ($149/mo in the brief, 帳號代管服務) — dropped
+ *   05/08/2026, it is not being offered. Removing it from this list is what
+ *   takes it out of Global Admin, Settings and Revenue Reports at once; the
+ *   `addon_type` CHECK on `organization_addons` still permits the value, on
+ *   purpose, so any historical row stays readable instead of the constraint
+ *   rejecting its own data. Nothing can create a new one.
  */
 export const ADDON_LIST = [
-  {
-    type: 'account_management', labelKey: 'addOn_account_management', price: '$149/mo',
-    // Brief: "Basic 加購；Premium／Enterprise 已內含" — a Basic upsell, and
-    // already part of the two plans above it.
-    plans: ['basic', 'ultra'] as PlanName[],
-    includedIn: ['premium', 'enterprise'] as PlanName[],
-  },
   {
     type: 'multi_workspace', labelKey: 'addOn_multi_workspace', price: '$300/mo per site',
     // Brief: "僅 Enterprise". Priced per site; the main one comes with the
@@ -484,6 +490,14 @@ export const ADDON_LIST = [
     includedIn: [] as PlanName[],
   },
   {
+    // El brief lo llama solo "SSO 單一登入". Precisado 05/08/2026 a SAML
+    // empresarial, que es lo único que este add-on entrega: la conexión al IdP
+    // del cliente (`sso_provider_id` + `sso_domains` en `organizations`, padrón
+    // en `sso_roster`). Ver docs/PLAN-SSO.md.
+    //
+    // El fee único cubre coordinar el intercambio de metadata con el
+    // departamento de IT de cada cliente. Eso es trabajo real y por cliente;
+    // el código ya está hecho y no se cobra por instalarlo de nuevo.
     type: 'sso', labelKey: 'addOn_sso', price: '$299 one-time',
     plans: ['premium', 'enterprise', 'ultra'] as PlanName[],
     includedIn: [] as PlanName[],
@@ -519,7 +533,9 @@ export function isAddonIncluded(addonType: string, plan: string): boolean {
 // Recurring monthly price per add-on, used by Revenue Reports. One-time / TBD
 // add-ons (sso, linkedin_auto_messaging) contribute 0 to the monthly run-rate.
 export const ADDON_MONTHLY_PRICE: Record<string, number> = {
-  account_management: 149,
+  // `account_management` retirado 05/08/2026 — ver ADDON_LIST. Fuera del mapa
+  // a propósito: `addonsMonthly()` usa `?? 0`, así que una fila histórica deja
+  // de sumar al MRR en vez de seguir facturando algo que ya no se vende.
   /** PER SITE, not per org. The main site comes with the plan, so Revenue
    *  Reports multiplies this by (active sites − 1). See `addonsMonthly()` in
    *  the reports page — reading this constant alone will understate an org

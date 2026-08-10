@@ -696,10 +696,9 @@
     "enabled": "Enabled",
     "disabled": "Disabled",
     "addons": {
-      "account_management": "Account Management",
       "multi_workspace": "Multi Workspace",
       "extended_data_retention": "Extended Data Retention",
-      "sso": "SSO",
+      "sso": "Enterprise SSO (SAML)",
       "linkedin_auto_messaging": "LinkedIn Auto Messaging",
       "bridge": "Bridge (Partnerships)"
     },

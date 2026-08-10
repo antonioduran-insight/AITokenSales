@@ -696,10 +696,9 @@
     "enabled": "Activado",
     "disabled": "Desactivado",
     "addons": {
-      "account_management": "Gestión de Cuentas",
       "multi_workspace": "Multi Workspace",
       "extended_data_retention": "Retención Extendida de Datos",
-      "sso": "SSO",
+      "sso": "SSO empresarial (SAML)",
       "linkedin_auto_messaging": "Mensajería Automática de LinkedIn",
       "bridge": "Bridge (Alianzas)"
     },

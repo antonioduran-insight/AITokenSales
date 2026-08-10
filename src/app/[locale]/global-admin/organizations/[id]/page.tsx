@@ -42,9 +42,15 @@ type AddonType = typeof ADDON_LIST[number]['type']
 // Derived from ADDON_LIST rather than written out again, so a new add-on gets
 // its history label for free. A hardcoded copy of this exact mapping is what
 // left `bridge` showing as a raw string in the customer's Settings page.
-const ADDON_LABEL_KEY: Record<string, string> = Object.fromEntries(
-  ADDON_LIST.map(a => [a.type, a.labelKey])
-)
+const ADDON_LABEL_KEY: Record<string, string> = {
+  ...Object.fromEntries(ADDON_LIST.map(a => [a.type, a.labelKey])),
+  // Retirados: ya no se pueden vender, así que salieron de ADDON_LIST — pero
+  // el historial de add-ons es un registro de facturación y tiene que seguir
+  // legible. Sin esto, una activación vieja se renderiza como
+  // `account_management` en crudo justo donde alguien está revisando por qué
+  // se le cobró algo.
+  account_management: 'addOn_account_management',
+}
 
 function generateSlug(name: string) {
   return name.toLowerCase().trim()

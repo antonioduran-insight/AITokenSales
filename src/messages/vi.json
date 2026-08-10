@@ -696,10 +696,9 @@
     "enabled": "Đã bật",
     "disabled": "Đã tắt",
     "addons": {
-      "account_management": "Quản Lý Tài Khoản",
       "multi_workspace": "Đa Không Gian Làm Việc",
       "extended_data_retention": "Lưu Trữ Dữ Liệu Mở Rộng",
-      "sso": "SSO",
+      "sso": "SSO doanh nghiệp (SAML)",
       "linkedin_auto_messaging": "Tin Nhắn Tự Động LinkedIn",
       "bridge": "Bridge (Đối tác)"
     },

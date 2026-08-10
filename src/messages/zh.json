@@ -696,10 +696,9 @@
     "enabled": "已啟用",
     "disabled": "已停用",
     "addons": {
-      "account_management": "客戶經理服務",
       "multi_workspace": "多工作區",
       "extended_data_retention": "延長資料保留",
-      "sso": "單一登入 (SSO)",
+      "sso": "SSO 單一登入（SAML）",
       "linkedin_auto_messaging": "LinkedIn 自動訊息",
       "bridge": "Bridge（合作夥伴探索）"
     },
