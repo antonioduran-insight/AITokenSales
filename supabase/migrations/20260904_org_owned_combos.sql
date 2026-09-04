@@ -75,8 +75,39 @@ END $$;
 --
 -- The old SELECT policy was `USING (true)` — fine for a catalogue everybody
 -- shares, a cross-tenant leak the moment one row belongs to one customer.
+--
+-- Dropped by what it DOES, not by what it is called. The first version of this
+-- migration named it, copying the spelling out of 20260706_scraper_v2.sql
+-- ("everyone reads combo master") — and production turned out to hold
+-- "Everyone reads combo master", with a capital E. Policy names are
+-- case-sensitive identifiers, so the DROP silently matched nothing, the blanket
+-- policy survived, and because permissive policies are OR'ed together its
+-- `true` overrode the scoped policy added below: every authenticated user could
+-- read every org's private combos. Caught by counting policies after the fact.
+--
+-- So: drop every permissive SELECT policy on this table whose qualifier is
+-- literally `true`, whatever it is called. That is precisely the set of
+-- policies that cannot coexist with per-org rows, and nothing else matches —
+-- the scoped policy created below has a real qualifier, and the admin_global
+-- policy is FOR ALL, not SELECT.
 -- ------------------------------------------------------------
-DROP POLICY IF EXISTS "everyone reads combo master" ON scraper_combos_master;
+DO $$
+DECLARE
+  p record;
+BEGIN
+  FOR p IN
+    SELECT policyname
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'scraper_combos_master'
+      AND cmd = 'SELECT'
+      AND permissive = 'PERMISSIVE'
+      AND COALESCE(qual, '') IN ('true', '(true)')
+  LOOP
+    EXECUTE format('DROP POLICY %I ON public.scraper_combos_master', p.policyname);
+    RAISE NOTICE 'Dropped blanket SELECT policy % on scraper_combos_master', p.policyname;
+  END LOOP;
+END $$;
 
 DROP POLICY IF EXISTS "read global and own combos" ON scraper_combos_master;
 CREATE POLICY "read global and own combos" ON scraper_combos_master
