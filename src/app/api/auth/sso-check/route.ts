@@ -38,13 +38,28 @@ export async function POST(req: NextRequest) {
   // `sso_provider_id` esté cargado: un dominio anotado sin conexión SAML real
   // haría que `signInWithSSO` falle del lado del cliente con un error que la
   // pantalla no puede explicar.
-  const { data } = await admin
+  const { data, error } = await admin
     .from('organizations')
     .select('id')
     .contains('sso_domains', [domain])
     .not('sso_provider_id', 'is', null)
     .eq('is_active', true)
     .limit(1)
+
+  // A failure here is indistinguishable from "this domain doesn't use SSO":
+  // both end as `{ sso: false }`, the login screen shows a password field, and
+  // nothing anywhere says why. That is the right behaviour for the user — an
+  // ordinary password login must not break because this lookup did — but it
+  // made a missing `organizations.sso_domains` column (the migration is run by
+  // hand, so it can simply not have been) look exactly like a correctly
+  // configured org whose SSO silently never engages. Log it: the response stays
+  // the same, the cause stops being invisible.
+  if (error) {
+    console.error(
+      `[sso-check] lookup failed for domain "${domain}": ${error.message}. ` +
+      'If this mentions a missing column, run supabase/migrations/20260805_sso_domains.sql.'
+    )
+  }
 
   const hasSso = (data?.length ?? 0) > 0
 

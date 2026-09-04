@@ -62,13 +62,21 @@ export async function provisionSsoUser(authUserId: string, email: string): Promi
   const domain = at > 0 ? normalised.slice(at + 1) : ''
   if (!domain) return 'no_org'
 
-  const { data: orgs } = await admin
+  const { data: orgs, error: orgsError } = await admin
     .from('organizations')
     .select('id, max_seats')
     .contains('sso_domains', [domain])
     .not('sso_provider_id', 'is', null)
     .eq('is_active', true)
     .limit(2)
+
+  // Same reasoning as /api/auth/sso-check: a query failure and a domain nobody
+  // claims both land on 'no_org', which the UI renders as "your administrator
+  // hasn't given you access yet" — a sentence that sends the customer to their
+  // admin instead of to whatever actually broke.
+  if (orgsError) {
+    console.error(`[sso-provision] org lookup failed for domain "${domain}": ${orgsError.message}`)
+  }
 
   // More than one match should be impossible — a trigger enforces that two orgs
   // cannot claim the same domain — but if it ever happens, refusing is the only
