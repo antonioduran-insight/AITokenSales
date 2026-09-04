@@ -1,113 +1,148 @@
-# Puesta en marcha: dominio, Vercel y Resend
+# Puesta en marcha: correo transaccional (y, aparte, el dominio de la app)
 
-Para Antonio. Son cuatro pasos y **el orden importa**: Resend no se puede
-verificar hasta que el dominio esté comprado, y las variables de entorno no
-sirven hasta que Resend esté verificado.
+Para Antonio. Son **dos cosas distintas** que este documento antes mezclaba:
 
-Contá con esperar entre pasos: los cambios de DNS tardan de 10 minutos a unas
-horas en propagarse.
+1. **El dominio desde el que salen los emails** — invitaciones y reset de
+   contraseña. Es lo único que hace falta para que el correo funcione.
+2. **El dominio en el que vive la app** — hoy `ai-token-sales.vercel.app`.
+   Es una decisión aparte y el correo no la necesita.
 
----
+Hacé la 1. La 2 solo si quieren mover la app a un dominio propio.
 
-## 1 · Comprar el dominio
-
-`renly.it.com` — en el registrador que prefieras (Namecheap, Cloudflare,
-Porkbun).
-
-Lo único que importa acá: **tenés que quedarte con acceso al panel de DNS**,
-porque los pasos 2 y 3 son los dos agregar registros ahí.
+> Este documento decía `renly.it.com`, que fue una idea que no prosperó. El
+> remitente ahora es **`noreply@send.insight-software.com`**.
 
 ---
 
-## 2 · Conectar el dominio a Vercel
+# 1 · Correo transaccional
 
-1. Vercel → proyecto **AITokenSales** → *Settings* → *Domains*
-2. *Add* → escribí `renly.it.com` → *Add*
-3. Vercel muestra uno o dos registros DNS (normalmente un `A` que apunta a
-   `76.76.21.21`, y un `CNAME` para `www`)
-4. Copiá esos registros al panel de DNS del registrador
-5. Esperá a que en Vercel diga **Valid Configuration** ✅
+## 1.1 · Por qué un subdominio y no `insight-software.com` a secas
 
-Por ahora el dominio pelado entra directamente al CRM. Eso es a propósito: la
-landing vive en `renly.it.com/landing` hasta que decidamos mover el CRM a un
-subdominio.
+El remitente es `send.insight-software.com`, un subdominio dedicado, por dos
+razones que cuestan caro si se ignoran:
 
-### Y apenas ande, avisá — hay un paso en Supabase
+- **Reputación.** El correo transaccional comparte reputación con el dominio
+  que lo envía. Si el CRM manda una tanda que rebota o cae en spam, con el
+  dominio corporativo eso arrastra al correo con el que el equipo le escribe a
+  sus clientes. Con un subdominio, el daño queda ahí.
+- **SPF.** Un dominio puede tener **un solo** registro SPF. Agregar un segundo
+  no "suma" nada: rompe la autenticación de **todo** el correo de la empresa.
+  En `insight-software.com` habría que *mezclar* el SPF existente de Google
+  Workspace con el de Resend, editando a mano un registro del que depende el
+  correo diario. En `send.` no hay ninguno, así que se crea y listo.
 
-Supabase → *Authentication* → *URL Configuration*:
+## 1.2 · Verificar el dominio en Resend
 
-- **Site URL**: `https://renly.it.com`
-- **Redirect URLs**: agregá `https://renly.it.com/auth/callback`
+1. [resend.com](https://resend.com) → *Domains* → *Add Domain* →
+   **`send.insight-software.com`**
+2. Resend muestra los registros DNS que hay que cargar (un `TXT` de SPF, un
+   `CNAME` o `TXT` de DKIM, y a veces un `MX`)
+3. Cargalos en el panel de DNS de `insight-software.com`
 
-Sin esto, los links de invitación y de recuperar contraseña **no vuelven a la
-app**. Es el error más fácil de pasar por alto, porque todo lo demás funciona
-igual.
+   > **Ojo con el nombre del registro.** Muchos paneles asumen el dominio y hay
+   > que escribir solo la parte de adelante. Si Resend pide un registro para
+   > `send.insight-software.com`, en el panel suele ir como `send`, no como el
+   > nombre completo — cargarlo entero produce
+   > `send.insight-software.com.insight-software.com`, que no resuelve y deja
+   > la verificación colgada sin decir por qué.
 
----
+4. Esperá a que Resend diga **Verified** ✅ (de 10 minutos a unas horas)
 
-## 3 · Configurar Resend
+> **Hasta que diga *Verified*, Resend acepta los envíos sin error pero solo los
+> entrega a tu propia dirección.** Es la causa número uno de "no me llega el
+> mail": parece que funciona y no llega a nadie más.
 
-1. Entrá a [resend.com](https://resend.com) con la cuenta **Teams** del equipo
-2. *Domains* → *Add Domain* → `renly.it.com`
-3. Resend muestra **tres registros DNS** (un `TXT` para SPF, un `CNAME` o `TXT`
-   para DKIM, y a veces un `MX`)
-4. Copiálos al mismo panel de DNS del paso 2
-5. Esperá a que Resend diga **Verified** ✅
-6. *API Keys* → *Create API Key* → permiso *Sending access* → **copiá la clave
-   ahora**, no se vuelve a mostrar
+## 1.3 · Crear la API key
 
-> **Ojo:** hasta que el dominio diga *Verified*, Resend acepta los envíos sin
-> error pero **solo los entrega a tu propia dirección**. Es la causa número uno
-> de "no me llega el mail" — parece que funciona y no llega a nadie más.
+*API Keys* → *Create API Key* → permiso **Sending access** → **copiala en ese
+momento**, no se vuelve a mostrar (empieza con `re_`).
 
----
+## 1.4 · Variables de entorno en Vercel
 
-## 4 · Variables de entorno en Vercel
+Vercel → *Settings* → *Environment Variables*:
 
-Vercel → *Settings* → *Environment Variables*. Agregá estas dos:
+| Nombre | Valor | Sensible |
+|---|---|---|
+| `RESEND_API_KEY` | la clave del paso anterior | **Sí** |
+| `EMAIL_FROM` | `Insight Software <noreply@send.insight-software.com>` | No |
 
-| Nombre | Valor |
-|---|---|
-| `RESEND_API_KEY` | la clave del paso 3.6 (empieza con `re_`) |
-| `EMAIL_FROM` | `Renly <noreply@renly.it.com>` |
-
-En **Environment**, tildá **Production** y **Preview** (las dos).
+- Tildá **Production y Preview**, las dos.
+- `EMAIL_FROM` es opcional: si no está, el código usa exactamente ese valor por
+  defecto. Cargala igual, así cambiar el remitente no requiere un deploy.
+- `RESEND_API_KEY` marcada como sensible queda de una sola dirección: no la
+  volvés a ver en el panel. No importa — si se pierde, se genera otra.
+- **Nunca** le pongas el prefijo `NEXT_PUBLIC_`: eso la empaquetaría en el
+  bundle del navegador.
 
 ### Después de agregarlas, redesplegá
 
-Las variables de entorno **no se aplican a los despliegues que ya existen**.
-Vercel → *Deployments* → el último → menú `···` → *Redeploy*.
+Las variables **no se aplican a los despliegues que ya existen**. Vercel →
+*Deployments* → el último → menú `···` → *Redeploy*.
 
-Si no hacés esto, agregaste las variables y no pasa nada. Es el segundo error
-más común.
+Si no hacés esto, agregaste las variables y no pasa nada. Es el error más común
+después del dominio sin verificar.
+
+## 1.5 · Comprobar
+
+```bash
+curl -X POST https://ai-token-sales.vercel.app/api/auth/forgot-password \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@insight-software.com","locale":"es"}'
+```
+
+| Respuesta | Qué significa |
+|---|---|
+| `{"found":true,"reason":"sent"}` | Resend **aceptó** el envío. Si aun así no llega: el dominio todavía no está *Verified*, o cayó en spam |
+| `{"found":true,"reason":"send_failed"}` | El envío falló. El motivo textual está en Vercel → *Logs*, buscando `[forgot-password]` |
+| `{"found":false,"reason":"no_account"}` | Ese email no existe como usuario. Probá con otro |
+| `{"found":true,"reason":"deactivated"}` | La cuenta existe pero está desactivada |
+
+El endpoint está limitado a 5 intentos por minuto por IP.
+
+## 1.6 · Las invitaciones que quedaron sin enviar
+
+Las personas invitadas mientras el correo no funcionaba **existen igual en la
+base**: la cuenta se crea antes de intentar el mail, y un fallo de envío
+deliberadamente no la borra. No hay que volver a invitarlas — botón **"Reset
+password"** en su fila de Usuarios y les llega el enlace para definir su
+contraseña.
 
 ---
 
-## Comprobar que quedó bien
+# 2 · Dominio propio para la app (opcional)
 
-Entrá a `https://renly.it.com/es/forgot-password`, poné tu email y dale enviar.
+Solo si quieren que el CRM deje de vivir en `ai-token-sales.vercel.app`. El
+correo del punto 1 **no depende de esto**.
 
-| Lo que ves | Qué significa |
-|---|---|
-| Llega el mail | ✅ listo, todo funciona |
-| "No hay ninguna cuenta con ese email" | El dominio y Resend andan; probá con un email que sí tenga cuenta |
-| "No se pudo enviar" | Falta la variable, o el dominio en Resend no está *Verified* |
-| No carga la página | El DNS todavía no propagó, o falta el paso 2 |
+1. Vercel → proyecto **AITokenSales** → *Settings* → *Domains* → *Add* →
+   el dominio o subdominio elegido
+2. Cargá en el DNS los registros que muestre Vercel (normalmente un `A` a
+   `76.76.21.21`, o un `CNAME`)
+3. Esperá a que Vercel diga **Valid Configuration** ✅
+4. **Supabase → Authentication → URL Configuration**: actualizá *Site URL* y
+   agregá el nuevo origen a *Redirect URLs*
 
-Si el mail llega pero el link no te trae de vuelta a la app: falta el paso de
-Supabase del final del punto 2.
+El paso 4 no es opcional si hacen el 1: los enlaces de invitación y de reset
+vuelven a `/auth/callback`, y Supabase rechaza cualquier redirect a un origen
+que no tenga en la lista. Sin eso, el mail llega y el link no entra.
 
 ---
 
 ## Resumen para tildar
 
-- [ ] Dominio comprado, con acceso al DNS
-- [ ] Registros de Vercel cargados → *Valid Configuration*
-- [ ] Site URL y Redirect URL cargadas en Supabase
-- [ ] Registros de Resend cargados → *Verified*
-- [ ] API key creada y copiada
-- [ ] `RESEND_API_KEY` y `EMAIL_FROM` en Vercel, en Production y Preview
+**Correo (necesario):**
+
+- [ ] `send.insight-software.com` agregado en Resend
+- [ ] Registros DNS cargados → *Verified* ✅
+- [ ] API key creada con *Sending access* y copiada
+- [ ] `RESEND_API_KEY` (sensible) y `EMAIL_FROM` en Vercel, en Production y Preview
 - [ ] Redeploy hecho
-- [ ] Probado desde `/forgot-password`
+- [ ] `curl` a `/api/auth/forgot-password` devuelve `sent` **y el mail llega**
+- [ ] Reenviadas las invitaciones pendientes con "Reset password"
+
+**Dominio de la app (opcional):**
+
+- [ ] Dominio agregado en Vercel → *Valid Configuration*
+- [ ] Site URL y Redirect URLs actualizadas en Supabase
 
 Cualquier cosa que se trabe, pasá la captura de dónde te quedaste.

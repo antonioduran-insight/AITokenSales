@@ -67,7 +67,7 @@ Two environment variables, in Vercel (Production **and** Preview):
 | Variable | Value |
 |---|---|
 | `RESEND_API_KEY` | From the Resend dashboard → API Keys |
-| `EMAIL_FROM` | e.g. `Renly <noreply@renly.it.com>` — defaults to that if unset |
+| `EMAIL_FROM` | e.g. `Insight Software <noreply@send.insight-software.com>` — defaults to that if unset |
 
 And in Resend: **verify the sending domain** (Domains → Add → the DNS records).
 Until that is done, Resend accepts the call and silently refuses to deliver to

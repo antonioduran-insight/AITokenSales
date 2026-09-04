@@ -19,8 +19,24 @@ import { Resend } from 'resend'
  * may be imported from a client component.
  */
 
-/** Verified sender. A Resend domain must be verified before this will deliver. */
-const FROM = process.env.EMAIL_FROM || 'Renly <noreply@renly.it.com>'
+/**
+ * Verified sender. A Resend domain must be verified before this will deliver —
+ * until then Resend accepts the call and quietly delivers to nobody but your
+ * own address, which looks exactly like success from here.
+ *
+ * The default is a SUBDOMAIN, `send.insight-software.com`, and that is
+ * deliberate: transactional mail sent from the same domain the team writes to
+ * customers from shares its reputation, so a run of bounces from the CRM would
+ * follow their real correspondence into spam filters. A dedicated sending
+ * subdomain also means adding SPF and DKIM records to a name with none, rather
+ * than merging into the corporate domain's existing SPF — a domain may carry
+ * only one SPF record, and a second one silently breaks authentication for
+ * every mail the company sends.
+ *
+ * `EMAIL_FROM` overrides it. Whatever it is set to must be verified in Resend
+ * first; this constant is only the fallback.
+ */
+const FROM = process.env.EMAIL_FROM || 'Insight Software <noreply@send.insight-software.com>'
 
 export type SendResult =
   | { ok: true; id: string | null }
