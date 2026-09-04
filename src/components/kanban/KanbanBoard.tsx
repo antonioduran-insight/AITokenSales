@@ -17,7 +17,7 @@ import { Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Prospect, OutreachStatus, Area } from '@/lib/types'
 import { OUTREACH_STATUSES } from '@/lib/types'
-import { getCachedEntry, setCached } from '@/lib/utils/pageCache'
+import { getCachedEntry, invalidateCachePrefix, setCached } from '@/lib/utils/pageCache'
 
 const PROSPECT_SELECT = '*, area:areas(*), assigned_user:users!assigned_to(id, full_name, email, role, area_id, is_active, created_at)'
 
@@ -341,6 +341,16 @@ export function KanbanBoard() {
     if (cached) setCached(cacheKey, cached.data.map(p => p.id === id ? patch(p) : p))
   }
 
+  /** Same cache entry, for a lead that has left the board rather than changed. */
+  function removeCachedProspect(id: string) {
+    const cacheKey = [
+      'kanban', isImpersonating ? impersonateOrgId : user?.organization_id,
+      isAdmin ? 'admin' : 'sdr', selectedAreaId ?? '',
+    ].join('|')
+    const cached = getCachedEntry<Prospect[]>(cacheKey)
+    if (cached) setCached(cacheKey, cached.data.filter(p => p.id !== id))
+  }
+
   // Chat counts for closed prospects — drives the "Missing conversation" badge.
   const closedIds = prospects.filter(p => p.outreach_status === 'closed').map(p => p.id).sort().join(',')
   useEffect(() => {
@@ -482,6 +492,20 @@ export function KanbanBoard() {
   }
 
   function handleProspectUpdated(updated: Prospect) {
+    // The board only ever queries unarchived leads (`.is('archived_at', null)`
+    // in both fetch paths), so an archived one has to leave it here too —
+    // patching it in place left the card sitting on the board after the drawer
+    // closed, which read as "archive did nothing".
+    if (updated.archived_at) {
+      setProspects(prev => prev.filter(p => p.id !== updated.id))
+      removeCachedProspect(updated.id)
+      setActiveProspect(null)
+      // The Leads table's cached views are now stale in the other direction —
+      // its archive view is missing this lead. Their keys aren't knowable from
+      // here, so drop the lot and let them refetch.
+      invalidateCachePrefix('prospects|')
+      return
+    }
     setProspects(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p))
     patchCachedProspect(updated.id, p => ({ ...p, ...updated }))
     setActiveProspect(updated)

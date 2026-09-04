@@ -15,7 +15,7 @@ import { format } from 'date-fns'
 import type { Prospect, OutreachStatus, Area, User, LeadTemperature } from '@/lib/types'
 import { OUTREACH_STATUSES, LEAD_TEMPERATURES } from '@/lib/types'
 import { useComboLabels } from '@/lib/hooks/useComboLabels'
-import { getCachedEntry, setCached } from '@/lib/utils/pageCache'
+import { getCachedEntry, invalidateCachePrefix, setCached } from '@/lib/utils/pageCache'
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250]
 
@@ -192,9 +192,17 @@ export function ProspectsTable() {
     // A hit means this exact view (org, page, filters) was already loaded
     // this session — render it immediately instead of a blank/skeleton
     // table, same as reopening a browser tab you never closed.
+    // `showArchived` MUST be part of the key. It was missing, and since the
+    // archive is a different set of rows fetched under the same query, the two
+    // views shared one cache entry: opening the archive within the freshness
+    // window returned the active board and never even ran the archived query,
+    // and once it did run, its rows overwrote the entry the normal board reads
+    // — so both views showed the wrong list. Any state that changes WHICH rows
+    // come back belongs here.
     const cacheKey = [
       'prospects', isImpersonating ? impersonateOrgId : user?.organization_id,
       page, pageSize, search, filterArea, filterSdr, filterStatus, filterTemp,
+      showArchived ? 'archived' : 'active',
     ].join('|')
     if (!force) {
       const cached = getCachedEntry<{ prospects: Prospect[]; total: number }>(cacheKey)
@@ -297,8 +305,11 @@ export function ProspectsTable() {
     if (user && (isAdmin || sdrAreaIds !== null)) fetchProspects()
   }, [user, fetchProspects])
 
-  // Reset page when filters or page size change
-  useEffect(() => { setPage(0) }, [search, filterArea, filterStatus, filterTemp, pageSize])
+  // Reset page when anything that changes the result set changes. `showArchived`
+  // and `filterSdr` were missing: switching to the archive from page 4 of the
+  // board asked for rows 60-79 of a list that usually has fewer than 20, so the
+  // archive looked empty even when it wasn't.
+  useEffect(() => { setPage(0) }, [search, filterArea, filterSdr, filterStatus, filterTemp, pageSize, showArchived])
 
   const closedIds = prospects.filter(p => p.outreach_status === 'closed').map(p => p.id).sort().join(',')
   useEffect(() => {
@@ -755,21 +766,43 @@ export function ProspectsTable() {
           open={drawerOpen}
           onClose={() => { setDrawerOpen(false); setDrawerProspect(null) }}
           onUpdated={updated => {
-            setProspects(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p))
+            // Archiving moves a lead BETWEEN the two views rather than editing
+            // it in place, so a straight map left the row sitting in a list it
+            // no longer belongs to: archive a lead and it stayed on the board
+            // until something else forced a refetch.
+            const belongsHere = showArchived ? !!updated.archived_at : !updated.archived_at
+
+            setProspects(prev => belongsHere
+              ? prev.map(p => p.id === updated.id ? { ...p, ...updated } : p)
+              : prev.filter(p => p.id !== updated.id))
+            if (!belongsHere) setTotal(prev => Math.max(0, prev - 1))
             setDrawerProspect(updated)
-            // This is an optimistic local patch, not a refetch — mirror it
-            // into the cache too, or leaving this page and coming back
-            // inside the freshness window would briefly show the
-            // pre-edit row again.
+
+            // This is an optimistic local patch, not a refetch — mirror it into
+            // the cache too, or leaving this page and coming back inside the
+            // freshness window would briefly show the pre-edit row again.
+            //
+            // When the lead changed views, every OTHER cached prospects/kanban
+            // entry is now wrong as well (it either still holds the row or is
+            // still missing it), and there is no way to know which keys exist
+            // from here — so drop them all first and re-seed only this one.
+            if (!belongsHere) {
+              invalidateCachePrefix('prospects|')
+              invalidateCachePrefix('kanban|')
+            }
             const cacheKey = [
               'prospects', isImpersonating ? impersonateOrgId : user?.organization_id,
               page, pageSize, search, filterArea, filterSdr, filterStatus, filterTemp,
+              showArchived ? 'archived' : 'active',
             ].join('|')
             const cached = getCachedEntry<{ prospects: Prospect[]; total: number }>(cacheKey)
             if (cached) {
+              const rows = belongsHere
+                ? cached.data.prospects.map(p => p.id === updated.id ? { ...p, ...updated } : p)
+                : cached.data.prospects.filter(p => p.id !== updated.id)
               setCached(cacheKey, {
-                ...cached.data,
-                prospects: cached.data.prospects.map(p => p.id === updated.id ? { ...p, ...updated } : p),
+                prospects: rows,
+                total: belongsHere ? cached.data.total : Math.max(0, cached.data.total - 1),
               })
             }
           }}
