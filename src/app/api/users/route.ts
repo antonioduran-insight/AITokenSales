@@ -3,7 +3,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { sendEmail } from '@/lib/email/send'
+import { sendEmail, type SendFailureReason } from '@/lib/email/send'
 import { inviteEmail, resetPasswordEmail } from '@/lib/email/templates'
 
 // Shared by DELETE (removing a user) and PATCH's 'edit' action (changing a
@@ -315,17 +315,27 @@ export async function POST(req: NextRequest) {
   // account over a transient mail error would be the worse outcome, so the
   // failure is reported alongside the success instead.
   let inviteEmailError: string | null = null
+  // Coarse cause, for the UI. The message above stays raw and server-side: it
+  // can name a missing environment variable, which belongs in a log, not in a
+  // toast a customer's admin reads.
+  let inviteEmailReason: SendFailureReason | null = null
   if (invite) {
     const link = (authData as { properties?: { action_link?: string } }).properties?.action_link
     if (!link) {
       inviteEmailError = 'The invitation link could not be generated.'
+      // Supabase, not the mail path — the deployment is what's wrong either
+      // way, and it is certainly not the recipient's address.
+      inviteEmailReason = 'not_configured'
     } else {
       const mail = inviteEmail(locale, link, { inviter: inviterName, org: orgName })
       const sent = await sendEmail({ to: email, ...mail })
-      if (!sent.ok) inviteEmailError = sent.error
+      if (!sent.ok) {
+        inviteEmailError = sent.error
+        inviteEmailReason = sent.reason
+      }
     }
     if (inviteEmailError) {
-      console.error(`[users] invite email to ${email} failed: ${inviteEmailError}`)
+      console.error(`[users] invite email to ${email} failed (${inviteEmailReason}): ${inviteEmailError}`)
     }
   }
 
@@ -334,6 +344,7 @@ export async function POST(req: NextRequest) {
     invited: invite,
     // Present only when the account was created but the email didn't go out.
     invite_email_error: inviteEmailError,
+    invite_email_reason: inviteEmailReason,
   })
 }
 

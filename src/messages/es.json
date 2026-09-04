@@ -391,7 +391,9 @@
     "resetSent": "Se envió un email de restablecimiento a {email}.",
     "resetFailed": "No se pudo enviar el email.",
     "resetPasswordHint": "Le envía un link para que elija una nueva contraseña. Vos nunca la ves.",
-    "inviteEmailFailed": "La cuenta de {email} se creó, pero no se pudo enviar el email de invitación. Usá “Restablecer” en su fila para reintentar."
+    "inviteEmailFailed": "La cuenta de {email} se creó, pero no se pudo enviar el email de invitación. Usá “Restablecer” en su fila para reintentar.",
+    "inviteEmailFailedConfig": "La cuenta de {email} se creó, pero este deployment todavía no puede enviar emails — es un problema de configuración del servidor, no de la dirección. Cuando esté resuelto, usá “Restablecer” en su fila para mandarle la invitación.",
+    "inviteEmailFailedAddress": "La cuenta de {email} se creó, pero el proveedor de email rechazó esa dirección. Revisá si tiene un error de tipeo, corregila y usá “Restablecer” en su fila."
   },
   "common": {
     "loading": "Cargando...",

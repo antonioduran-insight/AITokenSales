@@ -239,7 +239,16 @@ export function UsersManagement() {
       // success, and the person is sitting there waiting for a message that
       // will never arrive. "Reset password" on their row sends it again.
       if (json.invite_email_error) {
-        setResetToast(t('inviteEmailFailed', { email: formEmail }))
+        // Three different problems with three different owners. Saying only
+        // "couldn't send" made a missing server-side API key look identical to
+        // a mistyped address, and the only way to tell them apart was reading
+        // the deployment's logs — which the person seeing this toast usually
+        // cannot do.
+        const key =
+          json.invite_email_reason === 'not_configured' ? 'inviteEmailFailedConfig'
+          : json.invite_email_reason === 'invalid_recipient' ? 'inviteEmailFailedAddress'
+          : 'inviteEmailFailed'
+        setResetToast(t(key, { email: formEmail }))
       }
     } finally { setCreating(false) }
   }

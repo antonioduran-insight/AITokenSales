@@ -38,9 +38,69 @@ import { Resend } from 'resend'
  */
 const FROM = process.env.EMAIL_FROM || 'Insight Software <noreply@send.insight-software.com>'
 
+/**
+ * Why a send failed, at the level a UI can act on.
+ *
+ * The raw message is still returned for the logs, but a caller showing
+ * something to a person needs to know WHOSE problem it is: "email isn't set up
+ * on this deployment" is for whoever owns the deployment, "that address was
+ * rejected" is for the admin who just typed it, and they are not the same
+ * sentence. Both used to render as one generic "couldn't send", which is what
+ * sent us digging through Vercel logs to discover a missing API key.
+ */
+export type SendFailureReason =
+  /** The deployment can't send at all: no API key, a rejected key, or a
+   *  `from` domain that isn't verified in Resend. Nothing the admin using the
+   *  CRM can fix. */
+  | 'not_configured'
+  /** The destination address itself was refused. Usually a typo. */
+  | 'invalid_recipient'
+  /** Something else. Deliberately NOT guessed at — see `classifyFailure`. */
+  | 'unknown'
+
 export type SendResult =
   | { ok: true; id: string | null }
-  | { ok: false; error: string }
+  | { ok: false; error: string; reason: SendFailureReason }
+
+/**
+ * Bucket a Resend error into something a UI can say out loud.
+ *
+ * This reads Resend's error `name` and message, which is a heuristic over
+ * somebody else's API surface — so anything not clearly recognised falls to
+ * `unknown` rather than being forced into a bucket. A wrong cause confidently
+ * stated is worse than "look at the logs": it sends someone to fix the thing
+ * that wasn't broken.
+ *
+ * Note what is NOT here: a bounce. Resend accepts a message and bounces it
+ * later, asynchronously, so a bounced address always looks like success from
+ * inside this function. Delivery failures are visible only in Resend's own
+ * dashboard.
+ */
+function classifyFailure(err: { name?: string; message?: string } | null): SendFailureReason {
+  const name = (err?.name ?? '').toLowerCase()
+  const message = (err?.message ?? '').toLowerCase()
+
+  // Key problems and domain problems are both "this deployment can't send".
+  if (
+    name.includes('api_key') ||
+    name.includes('access') ||
+    name.includes('restricted') ||
+    message.includes('api key') ||
+    message.includes('not verified') ||
+    message.includes('verify a domain') ||
+    message.includes('domain is not')
+  ) {
+    return 'not_configured'
+  }
+
+  // A validation error that names the destination is the admin's typo; one
+  // that names the sender is configuration, and is caught above.
+  if (name.includes('validation') && (message.includes('`to`') || message.includes(' to '))) {
+    return 'invalid_recipient'
+  }
+
+  return 'unknown'
+}
 
 /**
  * Never throws. Every caller is in the middle of something the user asked for
@@ -62,7 +122,11 @@ export async function sendEmail(opts: {
   if (!apiKey) {
     // Named precisely, because the symptom ("no email arrived") is identical
     // to a dozen other causes and this one is fixed in thirty seconds.
-    return { ok: false, error: 'RESEND_API_KEY is not configured on this deployment.' }
+    return {
+      ok: false,
+      error: 'RESEND_API_KEY is not configured on this deployment.',
+      reason: 'not_configured',
+    }
   }
 
   try {
@@ -75,9 +139,15 @@ export async function sendEmail(opts: {
       text: opts.text,
     })
 
-    if (error) return { ok: false, error: error.message }
+    if (error) return { ok: false, error: error.message, reason: classifyFailure(error) }
     return { ok: true, id: data?.id ?? null }
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : 'Unknown email error' }
+    // A thrown exception is the network or the SDK, never a verdict about the
+    // recipient — 'unknown' is the honest bucket.
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : 'Unknown email error',
+      reason: 'unknown',
+    }
   }
 }

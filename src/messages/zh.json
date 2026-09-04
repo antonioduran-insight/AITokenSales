@@ -391,7 +391,9 @@
     "resetSent": "已寄送重設密碼郵件至 {email}。",
     "resetFailed": "重設郵件寄送失敗。",
     "resetPasswordHint": "寄送連結讓對方自行設定新密碼，你不會看到密碼內容。",
-    "inviteEmailFailed": "已建立 {email} 的帳號，但邀請郵件寄送失敗。請在該列點選「重設密碼」重新寄送。"
+    "inviteEmailFailed": "已建立 {email} 的帳號，但邀請郵件寄送失敗。請在該列點選「重設密碼」重新寄送。",
+    "inviteEmailFailedConfig": "已建立 {email} 的帳號，但這個部署目前無法寄送郵件——這是伺服器設定的問題，不是這個信箱有誤。修好之後，請在該列點選「重設密碼」寄出邀請。",
+    "inviteEmailFailedAddress": "已建立 {email} 的帳號，但郵件服務商拒絕了這個地址。請確認有沒有拼錯，更正後在該列點選「重設密碼」。"
   },
   "common": {
     "loading": "載入中...",

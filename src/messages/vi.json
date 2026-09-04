@@ -391,7 +391,9 @@
     "resetSent": "Đã gửi email đặt lại mật khẩu tới {email}.",
     "resetFailed": "Không gửi được email đặt lại.",
     "resetPasswordHint": "Gửi liên kết để họ tự chọn mật khẩu mới. Bạn không bao giờ thấy mật khẩu.",
-    "inviteEmailFailed": "Đã tạo tài khoản cho {email}, nhưng không gửi được email mời. Dùng “Đặt lại mật khẩu” ở dòng của họ để thử lại."
+    "inviteEmailFailed": "Đã tạo tài khoản cho {email}, nhưng không gửi được email mời. Dùng “Đặt lại mật khẩu” ở dòng của họ để thử lại.",
+    "inviteEmailFailedConfig": "Đã tạo tài khoản cho {email}, nhưng bản triển khai này chưa gửi được email — đây là vấn đề cấu hình máy chủ, không phải do địa chỉ. Khi đã khắc phục, dùng “Đặt lại mật khẩu” ở dòng của họ để gửi lời mời.",
+    "inviteEmailFailedAddress": "Đã tạo tài khoản cho {email}, nhưng nhà cung cấp email đã từ chối địa chỉ đó. Kiểm tra xem có gõ nhầm không, sửa lại rồi dùng “Đặt lại mật khẩu” ở dòng của họ."
   },
   "common": {
     "loading": "Đang tải...",

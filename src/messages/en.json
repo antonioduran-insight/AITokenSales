@@ -391,7 +391,9 @@
     "resetSent": "A password reset email was sent to {email}.",
     "resetFailed": "The reset email could not be sent.",
     "resetPasswordHint": "Emails them a link to choose a new password. You never see it.",
-    "inviteEmailFailed": "The account for {email} was created, but the invitation email could not be sent. Use “Reset password” on their row to try again."
+    "inviteEmailFailed": "The account for {email} was created, but the invitation email could not be sent. Use “Reset password” on their row to try again.",
+    "inviteEmailFailedConfig": "The account for {email} was created, but this deployment cannot send email yet — that is a server setup issue, not a problem with the address. Once it is fixed, use \"Reset password\" on their row to send the invitation.",
+    "inviteEmailFailedAddress": "The account for {email} was created, but that address was refused by the mail provider. Check it for a typo, correct it, and use \"Reset password\" on their row."
   },
   "common": {
     "loading": "Loading...",
