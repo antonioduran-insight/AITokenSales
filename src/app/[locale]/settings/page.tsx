@@ -5,8 +5,9 @@ import { createClient } from '@/lib/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import { useUser } from '@/contexts/UserContext'
-import { Plus, Trash2, Pencil } from 'lucide-react'
+import { Plus, Trash2, Pencil, Copy } from 'lucide-react'
 import { OrgMarketsSettings } from '@/components/markets/OrgMarketsSettings'
+import CustomComboModal from '@/components/scraper/CustomComboModal'
 import type { Organization, OrganizationAddon, ScraperComboMaster, User, SenderProfile, Workspace } from '@/lib/types'
 
 const PLAN_COLORS: Record<string, string> = {
@@ -42,6 +43,7 @@ const S: Record<string, React.CSSProperties> = {
   btn:     { backgroundColor: 'var(--crm-accent)', color: '#fff', border: 'none', borderRadius: 7, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   btnGhost:{ backgroundColor: 'transparent', color: 'var(--crm-text-secondary)', border: '1px solid var(--crm-border)', borderRadius: 7, padding: '8px 16px', fontSize: 13, cursor: 'pointer' },
   sectionTitle: { fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: 16 },
+  iconBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 6, backgroundColor: 'transparent', border: '1px solid var(--crm-border)', color: 'var(--crm-text-secondary)', cursor: 'pointer', padding: 0, flexShrink: 0 },
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -575,6 +577,10 @@ function ScraperTab() {
   const [combos, setCombos] = useState<ScraperComboMaster[]>([])
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState<Record<string, boolean>>({})
+  // null = closed. `seed` is the row being edited, or the global combo being
+  // copied; `duplicating` is what tells those two apart at save time.
+  const [comboModal, setComboModal] = useState<{ seed: ScraperComboMaster | null; duplicating: boolean } | null>(null)
+  const [comboError, setComboError] = useState<string | null>(null)
 
   const [sdrs, setSdrs] = useState<User[]>([])
   const [profilesBySdr, setProfilesBySdr] = useState<Record<string, SenderProfile[]>>({})
@@ -730,6 +736,31 @@ function ScraperTab() {
       if (res.ok) setCombos(prev => prev.map(c => c.code === code ? { ...c, org_active: !currentActive } : c))
     } catch { /* ignore */ }
     finally { setToggling(p => ({ ...p, [code]: false })) }
+  }
+
+  // A saved combo is either new (append) or an edit of one already listed
+  // (replace in place, so it doesn't jump to the bottom of the list).
+  function onComboSaved(saved: ScraperComboMaster & { org_active?: boolean }) {
+    setCombos(prev => {
+      const i = prev.findIndex(c => c.code === saved.code)
+      if (i === -1) return [...prev, { ...saved, org_active: saved.org_active ?? true }]
+      const next = [...prev]
+      next[i] = { ...next[i], ...saved }
+      return next
+    })
+    setComboModal(null)
+  }
+
+  async function deleteCombo(c: ScraperComboMaster) {
+    if (!confirm(t('deleteComboConfirm', { name: c.name }))) return
+    setToggling(p => ({ ...p, [c.code]: true }))
+    setComboError(null)
+    try {
+      const res = await fetch(`/api/scraper-combos?code=${encodeURIComponent(c.code)}`, { method: 'DELETE' })
+      if (res.ok) setCombos(prev => prev.filter(x => x.code !== c.code))
+      else setComboError((await res.json())?.error ?? tc('error'))
+    } catch { setComboError(tc('error')) }
+    finally { setToggling(p => ({ ...p, [c.code]: false })) }
   }
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--crm-text-muted)' }}>{tc('loading')}</div>
@@ -889,10 +920,36 @@ function ScraperTab() {
       )}
 
       <div style={S.card}>
-        <p style={S.sectionTitle}>{t('searchCombos')}</p>
-        <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', marginBottom: 16, marginTop: 0 }}>
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+          gap: 12, flexWrap: 'wrap', rowGap: 8,
+        }}>
+          <p style={S.sectionTitle}>{t('searchCombos')}</p>
+          <button
+            onClick={() => { setComboError(null); setComboModal({ seed: null, duplicating: false }) }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+              backgroundColor: 'var(--crm-accent)', color: '#fff', border: 'none',
+              borderRadius: 7, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            <Plus size={14} /> {t('newCombo')}
+          </button>
+        </div>
+        <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', marginBottom: 8, marginTop: 0 }}>
           {t('searchCombosDesc')} {activeCount > 0 && t('combosActiveCount', { count: activeCount })}
         </p>
+        <p style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginBottom: 16, marginTop: 0 }}>
+          {t('customCombosDesc')}
+        </p>
+        {comboError && (
+          <div style={{
+            fontSize: 12, color: '#F87171', backgroundColor: '#F8717115',
+            border: '1px solid #F8717140', borderRadius: 7, padding: '8px 12px', marginBottom: 14,
+          }}>
+            {comboError}
+          </div>
+        )}
         {combos.length === 0 ? (
           <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: 0 }}>{t('noCombos')}</p>
         ) : (
@@ -913,6 +970,11 @@ function ScraperTab() {
                     {c.org_active && (
                       <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, backgroundColor: '#6C63FF20', color: 'var(--crm-accent)', fontWeight: 700, textTransform: 'uppercase' }}>
                         {t('active')}
+                      </span>
+                    )}
+                    {c.organization_id && (
+                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, backgroundColor: '#22C55E20', color: '#22C55E', fontWeight: 700, textTransform: 'uppercase' }}>
+                        {t('yourCombo')}
                       </span>
                     )}
                   </div>
@@ -938,24 +1000,66 @@ function ScraperTab() {
                     </div>
                   )}
                 </div>
-                <button
-                  onClick={() => toggle(c.code, !!c.org_active)}
-                  disabled={toggling[c.code]}
-                  style={{
-                    flexShrink: 0, padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-                    cursor: toggling[c.code] ? 'default' : 'pointer', border: 'none',
-                    backgroundColor: c.org_active ? '#22C55E20' : 'var(--crm-border)',
-                    color: c.org_active ? '#22C55E' : 'var(--crm-text-muted)',
-                    transition: 'all .15s',
-                  }}
-                >
-                  {c.org_active ? `● ${t('enabled')}` : `○ ${t('disabled')}`}
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  {c.organization_id ? (
+                    <>
+                      <button
+                        onClick={() => { setComboError(null); setComboModal({ seed: c, duplicating: false }) }}
+                        title={tc('edit')}
+                        style={S.iconBtn}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => deleteCombo(c)}
+                        disabled={toggling[c.code]}
+                        title={tc('delete')}
+                        style={{ ...S.iconBtn, color: '#F87171' }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </>
+                  ) : (
+                    // A catalogue combo can't be edited — it is shared with every
+                    // other customer — but it can be copied into this org and then
+                    // changed freely, which is what an admin almost always wants
+                    // when ours is close but not quite right.
+                    <button
+                      onClick={() => { setComboError(null); setComboModal({ seed: c, duplicating: true }) }}
+                      title={t('catalogueComboNote')}
+                      style={S.iconBtn}
+                    >
+                      <Copy size={14} />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => toggle(c.code, !!c.org_active)}
+                    disabled={toggling[c.code]}
+                    style={{
+                      padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                      cursor: toggling[c.code] ? 'default' : 'pointer', border: 'none',
+                      backgroundColor: c.org_active ? '#22C55E20' : 'var(--crm-border)',
+                      color: c.org_active ? '#22C55E' : 'var(--crm-text-muted)',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    {c.org_active ? `● ${t('enabled')}` : `○ ${t('disabled')}`}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {comboModal && (
+        <CustomComboModal
+          seed={comboModal.seed}
+          duplicating={comboModal.duplicating}
+          onClose={() => setComboModal(null)}
+          onSaved={onComboSaved}
+        />
+      )}
     </div>
   )
 }

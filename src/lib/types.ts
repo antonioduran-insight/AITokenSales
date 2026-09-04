@@ -10,14 +10,26 @@ export type OutreachStatus =
 export type LeadTemperature = 'Cold' | 'Warm' | 'Hot'
 
 /**
- * The opaque combo code stored in `prospects.search_combo`. The DB CHECK is
- * `search_combo = ANY (ARRAY['combo_A','combo_B','combo_C','combo_D','combo_E','combo_F'])`
- * (verified with `pg_get_constraintdef`), so these are the literal codes —
- * never the bare letters, which the DB rejects. Same vocabulary as
- * `scraper_combos_master.code` and `runs.combos`; resolve to a human label
- * with `useComboLabels()` rather than rendering the code.
+ * The opaque combo code stored in `prospects.search_combo` — the same
+ * vocabulary as `scraper_combos_master.code` and `runs.combos`. Always resolve
+ * it to a human label with `useComboLabels()` rather than rendering the code.
+ *
+ * This was a union of `combo_A`..`combo_F`, mirroring a DB CHECK with the same
+ * list. Both were wrong and both are gone:
+ *
+ *  - The catalogue never had a `combo_F`. It seeds A, B, C, D, E and **G**, so
+ *    the CHECK rejected every lead combo_G found, and `assignRunLeads()` —
+ *    which only tolerates duplicate-key errors row by row — aborted the whole
+ *    run's assignment with a 500 rather than skipping one lead.
+ *  - Since `20260904_org_owned_combos.sql` an organization can define its own
+ *    combos, whose codes are minted as `custom_<12 hex>`. No fixed union can
+ *    describe those.
+ *
+ * So the type is a bare string on purpose: the set of valid codes lives in the
+ * database, per organization, not in this file. Use `normalizeSearchCombo()`
+ * for anything arriving from a CSV or a human.
  */
-export type SearchCombo = 'combo_A' | 'combo_B' | 'combo_C' | 'combo_D' | 'combo_E' | 'combo_F'
+export type SearchCombo = string
 
 export type UserRole = 'admin_global' | 'admin' | 'sdr' | 'support'
 
@@ -188,25 +200,98 @@ export const OUTREACH_STATUSES: OutreachStatus[] = [
 ]
 
 export const LEAD_TEMPERATURES: LeadTemperature[] = ['Cold', 'Warm', 'Hot']
-export const SEARCH_COMBOS: SearchCombo[] = ['combo_A', 'combo_B', 'combo_C', 'combo_D', 'combo_E', 'combo_F']
+
+// `SEARCH_COMBOS` used to sit here as a hardcoded list of combo codes. It is
+// gone rather than updated: it had no readers, it listed a `combo_F` that has
+// never existed, and per-org combos make any static list wrong by construction.
+// The live catalogue is `GET /api/scraper-combos` (global rows + the caller's
+// own), surfaced to components through `useComboLabels()` / `useComboMeta()`.
 
 /**
- * Tolerant parser for a `search_combo` coming from a CSV or a human: accepts
- * `combo_D`, `combo_d`, `Combo D`, `COMBO-D`, `D` and `d`, all normalising to
- * `combo_D`. Anything unrecognised returns `null` (the column is nullable)
- * instead of being passed through to fail the DB CHECK — a single bad value
- * used to take a whole insert batch down with it.
+ * Tolerant parser for a `search_combo` coming from a CSV or a human.
  *
- * Lives here next to the constant, not in the wizard, because the CSV wizard
- * (client) and `PUT /api/import` (server) must agree on it exactly, and a
- * route handler must not import from a `'use client'` component.
+ * Accepts three shapes:
+ *  - a catalogue letter code, however it was typed: `combo_D`, `combo_d`,
+ *    `Combo D`, `COMBO-D`, `D`, `d` — all normalise to `combo_D`. The letter
+ *    range is A-Z, not A-F: the seeded catalogue includes `combo_G`, and the
+ *    old A-F test silently dropped it on every import.
+ *  - a custom combo code (`custom_<hex>`), which is what an organization's own
+ *    combos are minted as. Lower-cased, since the code is stored lower-case.
+ *  - anything else -> `null` (the column is nullable).
+ *
+ * Deliberately still a whitelist and not a passthrough. The DB CHECK that used
+ * to catch junk is gone (see {@link SearchCombo}), so this function is now the
+ * only thing standing between a mis-mapped CSV column and a `search_combo`
+ * holding a person's job title.
+ *
+ * Lives here, not in the wizard, because the CSV wizard (client) and
+ * `PUT /api/import` (server) must agree on it exactly, and a route handler must
+ * not import from a `'use client'` component.
  */
 export function normalizeSearchCombo(value: unknown): SearchCombo | null {
   if (typeof value !== 'string') return null
-  const letter = value.trim().toUpperCase().replace(/^COMBO[\s_-]*/, '')
-  if (!/^[A-F]$/.test(letter)) return null
-  return `combo_${letter}` as SearchCombo
+  const raw = value.trim()
+  if (/^custom_[0-9a-fA-F]{6,32}$/.test(raw)) return raw.toLowerCase()
+  const letter = raw.toUpperCase().replace(/^COMBO[\s_-]*/, '')
+  if (!/^[A-Z]$/.test(letter)) return null
+  return `combo_${letter}`
 }
+
+/**
+ * The seniority labels the Apify actor accepts, verbatim.
+ *
+ * Not a style choice and not extensible: the actor validates this field against
+ * its own enum and rejects the ENTIRE input — failing the whole run — on a
+ * value it doesn't recognise. The backend defends itself
+ * (`_normalize_seniority_levels` maps a few high-confidence aliases and drops
+ * the rest with a log line), but a dropped value is a filter the customer
+ * thought they had set and silently didn't, so the combo editor offers exactly
+ * these and the API rejects anything else.
+ *
+ * Mirrors `ALLOWED_SENIORITY_LEVELS` in `scraper/apify_scraper.py`. If LinkedIn
+ * ever changes the vocabulary, both move together.
+ */
+export const SENIORITY_LEVELS = [
+  'Owner/Partner',
+  'CXO',
+  'Vice President',
+  'Director',
+  'Experienced Manager',
+  'Entry Level Manager',
+  'Strategic',
+  'Senior',
+  'Entry Level',
+  'In Training',
+] as const
+
+/**
+ * The company-size buckets the actor accepts, verbatim — same contract as
+ * {@link SENIORITY_LEVELS}, mirroring `ALLOWED_COMPANY_HEADCOUNTS`.
+ *
+ * The seeded global combos store LinkedIn's letter codes (`'B'`, `'C'`) instead;
+ * the backend maps those through `COMPANY_HEADCOUNT_CODE_MAP`. New combos are
+ * written with these labels directly — there is no reason to make a customer
+ * pick a letter whose meaning is documented in a Python dict.
+ */
+export const COMPANY_HEADCOUNTS = [
+  'Self-employed',
+  '1-10',
+  '11-50',
+  '51-200',
+  '201-500',
+  '501-1000',
+  '1001-5000',
+  '5001-10000',
+  '10001+',
+] as const
+
+/**
+ * Hard cap on a combo's `title_keywords`, enforced when a custom combo is
+ * saved. The incumbent actor rejects an input with more than 20 and HarvestAPI
+ * caps at 50; the backend truncates to whichever applies at run time, so this
+ * is only here to stop someone pasting a thousand titles into the form.
+ */
+export const MAX_COMBO_TITLE_KEYWORDS = 50
 
 /** `prospects.icp_score` has a DB CHECK of `icp_score >= 0 AND icp_score <= 100`. */
 export const ICP_SCORE_MIN = 0
@@ -260,6 +345,10 @@ export interface Organization {
 
 export interface ScraperComboMaster {
   id: string
+  /** NULL for the shared global catalogue; the owning org for a custom combo
+   *  it defined itself. See `20260904_org_owned_combos.sql`. Only present on
+   *  rows read through `GET /api/scraper-combos`. */
+  organization_id?: string | null
   code: string
   name: string
   description: string | null

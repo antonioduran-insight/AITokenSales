@@ -431,7 +431,8 @@
     "selected": "已選 {count} 個",
     "leadsCount": "{count} 個線索",
     "flagTomorrow": "已標記明天跟進",
-    "remove": "移除"
+    "remove": "移除",
+    "saving": "儲存中..."
   },
   "export": {
     "title": "匯出 CSV",
@@ -711,7 +712,27 @@
     "siteDeactivate": "停用",
     "siteActivate": "啟用",
     "siteInactive": "已停用",
-    "siteMembers": "{count, plural, other {# 位成員}}"
+    "siteMembers": "{count, plural, other {# 位成員}}",
+    "customCombosDesc": "目錄組合由 Insight Software 維護。您可以自行新增，針對團隊實際要開發的客戶——這裡填的內容就是抓取工具在 LinkedIn 上實際搜尋的條件。",
+    "newCombo": "新增組合",
+    "editCombo": "編輯組合",
+    "yourCombo": "自訂",
+    "duplicateCombo": "複製",
+    "comboCopySuffix": "{name}（副本）",
+    "catalogueComboNote": "目錄組合——請複製一份後再修改搜尋條件。",
+    "comboName": "名稱",
+    "comboNamePlaceholder": "例如：供應鏈主管",
+    "comboDescription": "說明",
+    "comboDescriptionPlaceholder": "這個策略要找的對象",
+    "comboTitles": "要搜尋的職稱",
+    "comboTitlesHint": "按 Enter 或用逗號新增。系統會照您填寫的字串在 LinkedIn 上搜尋，也會用來計算名單的 ICP 分數——請把客戶實際使用的職稱寫法都加進來，並涵蓋您銷售的每一種語言。",
+    "comboAddTitle": "新增職稱...",
+    "comboSeniority": "職級",
+    "comboHeadcounts": "公司規模",
+    "comboOptionalFilter": "選填。留空表示不篩選。",
+    "comboNameRequired": "請為組合命名。",
+    "comboTitlesRequired": "請至少新增一個職稱——沒有職稱的組合等於沒有搜尋條件。",
+    "deleteComboConfirm": "確定刪除「{name}」？已經找到的名單會保留。"
   },
   "run": {
     "title": "新抓取任務",

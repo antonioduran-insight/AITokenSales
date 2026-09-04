@@ -41,6 +41,20 @@ Multi-tenant CRM platform for managing LinkedIn outreach campaigns across geogra
 
 ## What's New
 
+### Combos an organization owns, and an ICP score that means something
+
+Two halves of the same fix, and they had to ship together.
+
+**Combos.** `scraper_combos_master` was a single global catalogue only Insight Software could write to; a customer could switch rows on and off and nothing else. Onboarding anyone whose buyers weren't already in it meant hand-inserting a row into a table every other customer also reads. Now the table carries an `organization_id`: NULL is the shared catalogue (unchanged, still ours), a real id is a combo that customer wrote themselves in Settings → Scraper, invisible to everyone else. "Duplicate" copies a catalogue combo into the org so it can be edited without touching the shared one. Custom codes are minted server-side as `custom_<12 hex>`.
+
+Both ends re-check ownership, because `org_combos.combo_code` is only an FK to `scraper_combos_master(code)` and therefore proves nothing about who owns the definition — without the check an admin could switch on another customer's private combo and run searches built from their title keywords. See `supabase/migrations/20260904_org_owned_combos.sql` (**run by hand**).
+
+That migration also **drops the CHECK on `prospects.search_combo`**, which was already breaking production: it allowed `combo_A`..`combo_F`, but the catalogue seeds A, B, C, D, E and **G** — there is no combo_F — so every lead found by combo_G violated it on insert, and since `assignRunLeads()` only tolerates duplicate-key errors row by row, one such lead failed an entire run's assignment with a 500.
+
+**ICP score.** The scorer (in the scraper repo) awarded 40 of 100 points as flat constants, matched its keyword lists as substrings — `"ai"` fired on av**ai**lable, `"cto"` on dire**cto**r, while "Chief Technology Officer" scored zero — and encoded exactly one ideal customer: ours. It now scores the lead's title against **the run's own combos**, plus seniority, plus a buying signal built from the org's `company_context`, with phrase-based script-aware matching. A component the org hasn't configured is excluded from the denominator instead of scored as zero.
+
+> **Leads scored before this are not comparable to leads scored after, and are deliberately not backfilled** — `scraper_leads` has no `about` column, so the buying-signal component can't be recomputed for a past lead and a backfill would invent a third scale. SDRs will see new leads score differently from ones they already know.
+
 ### Bridge — partnership discovery (add-on)
 
 A separate product from the lead scraper. Bridge finds **B2B partnership contacts** inside target companies so the admin can explore partnership opportunities manually. It does **not** generate outreach messages — it discovers and organises candidates for human review.
@@ -85,7 +99,7 @@ New Run's auto-assign used to be **entirely client-driven**: it only fired if th
 
 1. **`POST /api/runs/[id]/complete`** — a server-to-server webhook the scraper backend (or a Supabase Database Webhook on `runs`, firing when `status` transitions to `completed`) calls the instant a run finishes. Authenticated by `X-Internal-Api-Key`, the same shared secret already used for every CRM→backend call — no new secret to provision on either side. This is the primary path: no browser involved at all.
 2. **Client-side optimistic assign** — New Run still calls `/api/runs/[id]/assign` on completion if the tab is open, for instant UI feedback. No longer load-bearing for correctness.
-3. **`GET /api/cron/reconcile-runs`**, run daily by Vercel Cron (`vercel.json`), sweeps for completed runs with unexported leads and an unambiguous single-SDR recipient — a backstop for whatever the webhook and the client both miss.
+3. **`GET /api/cron/reconcile-runs`**, run hourly by Vercel Cron (`vercel.json`), sweeps for completed runs with unexported leads and an unambiguous single-SDR recipient — a backstop for whatever the webhook and the client both miss.
 
 All three call the same `assignRunLeads()` (`src/lib/utils/run-assign.ts`) and share its idempotent insert, so they're safe to race regardless of which one gets there first — the unique-key guard makes a duplicate assignment a no-op. Runs with zero or multiple `run_sdr_assignments` rows (e.g. after a manual "Send to another SDR") are skipped and reported by both the webhook and the cron, never guessed at.
 
@@ -350,7 +364,7 @@ CRON_SECRET=your-cron-secret
 
 > `SUPABASE_SERVICE_ROLE_KEY`, `INTERNAL_API_KEY` and `CRON_SECRET` must never reach the browser. They are server-only — never prefix them with `NEXT_PUBLIC_`.
 >
-> `vercel.json` schedules `/api/cron/reconcile-runs` once a day (`0 3 * * *`, ~3am UTC — Vercel doesn't guarantee the exact minute). This schedule is deliberately Hobby-plan-compatible: **Vercel rejects the entire deployment** if any cron in `vercel.json` would run more than once a day on Hobby, so an invalid schedule here silently blocks every deploy, not just the cron. Since `POST /api/runs/[id]/complete` is now the primary assign path, once-a-day is an acceptable backstop even on Hobby (worst case: a webhook failure sits unassigned up to ~24h). If/when the project moves to Pro or higher, this can be tightened (e.g. `*/10 * * * *`) for a faster backstop, or replaced with a GitHub Actions cron hitting the same `CRON_SECRET`-protected route on a tighter schedule without needing a Vercel plan change at all.
+> `vercel.json` schedules `/api/cron/reconcile-runs` **hourly** (`0 * * * *`), which cuts the worst case for a lead both the webhook and the client missed from ~24h to ~1h. **That schedule is borrowed, not owned.** Vercel validates every cron in `vercel.json` at deploy time and **rejects the entire deployment** — not just the cron — if any schedule would fire more than once a day on a Hobby plan, with no error surfaced in `git push`. The project sits on the `Insight Software` team's **Pro trial** (transferred 29/07), which is what makes hourly legal; the team is deliberately not paying yet while it evaluates Vercel against AWS. If that trial lapses without converting, the scope reverts to Hobby and this line becomes a deploy-blocker for **every** future push, including unrelated commits. Whoever notices deploys failing should suspect this first and set the schedule back to `0 3 * * *`. Check the Vercel Deployments tab, not just `git push` exit codes, when changing this file. A GitHub Actions cron hitting the same `CRON_SECRET`-protected route is the plan-independent alternative.
 
 Per-org credentials (**Apify token**, **Anthropic key / base URL / model**) are stored on the `organizations` row, not in env vars — set them in Settings → Scraper or in Global Admin.
 
@@ -500,7 +514,9 @@ npm run lint         # ESLint
 | POST | `/api/runs/[id]/assign` | admin | Assign the run's leads to its SDR (`manual: true` moves them) |
 | POST | `/api/runs/[id]/complete` | `X-Internal-Api-Key` shared secret | Run-completion webhook — primary auto-assign trigger, called by the backend/a DB webhook, not a browser |
 | GET | `/api/runs/quota` | any | Lead quota for the current billing period |
-| GET/POST | `/api/scraper-combos` | admin | Search strategies enabled per org |
+| GET | `/api/scraper-combos` | any | Search strategies available to the caller's org (global catalogue + their own) |
+| POST | `/api/scraper-combos` | admin | Toggle a combo on/off for the org |
+| PUT/PATCH/DELETE | `/api/scraper-combos` | admin | Create / edit / delete a combo the org owns |
 | POST | `/api/scraper/to-crm` | admin | Import scraped leads into `prospects` |
 | GET | `/api/cron/reconcile-runs` | `CRON_SECRET` bearer token | Vercel Cron backstop — assigns completed runs the webhook and client-side flow both missed |
 

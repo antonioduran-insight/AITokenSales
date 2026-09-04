@@ -31,10 +31,12 @@ const PROSPECT_FIELDS = [
   { key: 'company_size', label: 'Company Size', required: false },
   { key: 'icp_score', label: 'ICP Score (0-100)', required: false },
   { key: 'lead_temperature', label: 'Temperature (Cold/Warm/Hot)', required: false },
-  // The stored value is the combo *code* (combo_A … combo_F), which is what the
-  // DB CHECK accepts. A bare letter in the CSV is still understood — see
-  // normalizeSearchCombo — but the label must not advertise "A-F" as the format.
-  { key: 'search_combo', label: 'Search Combo (combo_A – combo_F)', required: false },
+  // The stored value is the combo *code* — a catalogue code (`combo_D`) or an
+  // organization's own (`custom_1a2b3c...`). A bare letter is still understood
+  // (see normalizeSearchCombo), but the label must not advertise "A-F" as the
+  // format: there is no combo_F, there IS a combo_G, and a customer's own
+  // combos aren't letters at all.
+  { key: 'search_combo', label: 'Search Combo (code, e.g. combo_D)', required: false },
   { key: 'scrape_date', label: 'Scrape Date', required: false },
   { key: 'market', label: 'Market / Country', required: false },
   { key: 'custom1', label: 'Custom 1 (msg1)', required: false },

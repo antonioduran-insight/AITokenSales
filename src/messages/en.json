@@ -431,7 +431,8 @@
     "selected": "{count} selected",
     "leadsCount": "{count} leads",
     "flagTomorrow": "Flagged for Tomorrow",
-    "remove": "Remove"
+    "remove": "Remove",
+    "saving": "Saving..."
   },
   "export": {
     "title": "Export CSV",
@@ -711,7 +712,27 @@
     "siteDeactivate": "Deactivate",
     "siteActivate": "Activate",
     "siteInactive": "Inactive",
-    "siteMembers": "{count, plural, =0 {no members} one {# member} other {# members}}"
+    "siteMembers": "{count, plural, =0 {no members} one {# member} other {# members}}",
+    "customCombosDesc": "Catalogue combos are maintained by Insight Software. Add your own for the buyers your team actually sells to — what you type here is what the scraper searches LinkedIn for.",
+    "newCombo": "New combo",
+    "editCombo": "Edit combo",
+    "yourCombo": "Yours",
+    "duplicateCombo": "Duplicate",
+    "comboCopySuffix": "{name} (copy)",
+    "catalogueComboNote": "Catalogue combo — duplicate it to change what it searches for.",
+    "comboName": "Name",
+    "comboNamePlaceholder": "e.g. Heads of Supply Chain",
+    "comboDescription": "Description",
+    "comboDescriptionPlaceholder": "Who this strategy is meant to find",
+    "comboTitles": "Job titles to search",
+    "comboTitlesHint": "Press Enter or use commas to add. These are searched on LinkedIn as written, and are what a lead’s ICP score is measured against — include the variants your buyers actually use, in every language you sell in.",
+    "comboAddTitle": "Add a job title...",
+    "comboSeniority": "Seniority",
+    "comboHeadcounts": "Company size",
+    "comboOptionalFilter": "Optional. Leave empty for no filter.",
+    "comboNameRequired": "Give the combo a name.",
+    "comboTitlesRequired": "Add at least one job title — a combo with none searches for nothing.",
+    "deleteComboConfirm": "Delete \"{name}\"? Leads already found with it are kept."
   },
   "run": {
     "title": "New Run",

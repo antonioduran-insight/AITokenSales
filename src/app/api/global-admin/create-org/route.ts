@@ -144,8 +144,20 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 6. Seed all active combos for this org
-  const { data: masterCombos } = await admin.from('scraper_combos_master').select('code').eq('is_active', true)
+  // 6. Seed the GLOBAL catalogue's active combos for this org.
+  //
+  // `.is('organization_id', null)` is load-bearing since
+  // 20260904_org_owned_combos.sql: `scraper_combos_master` now also holds
+  // combos that belong to a single customer, and this runs with the admin
+  // client, which bypasses the RLS that would otherwise hide them. Without the
+  // filter, every new org would be seeded with every other customer's private
+  // search strategies — visible to them in Settings, and billed for on every
+  // run that used them.
+  const { data: masterCombos } = await admin
+    .from('scraper_combos_master')
+    .select('code')
+    .eq('is_active', true)
+    .is('organization_id', null)
   if (masterCombos && masterCombos.length > 0) {
     await admin.from('org_combos').insert(
       masterCombos.map((c: { code: string }) => ({

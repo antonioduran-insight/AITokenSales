@@ -431,7 +431,8 @@
     "selected": "{count} seleccionados",
     "leadsCount": "{count} leads",
     "flagTomorrow": "Marcado para mañana",
-    "remove": "Quitar"
+    "remove": "Quitar",
+    "saving": "Guardando..."
   },
   "export": {
     "title": "Exportar CSV",
@@ -711,7 +712,27 @@
     "siteDeactivate": "Desactivar",
     "siteActivate": "Activar",
     "siteInactive": "Inactiva",
-    "siteMembers": "{count, plural, =0 {sin miembros} one {# miembro} other {# miembros}}"
+    "siteMembers": "{count, plural, =0 {sin miembros} one {# miembro} other {# miembros}}",
+    "customCombosDesc": "Los combos del catálogo los mantiene Insight Software. Agregá los tuyos para los compradores a los que tu equipo realmente le vende: lo que escribas acá es lo que el scraper busca en LinkedIn.",
+    "newCombo": "Nuevo combo",
+    "editCombo": "Editar combo",
+    "yourCombo": "Propio",
+    "duplicateCombo": "Duplicar",
+    "comboCopySuffix": "{name} (copia)",
+    "catalogueComboNote": "Combo del catálogo: duplicalo para cambiar lo que busca.",
+    "comboName": "Nombre",
+    "comboNamePlaceholder": "Ej.: Jefes de Cadena de Suministro",
+    "comboDescription": "Descripción",
+    "comboDescriptionPlaceholder": "A quién busca esta estrategia",
+    "comboTitles": "Cargos a buscar",
+    "comboTitlesHint": "Enter o comas para agregar. Se buscan en LinkedIn tal cual los escribas, y son contra lo que se mide el puntaje ICP de un lead: incluí las variantes que tus compradores usan de verdad, en cada idioma en el que vendas.",
+    "comboAddTitle": "Agregar un cargo...",
+    "comboSeniority": "Nivel jerárquico",
+    "comboHeadcounts": "Tamaño de empresa",
+    "comboOptionalFilter": "Opcional. Vacío = sin filtro.",
+    "comboNameRequired": "Poné un nombre al combo.",
+    "comboTitlesRequired": "Agregá al menos un cargo: un combo sin cargos no busca nada.",
+    "deleteComboConfirm": "¿Borrar \"{name}\"? Los leads ya encontrados con él se conservan."
   },
   "run": {
     "title": "Nueva Búsqueda",

@@ -431,7 +431,8 @@
     "selected": "Đã chọn {count}",
     "leadsCount": "{count} khách hàng",
     "flagTomorrow": "Đã đánh dấu cho ngày mai",
-    "remove": "Xóa"
+    "remove": "Xóa",
+    "saving": "Đang lưu..."
   },
   "export": {
     "title": "Xuất CSV",
@@ -711,7 +712,27 @@
     "siteDeactivate": "Vô hiệu hóa",
     "siteActivate": "Kích hoạt",
     "siteInactive": "Không hoạt động",
-    "siteMembers": "{count, plural, other {# thành viên}}"
+    "siteMembers": "{count, plural, other {# thành viên}}",
+    "customCombosDesc": "Các tổ hợp trong danh mục do Insight Software quản lý. Hãy thêm tổ hợp của riêng bạn cho đúng nhóm khách hàng mà đội của bạn thực sự bán tới — những gì bạn nhập ở đây chính là thứ công cụ thu thập tìm trên LinkedIn.",
+    "newCombo": "Tổ hợp mới",
+    "editCombo": "Sửa tổ hợp",
+    "yourCombo": "Của bạn",
+    "duplicateCombo": "Nhân bản",
+    "comboCopySuffix": "{name} (bản sao)",
+    "catalogueComboNote": "Tổ hợp danh mục — hãy nhân bản để thay đổi điều kiện tìm kiếm.",
+    "comboName": "Tên",
+    "comboNamePlaceholder": "Ví dụ: Trưởng bộ phận Chuỗi cung ứng",
+    "comboDescription": "Mô tả",
+    "comboDescriptionPlaceholder": "Chiến lược này nhắm tới ai",
+    "comboTitles": "Chức danh cần tìm",
+    "comboTitlesHint": "Nhấn Enter hoặc dùng dấu phẩy để thêm. Chúng được tìm trên LinkedIn đúng như bạn viết, và cũng là cơ sở chấm điểm ICP của một lead — hãy thêm mọi biến thể mà khách hàng của bạn thực sự dùng, ở mọi ngôn ngữ bạn bán.",
+    "comboAddTitle": "Thêm một chức danh...",
+    "comboSeniority": "Cấp bậc",
+    "comboHeadcounts": "Quy mô công ty",
+    "comboOptionalFilter": "Không bắt buộc. Để trống là không lọc.",
+    "comboNameRequired": "Hãy đặt tên cho tổ hợp.",
+    "comboTitlesRequired": "Thêm ít nhất một chức danh — tổ hợp không có chức danh thì không tìm gì cả.",
+    "deleteComboConfirm": "Xóa \"{name}\"? Các lead đã tìm được vẫn được giữ lại."
   },
   "run": {
     "title": "Lượt Thu Thập Mới",
