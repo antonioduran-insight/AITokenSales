@@ -734,7 +734,8 @@
     "comboOptionalFilter": "Không bắt buộc. Để trống là không lọc.",
     "comboNameRequired": "Hãy đặt tên cho tổ hợp.",
     "comboTitlesRequired": "Thêm ít nhất một chức danh — tổ hợp không có chức danh thì không tìm gì cả.",
-    "deleteComboConfirm": "Xóa \"{name}\"? Các lead đã tìm được vẫn được giữ lại."
+    "deleteComboConfirm": "Xóa \"{name}\"? Các lead đã tìm được vẫn được giữ lại.",
+    "pricingTrial": "Dùng thử — không tính phí"
   },
   "run": {
     "title": "Lượt Thu Thập Mới",

@@ -1,6 +1,7 @@
 'use client'
 
 import { useLocale } from 'next-intl'
+import { planHasFullAccess } from '@/lib/types'
 
 interface PremiumFeatureProps {
   children: React.ReactNode
@@ -13,8 +14,8 @@ export function PremiumFeature({ children, plan, requiredPlan, featureName }: Pr
   const locale = useLocale()
 
   const hasAccess =
-    !plan ||                // admin_global / no org
-    plan === 'ultra' ||
+    !plan ||                       // admin_global / no org
+    planHasFullAccess(plan) ||     // ultra (internal) and demo (a trial shows everything)
     plan === 'enterprise' ||
     (requiredPlan === 'premium' && plan === 'premium')
 

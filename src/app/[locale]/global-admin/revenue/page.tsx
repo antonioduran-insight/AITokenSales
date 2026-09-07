@@ -4,19 +4,20 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useLocale } from 'next-intl'
 import type { Organization, Vendor } from '@/lib/types'
-import { PLAN_PRICES } from '@/lib/types'
+import { PLAN_PRICES, isBillablePlan } from '@/lib/types'
 import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 function calcMRR(org: Organization): number {
   if (!org.is_active) return 0
   if (org.plan === 'enterprise') return org.custom_price ?? 0
-  if (org.plan === 'ultra') return 0
+  // Internal (ultra) and unpaid trials (demo) contribute nothing.
+  if (!isBillablePlan(org.plan)) return 0
   return PLAN_PRICES[org.plan] ?? 0
 }
 
 const PLAN_COLORS: Record<string, string> = {
-  basic: '#3B82F6', premium: '#8B5CF6', enterprise: '#F59E0B', ultra: '#EF4444',
+  basic: '#3B82F6', premium: '#8B5CF6', enterprise: '#F59E0B', ultra: '#EF4444', demo: '#14B8A6',
 }
 
 const SETUP_FEE = 1000
@@ -139,7 +140,7 @@ export default function RevenuePage() {
   const chartData = q.months.map(monthIdx => {
     const monthEnd = new Date(q.year, monthIdx + 1, 0, 23, 59, 59)
     const activeThen = orgs.filter(o => {
-      if (!o.is_active || o.plan === 'ultra') return false
+      if (!o.is_active || !isBillablePlan(o.plan)) return false
       return new Date(o.created_at) <= monthEnd
     })
     return { month: MONTH_NAMES[monthIdx], mrr: activeThen.reduce((sum, o) => sum + calcMRR(o), 0) }

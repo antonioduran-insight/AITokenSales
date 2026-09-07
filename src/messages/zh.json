@@ -734,7 +734,8 @@
     "comboOptionalFilter": "選填。留空表示不篩選。",
     "comboNameRequired": "請為組合命名。",
     "comboTitlesRequired": "請至少新增一個職稱——沒有職稱的組合等於沒有搜尋條件。",
-    "deleteComboConfirm": "確定刪除「{name}」？已經找到的名單會保留。"
+    "deleteComboConfirm": "確定刪除「{name}」？已經找到的名單會保留。",
+    "pricingTrial": "試用中 — 不計費"
   },
   "run": {
     "title": "新抓取任務",

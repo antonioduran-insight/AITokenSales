@@ -15,6 +15,7 @@ const PLAN_COLORS: Record<string, string> = {
   premium: '#8B5CF6',
   enterprise: '#F59E0B',
   ultra: '#EF4444',
+  demo: '#14B8A6',
 }
 
 // Whether an add-on has a translated label under `settings.addons.*`.
@@ -442,6 +443,9 @@ function PlanTab() {
               {org.plan === 'enterprise' && org.custom_price
                 ? `$${org.custom_price.toLocaleString()}${t('perMonth')}`
                 : org.plan === 'ultra' ? t('pricingInternal')
+                // Without this branch a trial fell through to the final `else`
+                // and told the prospect they were paying $550 a month.
+                : org.plan === 'demo' ? t('pricingTrial')
                 : org.plan === 'enterprise' ? t('pricingCustom')
                 : org.plan === 'premium' ? `$2,300${t('perMonth')}`
                 : `$550${t('perMonth')}`}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useLocale } from 'next-intl'
-import type { Vendor } from '@/lib/types'
+import type { PlanName, Vendor } from '@/lib/types'
 import { ADDON_LIST, MAX_INT, PLAN_DEFAULTS, isAddonSellable, isAddonIncluded } from '@/lib/types'
 import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
 import { createClient } from '@/lib/supabase/client'
@@ -12,6 +12,9 @@ const PLAN_PREVIEW: Record<string, string> = {
   premium: '$2,300/mo · 7 seats · 3,000 leads/mo',
   enterprise: 'Custom · 15 seats · 10,000 leads/mo',
   ultra: 'Internal · Unlimited',
+  // The numbers below are only where the form starts — set them to whatever
+  // this prospect should get. A demo sees every feature and is never invoiced.
+  demo: 'Trial · not billed · every feature unlocked · set the limits below',
 }
 
 function generateSlug(name: string): string {
@@ -39,7 +42,7 @@ export default function NewOrganizationPage() {
 
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
-  const [plan, setPlan] = useState<'basic' | 'premium' | 'enterprise' | 'ultra'>('basic')
+  const [plan, setPlan] = useState<PlanName>('basic')
   const [logoUrl, setLogoUrl] = useState('')
   const [logoPreview, setLogoPreview] = useState('')
   const [logoUploading, setLogoUploading] = useState(false)
@@ -256,6 +259,7 @@ export default function NewOrganizationPage() {
                 <option value="premium">Premium</option>
                 <option value="enterprise">Enterprise</option>
                 <option value="ultra">Ultra</option>
+                <option value="demo">Demo (trial)</option>
               </select>
               <div style={{ fontSize: 11, color: colors.accent, marginTop: 4, padding: '4px 8px', backgroundColor: `${colors.accent}10`, borderRadius: 4 }}>
                 {PLAN_PREVIEW[plan]}

@@ -41,6 +41,16 @@ Multi-tenant CRM platform for managing LinkedIn outreach campaigns across geogra
 
 ## What's New
 
+### Demo plan
+
+A prospect can now be given a real account with limits chosen for them. The three obvious knobs — leads, SDR seats, add-ons — were already per-organization fields, so what the plan actually changes is everything that was hardcoded to a tier: Stats and the Audit Log required Premium+, sender profiles were blocked on Basic, Multi-workspace could only be sold on Enterprise, and every org fed MRR.
+
+`demo` unlocks every feature and lists in every add-on's `plans`, while staying out of MRR, the quarter breakdown and vendor commission — the same treatment `ultra` already got. Both rules are now single predicates, `planHasFullAccess()` and `isBillablePlan()`, rather than the inline plan lists they replaced: those were repeated across `PremiumFeature` and both revenue views, so adding a plan meant finding all of them and missing one failed silently — a padlock in the middle of a demo, or a free trial counted as revenue.
+
+**No expiry, on purpose.** A trial ends when someone deactivates the organization with the toggle that already exists. `demo_expires_at` plus a cron is the obvious addition the day trials start being forgotten; building it before that is guessing.
+
+Needs `supabase/migrations/20260907_demo_plan.sql` (**run by hand, before deploying**) — it widens the `organizations.plan` CHECK. The constraint is matched by its definition rather than its name, since the table predates this migrations folder, and it is **rebuilt** rather than dropped: `demo` becomes valid, a typo stays invalid.
+
 ### Combos an organization owns, and an ICP score that means something
 
 Two halves of the same fix, and they had to ship together.
@@ -188,12 +198,13 @@ Once that fix landed, the Settings → Pipeline editor (rename/recolor stages) w
 
 ## Plans & Add-ons
 
-| Plan | Seats | Leads/period |
-|---|---|---|
-| Basic | 3 | 1,000 |
-| Premium | 7 | 3,000 |
-| Enterprise | 15+ | 10,000 |
-| Ultra (internal) | Unlimited | Unlimited |
+| Plan | Seats | Leads/period | Notes |
+|---|---|---|---|
+| Basic | 3 | 1,000 | |
+| Premium | 7 | 3,000 | |
+| Enterprise | 15+ | 10,000 | |
+| Ultra (internal) | Unlimited | Unlimited | Insight Software's own; never invoiced |
+| **Demo (trial)** | 3 | 200 | Every feature unlocked, any add-on, never invoiced. The numbers are only where the form starts — set them per prospect. |
 
 Plan limits apply immediately on selection. Seats and leads stored as `int4`; Ultra uses `2147483647` (INT_MAX), displayed as `∞`. The lead allowance renews on the org's `billing_day`, not the calendar month.
 

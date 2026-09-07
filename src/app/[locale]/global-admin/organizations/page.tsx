@@ -21,6 +21,7 @@ const PLAN_COLORS: Record<string, string> = {
   premium: '#8B5CF6',
   enterprise: '#F59E0B',
   ultra: '#EF4444',
+  demo: '#14B8A6',
 }
 
 const MAX_INT = 2147483647
@@ -115,6 +116,7 @@ export default function OrganizationsPage() {
           <option value="premium">Premium</option>
           <option value="enterprise">Enterprise</option>
           <option value="ultra">Ultra</option>
+          <option value="demo">Demo</option>
         </select>
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={selectStyle}>
           <option value="all">{t('allStatus')}</option>

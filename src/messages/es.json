@@ -734,7 +734,8 @@
     "comboOptionalFilter": "Opcional. Vacío = sin filtro.",
     "comboNameRequired": "Poné un nombre al combo.",
     "comboTitlesRequired": "Agregá al menos un cargo: un combo sin cargos no busca nada.",
-    "deleteComboConfirm": "¿Borrar \"{name}\"? Los leads ya encontrados con él se conservan."
+    "deleteComboConfirm": "¿Borrar \"{name}\"? Los leads ya encontrados con él se conservan.",
+    "pricingTrial": "Prueba — sin cargo"
   },
   "run": {
     "title": "Nueva Búsqueda",

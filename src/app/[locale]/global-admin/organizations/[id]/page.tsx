@@ -6,11 +6,11 @@ import { useLocale } from 'next-intl'
 import { ArrowLeft } from 'lucide-react'
 import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
 import { createClient } from '@/lib/supabase/client'
-import type { Organization, OrganizationAddon, Vendor } from '@/lib/types'
+import type { Organization, OrganizationAddon, PlanName, Vendor } from '@/lib/types'
 import { ADDON_LIST, PLAN_DEFAULTS, isAddonSellable, isAddonIncluded } from '@/lib/types'
 
 const PLAN_COLORS: Record<string, string> = {
-  basic: '#3B82F6', premium: '#8B5CF6', enterprise: '#F59E0B', ultra: '#EF4444',
+  basic: '#3B82F6', premium: '#8B5CF6', enterprise: '#F59E0B', ultra: '#EF4444', demo: '#14B8A6',
 }
 
 // Default model for a brand-new / never-configured org. This value is also
@@ -79,7 +79,7 @@ export default function OrgDetailPage() {
 
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
-  const [plan, setPlan] = useState<'basic' | 'premium' | 'enterprise' | 'ultra'>('basic')
+  const [plan, setPlan] = useState<PlanName>('basic')
   const [maxSeats, setMaxSeats] = useState<number>(3)
   const [maxLeads, setMaxLeads] = useState<number>(1000)
   const [vendors, setVendors] = useState<Vendor[]>([])
@@ -499,6 +499,7 @@ export default function OrgDetailPage() {
                 <option value="premium">Premium</option>
                 <option value="enterprise">Enterprise</option>
                 <option value="ultra">Ultra</option>
+                <option value="demo">Demo (trial)</option>
               </select>
             </div>
             <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>

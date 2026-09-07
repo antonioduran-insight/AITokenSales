@@ -734,7 +734,8 @@
     "comboOptionalFilter": "Optional. Leave empty for no filter.",
     "comboNameRequired": "Give the combo a name.",
     "comboTitlesRequired": "Add at least one job title — a combo with none searches for nothing.",
-    "deleteComboConfirm": "Delete \"{name}\"? Leads already found with it are kept."
+    "deleteComboConfirm": "Delete \"{name}\"? Leads already found with it are kept.",
+    "pricingTrial": "Trial — not billed"
   },
   "run": {
     "title": "New Run",

@@ -319,7 +319,11 @@ export interface Organization {
   id: string
   name: string
   slug: string
-  plan: 'basic' | 'premium' | 'enterprise' | 'ultra'
+  /** {@link PlanName}, not a second copy of the same union — this field used to
+   *  spell the plans out inline, so adding one left `Organization.plan` behind
+   *  and every comparison against the new plan became a type error in code that
+   *  was correct. */
+  plan: PlanName
   is_active: boolean
   logo_url: string | null
   max_seats: number
@@ -519,6 +523,9 @@ export const PLAN_PRICES: Record<string, number> = {
   premium: 2300,
   enterprise: 0,
   ultra: 0,
+  // A trial is not sold. Zero here AND excluded from the revenue views, the
+  // same belt-and-braces `ultra` gets — see isBillablePlan.
+  demo: 0,
 }
 
 export const MAX_INT = 2147483647
@@ -535,11 +542,49 @@ export const PLAN_DEFAULTS: Record<string, { max_seats: number; max_leads_per_mo
   premium:    { max_seats: 7,        max_leads_per_month: 3000 },
   enterprise: { max_seats: 15,       max_leads_per_month: 10000 },
   ultra:      { max_seats: MAX_INT,  max_leads_per_month: MAX_INT },
+  // Only a starting point. The whole purpose of `demo` is that Global Admin
+  // then sets these to whatever this particular prospect should get — the
+  // numbers were always per-org editable, so the plan just picks where the
+  // form starts.
+  demo:       { max_seats: 3,        max_leads_per_month: 200 },
 }
 
-export type PlanName = 'basic' | 'premium' | 'enterprise' | 'ultra'
+export type PlanName = 'basic' | 'premium' | 'enterprise' | 'ultra' | 'demo'
 
-const ALL_PLANS: PlanName[] = ['basic', 'premium', 'enterprise', 'ultra']
+const ALL_PLANS: PlanName[] = ['basic', 'premium', 'enterprise', 'ultra', 'demo']
+
+/**
+ * Plans that see every feature regardless of tier.
+ *
+ * `ultra` is Insight Software's own internal plan. `demo` is a prospect being
+ * shown the product, and a demo that hides half of it is not a demo — so the
+ * trial deliberately behaves like the top tier while its NUMBERS (seats, leads)
+ * stay whatever Global Admin set, which is usually small.
+ *
+ * This exists as one exported predicate because tier gating was previously an
+ * inline plan list repeated in each gate. Adding a plan then meant finding all
+ * of them, and missing one fails silently in the worst direction: a prospect
+ * being sold the product hits a padlock in the middle of a demo.
+ *
+ * The sales consequence is worth stating out loud: a demo shows features that
+ * Basic and Premium do not include, so whoever runs it has to say which plan
+ * each one lands on. That was the accepted trade when this was chosen.
+ */
+export function planHasFullAccess(plan: string | null | undefined): boolean {
+  return plan === 'ultra' || plan === 'demo'
+}
+
+/**
+ * Whether this plan's organization counts as revenue.
+ *
+ * `ultra` is internal and `demo` is unpaid; neither belongs in MRR, the quarter
+ * breakdown, or a vendor's commission. Mirrors the `plan === 'ultra'` skips
+ * that already existed in both revenue views, so those two never drift apart
+ * again.
+ */
+export function isBillablePlan(plan: string | null | undefined): boolean {
+  return !!plan && plan !== 'ultra' && plan !== 'demo'
+}
 
 /**
  * The add-on catalogue — what can actually be sold.
@@ -570,7 +615,10 @@ export const ADDON_LIST = [
     type: 'multi_workspace', labelKey: 'addOn_multi_workspace', price: '$300/mo per site',
     // Brief: "僅 Enterprise". Priced per site; the main one comes with the
     // plan, so Revenue Reports charges (active sites − 1).
-    plans: ['enterprise', 'ultra'] as PlanName[],
+    // `demo` is on every add-on list on purpose: a trial has to be able to
+    // show whatever this prospect is being sold, including the Enterprise-only
+    // pieces. It is never invoiced (see isBillablePlan).
+    plans: ['enterprise', 'ultra', 'demo'] as PlanName[],
     includedIn: [] as PlanName[],
   },
   {
@@ -588,12 +636,12 @@ export const ADDON_LIST = [
     // departamento de IT de cada cliente. Eso es trabajo real y por cliente;
     // el código ya está hecho y no se cobra por instalarlo de nuevo.
     type: 'sso', labelKey: 'addOn_sso', price: '$299 one-time',
-    plans: ['premium', 'enterprise', 'ultra'] as PlanName[],
+    plans: ['premium', 'enterprise', 'ultra', 'demo'] as PlanName[],
     includedIn: [] as PlanName[],
   },
   {
     type: 'linkedin_auto_messaging', labelKey: 'addOn_linkedin_auto_messaging', price: 'TBD',
-    plans: ['premium', 'enterprise', 'ultra'] as PlanName[],
+    plans: ['premium', 'enterprise', 'ultra', 'demo'] as PlanName[],
     includedIn: [] as PlanName[],
   },
   {

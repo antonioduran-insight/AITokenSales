@@ -215,7 +215,20 @@ basic:      { max_seats: 3,       max_leads_per_month: 1000 }
 premium:    { max_seats: 7,       max_leads_per_month: 3000 }
 enterprise: { max_seats: 15,      max_leads_per_month: 10000 }
 ultra:      { max_seats: MAX_INT, max_leads_per_month: MAX_INT }
+demo:       { max_seats: 3,       max_leads_per_month: 200 }
 ```
+
+**`demo` is a trial plan, and tier gating goes through two predicates — never an inline plan list.** `planHasFullAccess(plan)` (true for `ultra` and `demo`) decides whether a plan sees every feature; `isBillablePlan(plan)` (false for `ultra` and `demo`) decides whether its org reaches MRR, the quarter breakdown and vendor commission. Both live in `types.ts`.
+
+They exist because the gates used to be inline lists — `plan === 'ultra' || plan === 'enterprise' || ...` in `PremiumFeature`, `plan === 'ultra'` twice in each revenue view — so adding a plan meant finding every one of them, and missing one fails in the worst direction each time: a prospect hits a padlock mid-demo, or an unpaid trial shows up as revenue. Any new gate must call the predicate.
+
+Three consequences worth knowing before touching the plan system:
+
+- **A demo sees features Basic and Premium don't include.** That was chosen deliberately (a demo that hides half the product isn't a demo), and it means whoever runs the demo has to say which plan each feature actually lands on.
+- **Every add-on lists `demo` in its `plans`,** so any of them can be switched on for a trial — including the Enterprise-only ones. None of it is invoiced.
+- **There is no expiry.** A trial ends when someone deactivates the org with the existing toggle. `demo_expires_at` plus a cron is the obvious next step if trials start being forgotten; it was deliberately not built up front.
+
+**The customer-facing price card in Settings needs a branch per plan, and its fallback is `$550`.** A plan without its own branch tells that customer they are paying Basic's price — which is how `demo` would have greeted a prospect with an invoice for a trial. Check that card whenever a plan is added.
 
 **Billing day default** — Always `10` (not 1).
 

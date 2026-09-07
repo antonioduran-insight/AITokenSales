@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useLocale } from 'next-intl'
 import { useGlobalAdminTheme } from '@/contexts/GlobalAdminThemeContext'
-import { PLAN_PRICES, ADDON_MONTHLY_PRICE, ADDON_ONE_TIME_PRICE, type Organization, type Vendor } from '@/lib/types'
+import { PLAN_PRICES, ADDON_MONTHLY_PRICE, ADDON_ONE_TIME_PRICE, isBillablePlan, type Organization, type Vendor } from '@/lib/types'
 import { quarterDef, billingForQuarter, type FiscalQuarter } from '@/lib/utils/quarter'
 import { Download } from 'lucide-react'
 
@@ -52,7 +52,8 @@ function roundShares(shares: number[], total: number): number[] {
 
 function planMonthly(org: Organization): number {
   if (org.plan === 'enterprise') return org.custom_price ?? 0
-  if (org.plan === 'ultra') return 0
+  // Internal (ultra) and unpaid trials (demo) contribute nothing.
+  if (!isBillablePlan(org.plan)) return 0
   return PLAN_PRICES[org.plan] ?? 0
 }
 
@@ -123,7 +124,9 @@ interface ReportRow {
 function buildRows(orgs: OrgWithAddons[], fq: FiscalQuarter, year: number): ReportRow[] {
   const rows: ReportRow[] = []
   for (const org of orgs) {
-    if (org.plan === 'ultra') continue // internal / unlimited — not billed
+    // Internal (ultra) and trials (demo) never reach a report: a demo with
+    // add-ons switched on would otherwise show up as real add-on revenue.
+    if (!isBillablePlan(org.plan)) continue
     const billing = billingForQuarter(new Date(org.created_at), fq, year, org.is_active)
     if (!billing.billsThisQuarter) continue
 
