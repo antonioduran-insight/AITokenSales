@@ -54,3 +54,21 @@ export async function requireAddon(locale: string, addonType: string) {
 
   if (!data) redirect(`/${locale}/kanban`)
 }
+
+/**
+ * API-route gate for `admin_global`. Returns the caller's profile, or null.
+ *
+ * Note the different shape from the two guards above: those are for PAGES and
+ * `redirect()` out of them, which throws. An API route has to answer with a
+ * status code, so this returns null and the caller decides — usually a 401.
+ *
+ * Nine route files each declare their own private copy of this check. They
+ * agree today, and that is luck rather than design: nothing makes them move
+ * together, and a global-admin route that gets the check subtly wrong is a
+ * cross-tenant hole. New routes should import this one; the existing nine are
+ * worth folding in, separately from whatever feature is being shipped.
+ */
+export async function requireGlobalAdmin() {
+  const user = await getCurrentUser()
+  return user?.role === 'admin_global' ? user : null
+}

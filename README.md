@@ -47,6 +47,8 @@ A prospect can now be given a real account with limits chosen for them. The thre
 
 `demo` unlocks every feature and lists in every add-on's `plans`, while staying out of MRR, the quarter breakdown and vendor commission — the same treatment `ultra` already got. Both rules are now single predicates, `planHasFullAccess()` and `isBillablePlan()`, rather than the inline plan lists they replaced: those were repeated across `PremiumFeature` and both revenue views, so adding a plan meant finding all of them and missing one failed silently — a padlock in the middle of a demo, or a free trial counted as revenue.
 
+**Resetting a demo** wipes what the demo generated and keeps what makes it an account: leads, runs, conversations, notes, audit trail, Bridge data and support tickets go; the plan and its limits, users and their logins, areas, sender profiles, add-ons, markets and combos stay. The lead quota comes back with it. It is a button in the organization's danger zone, shown only on `demo` plans, and it runs as one Postgres transaction — see `supabase/migrations/20260907_reset_organization_data.sql` (**run by hand**). It never touches auth accounts: to remove a test SDR, delete them from Users in the CRM.
+
 **No expiry, on purpose.** A trial ends when someone deactivates the organization with the toggle that already exists. `demo_expires_at` plus a cron is the obvious addition the day trials start being forgotten; building it before that is guessing.
 
 Needs `supabase/migrations/20260907_demo_plan.sql` (**run by hand, before deploying**) — it widens the `organizations.plan` CHECK. The constraint is matched by its definition rather than its name, since the table predates this migrations folder, and it is **rebuilt** rather than dropped: `demo` becomes valid, a typo stays invalid.
@@ -545,6 +547,7 @@ Client wrapper: `src/lib/bridge-api.ts` (`seed-lists`, `runs`, `runs/{id}/logs`,
 |---|---|---|---|
 | GET/PATCH | `/api/global-admin/organizations` | admin_global | List + update orgs |
 | GET/PATCH/DELETE | `/api/global-admin/organizations/[id]` | admin_global | Single org |
+| POST | `/api/global-admin/organizations/[id]/reset` | admin_global | Wipe a **demo** org's data, keep its setup |
 | GET/POST/DELETE | `/api/global-admin/organizations/[id]/addons` | admin_global | Add-on toggles |
 | POST | `/api/global-admin/create-org` | admin_global | Provision org + admin user |
 | GET | `/api/global-admin/reports` | admin_global | Orgs + add-ons + vendors for Reports |

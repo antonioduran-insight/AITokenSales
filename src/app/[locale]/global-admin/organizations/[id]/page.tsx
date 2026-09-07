@@ -106,6 +106,10 @@ export default function OrgDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [resetConfirmText, setResetConfirmText] = useState('')
+  const [resetting, setResetting] = useState(false)
+  const [resetResult, setResetResult] = useState<string | null>(null)
 
   const [apifyToken, setApifyToken] = useState('')
   const [anthropicKey, setAnthropicKey] = useState('')
@@ -359,6 +363,26 @@ export default function OrgDetailPage() {
     })
     setDeactivating(false); setConfirmDeactivate(false)
     if (res.ok) setOrg(prev => prev ? { ...prev, is_active: false } : prev)
+  }
+
+  async function handleResetOrg() {
+    setResetting(true)
+    setError(null)
+    const res = await fetch(`/api/global-admin/organizations/${id}/reset`, { method: 'POST' })
+    const data = await res.json().catch(() => ({}))
+    setResetting(false)
+    setShowResetConfirm(false)
+    setResetConfirmText('')
+    if (!res.ok) { setError(data.error ?? 'Reset failed'); return }
+    // Report what actually went, rather than a bare "done". Zeroes are useful
+    // too: they say the account was already clean, which is a different thing
+    // from the reset having silently skipped something.
+    const counts = (data.deleted ?? {}) as Record<string, number>
+    const summary = Object.entries(counts)
+      .filter(([, n]) => n > 0)
+      .map(([k, n]) => `${n} ${k.replace(/_/g, ' ')}`)
+      .join(', ')
+    setResetResult(summary ? `Deleted ${summary}. Settings, users and areas kept.` : 'Nothing to delete — this account was already clean.')
   }
 
   async function handleDeleteOrg() {
@@ -816,6 +840,25 @@ export default function OrgDetailPage() {
                   </div>
                 )
               )}
+              {/* Only for demo accounts. This is irreversible and sits one
+                  click from a customer's entire pipeline, so the plan check —
+                  enforced again in the API route — is what keeps a misclick
+                  survivable. Resetting anything else means calling
+                  reset_organization_data() in the SQL editor, and that friction
+                  is deliberate. */}
+              {org.plan === 'demo' && (
+                <button
+                  onClick={() => { setShowResetConfirm(true); setResetConfirmText(''); setResetResult(null) }}
+                  style={{ backgroundColor: 'transparent', color: '#F59E0B', border: '1px solid #F59E0B', borderRadius: 7, padding: '8px 14px', fontSize: 13, cursor: 'pointer', textAlign: 'left' }}
+                >
+                  Reset demo data — wipe leads, keep the setup
+                </button>
+              )}
+              {resetResult && (
+                <div style={{ fontSize: 12, color: '#22C55E', backgroundColor: '#22C55E15', border: '1px solid #22C55E40', borderRadius: 6, padding: '8px 12px' }}>
+                  {resetResult}
+                </div>
+              )}
               <button
                 onClick={() => { setShowDeleteConfirm(true); setDeleteConfirmText('') }}
                 style={{ backgroundColor: '#EF444420', color: '#EF4444', border: '1px solid #EF4444', borderRadius: 7, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
@@ -828,6 +871,45 @@ export default function OrgDetailPage() {
       </div>
 
       {/* Delete confirm modal */}
+      {showResetConfirm && org && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: '#000000AA', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: 16 }}>
+          <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 24, width: 460, maxWidth: '90vw', boxSizing: 'border-box' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 16, color: colors.textPrimary }}>Reset {org.name}?</h3>
+            <p style={{ fontSize: 13, color: colors.textSecondary, marginTop: 0 }}>
+              Deletes every lead, scraped lead, run, conversation, note, audit entry,
+              Bridge seed list and support ticket, and gives the lead quota back.
+            </p>
+            <p style={{ fontSize: 13, color: colors.textSecondary }}>
+              Keeps the plan and its limits, users and their logins, areas, sender
+              profiles, add-ons, markets and combos — so the account is ready for the
+              next demo without setting it up again.
+            </p>
+            <p style={{ fontSize: 12, color: colors.danger, marginBottom: 14 }}>
+              This cannot be undone. Type <b>{org.name}</b> to confirm.
+            </p>
+            <input
+              value={resetConfirmText}
+              onChange={e => setResetConfirmText(e.target.value)}
+              placeholder={org.name}
+              autoComplete="off"
+              style={{ width: '100%', padding: '8px 12px', backgroundColor: colors.surfaceRaised, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textPrimary, marginBottom: 16, fontSize: 14, boxSizing: 'border-box', outline: 'none' }}
+            />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowResetConfirm(false)} style={{ backgroundColor: 'transparent', color: colors.textSecondary, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '8px 14px', fontSize: 13, cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button
+                disabled={resetConfirmText !== org.name || resetting}
+                onClick={handleResetOrg}
+                style={{ backgroundColor: resetConfirmText === org.name ? '#F59E0B' : '#F59E0B40', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: resetConfirmText === org.name ? 'pointer' : 'not-allowed', opacity: resetting ? 0.7 : 1 }}
+              >
+                {resetting ? 'Resetting...' : 'Reset data'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showDeleteConfirm && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ backgroundColor: colors.surface, border: '1px solid #EF4444', borderRadius: 12, padding: 32, maxWidth: 400, width: '90%' }}>

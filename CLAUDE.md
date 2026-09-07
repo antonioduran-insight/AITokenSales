@@ -228,6 +228,16 @@ Three consequences worth knowing before touching the plan system:
 - **Every add-on lists `demo` in its `plans`,** so any of them can be switched on for a trial — including the Enterprise-only ones. None of it is invoiced.
 - **There is no expiry.** A trial ends when someone deactivates the org with the existing toggle. `demo_expires_at` plus a cron is the obvious next step if trials start being forgotten; it was deliberately not built up front.
 
+**Resetting a demo wipes DATA and keeps SETUP** — `reset_organization_data(uuid)` (`supabase/migrations/20260907_reset_organization_data.sql`, **run by hand**), behind `POST /api/global-admin/organizations/[id]/reset` and a button in the org's danger zone. Deletes leads, scraper leads, runs, conversations, notes, audit trail, CSV sessions, all Bridge data, support tickets and `monthly_lead_counts`; keeps the org row, users, areas, sender profiles, add-ons, markets, combos, pipeline stages and workspaces. Deleting `scraper_leads` is what gives the lead quota back — `getLeadQuota()` derives it from that table, not from `prospects`.
+
+Three constraints on it, all deliberate:
+
+- **`demo` plans only**, enforced in the route. It is irreversible and one click from a customer's whole pipeline; the plan check is what makes a misclick survivable. Resetting anything else means calling the function in the SQL editor, and that friction is the design.
+- **It never touches `auth.users`.** Keeping the people is what keeps the whole thing inside one transaction — auth accounts live outside it and cannot roll back with it, which is exactly how `testorg` ended up half-destroyed in August. Removing a test SDR is a job for Users in the CRM, which handles auth through its own API.
+- **Order follows the FK graph in `20260805_delete_organization_fn.sql`.** The NO ACTION edges pointing at `prospects` (`audit_log`, `conversations`, `notes`) must be cleared first, and each is deleted twice — by `organization_id` and by `prospect_id` — because a row with a null or stale org column still blocks the lead it references.
+
+**`requireGlobalAdmin()` in `route-guard.ts` is the shared API-route gate.** Nine older route files each declare a private `verifyGlobalAdmin` copy; they agree by luck, not design. New global-admin routes import the shared one — a route that gets this check subtly wrong is a cross-tenant hole.
+
 **The customer-facing price card in Settings needs a branch per plan, and its fallback is `$550`.** A plan without its own branch tells that customer they are paying Basic's price — which is how `demo` would have greeted a prospect with an invoice for a trial. Check that card whenever a plan is added.
 
 **Billing day default** — Always `10` (not 1).
