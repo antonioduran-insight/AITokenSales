@@ -266,6 +266,43 @@ export default function NewOrganizationPage() {
               </div>
             </div>
 
+            {/* Seats and leads were computed from PLAN_DEFAULTS and submitted
+                with no way to see or change them: creating an organization with
+                anything other than its plan's stock numbers meant creating it
+                first and then opening it to edit, which is where the only two
+                inputs lived. `handlePlanChange` still refills both whenever the
+                plan changes, so the defaults keep working — they are just a
+                starting point now instead of the only option. This is what a
+                demo needs most: the plan is fixed, the limits are the part you
+                choose per prospect. */}
+            <div className="crm-grid-1-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Max Seats</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={maxSeats}
+                  onChange={e => setMaxSeats(Number(e.target.value))}
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Max Leads / Month</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={maxLeads}
+                  onChange={e => setMaxLeads(Number(e.target.value))}
+                  style={inputStyle}
+                />
+              </div>
+              <div style={{ gridColumn: 'span 2', fontSize: 11, color: colors.textMuted }}>
+                {plan === 'ultra'
+                  ? 'Ultra is unlimited — both are stored as INT_MAX and shown as ∞.'
+                  : 'Prefilled from the plan. Change them to whatever this organization should get.'}
+              </div>
+            </div>
+
             {plan === 'enterprise' && (
               <div>
                 <label style={labelStyle}>{t('customPrice')} (USD/mo)</label>
