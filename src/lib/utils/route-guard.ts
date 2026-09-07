@@ -62,11 +62,16 @@ export async function requireAddon(locale: string, addonType: string) {
  * `redirect()` out of them, which throws. An API route has to answer with a
  * status code, so this returns null and the caller decides — usually a 401.
  *
- * Nine route files each declare their own private copy of this check. They
- * agree today, and that is luck rather than design: nothing makes them move
- * together, and a global-admin route that gets the check subtly wrong is a
- * cross-tenant hole. New routes should import this one; the existing nine are
- * worth folding in, separately from whatever feature is being shipped.
+ * Every `admin_global` route imports this one. Ten of them used to declare a
+ * private copy each, and the copies had already drifted: seven differed only in
+ * formatting, but two returned a different SHAPE because they needed the
+ * actor's `full_name` for the audit trail, and a tenth returned just an id.
+ * Nothing made them move together, and a global-admin route that gets this
+ * check subtly wrong is a cross-tenant hole — so there is one.
+ *
+ * It returns the `public.users` PROFILE, not the auth user: same `id` (the
+ * schema requires `users.id = auth.uid()`), plus `full_name`, `email` and
+ * `role`, which is a superset of what any caller needed.
  */
 export async function requireGlobalAdmin() {
   const user = await getCurrentUser()

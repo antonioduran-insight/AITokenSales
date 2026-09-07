@@ -1,35 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
-
-async function verifyGlobalAdmin() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll() {},
-      },
-    }
-  )
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  return profile?.role === 'admin_global' ? user : null
-}
+import { requireGlobalAdmin } from '@/lib/utils/route-guard'
 
 // GET — list Support staff accounts
 export async function GET() {
-  const user = await verifyGlobalAdmin()
+  const user = await requireGlobalAdmin()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient(
@@ -51,7 +26,7 @@ export async function GET() {
 // (organization_id: null), same as admin_global — Support isn't tied to
 // any client.
 export async function POST(req: NextRequest) {
-  const user = await verifyGlobalAdmin()
+  const user = await requireGlobalAdmin()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { full_name, email, password } = await req.json()
@@ -93,7 +68,7 @@ export async function POST(req: NextRequest) {
 
 // PATCH — activate/deactivate a Support staff account
 export async function PATCH(req: NextRequest) {
-  const user = await verifyGlobalAdmin()
+  const user = await requireGlobalAdmin()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id, is_active } = await req.json()

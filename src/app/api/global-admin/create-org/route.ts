@@ -1,33 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
 import { normalizeAnthropicBaseUrl } from '@/lib/utils/anthropic'
 import { isAddonSellable, isAddonIncluded } from '@/lib/types'
-
-async function verifyGlobalAdmin() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll() {},
-      },
-    }
-  )
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  return profile?.role === 'admin_global' ? user : null
-}
+import { requireGlobalAdmin } from '@/lib/utils/route-guard'
 
 const MARKET_MAP: Record<string, { continent: string; country: string | null; language: string }> = {
   Taiwan: { continent: 'Asia', country: 'Taiwan', language: 'zh' },
@@ -38,7 +13,7 @@ const MARKET_MAP: Record<string, { continent: string; country: string | null; la
 }
 
 export async function POST(req: NextRequest) {
-  const user = await verifyGlobalAdmin()
+  const user = await requireGlobalAdmin()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()

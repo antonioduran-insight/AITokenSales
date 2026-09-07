@@ -1,34 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
-
-async function verifyGlobalAdmin() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll() {},
-      },
-    }
-  )
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role, full_name')
-    .eq('id', user.id)
-    .single()
-
-  return profile?.role === 'admin_global' ? { user, profile } : null
-}
+import { requireGlobalAdmin } from '@/lib/utils/route-guard'
 
 export async function POST(req: NextRequest) {
-  const auth = await verifyGlobalAdmin()
+  const auth = await requireGlobalAdmin()
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { org_id, org_name } = await req.json()
@@ -42,8 +17,11 @@ export async function POST(req: NextRequest) {
 
   try {
     await admin.from('audit_log').insert({
-      actor_id: auth.user.id,
-      actor_name: auth.profile.full_name ?? auth.user.email ?? 'global-admin',
+      actor_id: auth.id,
+      // Name snapshotted rather than joined, so the audit row still reads
+      // correctly after the staff account is gone. Email as the fallback,
+      // 'global-admin' as the last resort.
+      actor_name: auth.full_name ?? auth.email ?? 'global-admin',
       event_type: 'prospect_created',
       prospect_id: null,
       prospect_name: null,

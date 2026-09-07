@@ -1,37 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
 import { isAddonSellable, isAddonIncluded } from '@/lib/types'
-
-async function verifyGlobalAdmin() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll() {},
-      },
-    }
-  )
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role, full_name')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin_global') return null
-
-  // `full_name` comes along for the audit trail: addon_audit_log snapshots the
-  // actor's name rather than joining on an id, so the record survives the
-  // staff account being deleted later.
-  return { ...user, full_name: profile.full_name as string | null }
-}
+import { requireGlobalAdmin } from '@/lib/utils/route-guard'
 
 /**
  * Record an add-on activation/deactivation in the internal trail.
@@ -74,7 +44,7 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await verifyGlobalAdmin()
+  const user = await requireGlobalAdmin()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
@@ -96,7 +66,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await verifyGlobalAdmin()
+  const user = await requireGlobalAdmin()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
@@ -186,7 +156,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await verifyGlobalAdmin()
+  const user = await requireGlobalAdmin()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params

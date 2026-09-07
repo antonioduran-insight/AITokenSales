@@ -236,7 +236,11 @@ Three constraints on it, all deliberate:
 - **It never touches `auth.users`.** Keeping the people is what keeps the whole thing inside one transaction — auth accounts live outside it and cannot roll back with it, which is exactly how `testorg` ended up half-destroyed in August. Removing a test SDR is a job for Users in the CRM, which handles auth through its own API.
 - **Order follows the FK graph in `20260805_delete_organization_fn.sql`.** The NO ACTION edges pointing at `prospects` (`audit_log`, `conversations`, `notes`) must be cleared first, and each is deleted twice — by `organization_id` and by `prospect_id` — because a row with a null or stale org column still blocks the lead it references.
 
-**`requireGlobalAdmin()` in `route-guard.ts` is the shared API-route gate.** Nine older route files each declare a private `verifyGlobalAdmin` copy; they agree by luck, not design. New global-admin routes import the shared one — a route that gets this check subtly wrong is a cross-tenant hole.
+**`requireGlobalAdmin()` in `route-guard.ts` is the ONLY `admin_global` gate — every global-admin route imports it.** Ten route files used to declare a private `verifyGlobalAdmin` each, and they had already drifted: seven differed only in formatting, two returned a different *shape* because they needed the actor's `full_name` for `audit_log`/`addon_audit_log`, and one returned a bare id. Nothing made them move together, and a route that gets this check subtly wrong is a cross-tenant hole.
+
+It returns the `public.users` **profile**, not the auth user — same `id` (the schema requires `users.id = auth.uid()`), plus `full_name`, `email` and `role`, a superset of what any caller used. Note the shape when writing a new route: it is `user.full_name`, not `user.profile.full_name`.
+
+Note also that the old copies passed a no-op `setAll` for cookies, so a session token Supabase refreshed mid-request was discarded; the shared client persists it.
 
 **The customer-facing price card in Settings needs a branch per plan, and its fallback is `$550`.** A plan without its own branch tells that customer they are paying Basic's price — which is how `demo` would have greeted a prospect with an invoice for a trial. Check that card whenever a plan is added.
 
